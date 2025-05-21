@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,9 +60,18 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: defaultValues || {
-      invoiceDate: new Date(),
-      dueDate: new Date(new Date().setDate(new Date().getDate() + 30)), // Default due date 30 days from now
-      items: [{ description: "", quantity: 1, price: 0 }],
+      // Initialize with null for dates to prevent hydration mismatch when creating new
+      // These will be set client-side in useEffect
+      invoiceDate: null as any, 
+      dueDate: null as any,
+      items: [{ description: "", quantity: 1, price: 0, gstCategory: "" }],
+      customerName: "",
+      customerEmail: "",
+      customerAddress: "",
+      invoiceNumber: "",
+      notes: "",
+      termsAndConditions: "",
+      invoiceImage: "",
     },
   });
 
@@ -78,6 +88,23 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
     setGstSuggestions(new Array(fields.length).fill(null));
     setLoadingGst(new Array(fields.length).fill(false));
   }, [fields.length]);
+
+  useEffect(() => {
+    // If defaultValues prop was NOT provided (i.e., we are creating a new invoice)
+    // and the dates in the form are still null, then initialize them on the client-side.
+    if (!defaultValues) {
+      if (form.getValues('invoiceDate') === null) {
+        form.setValue("invoiceDate", new Date(), { shouldValidate: true });
+      }
+      if (form.getValues('dueDate') === null) {
+        const todayForDueDate = new Date();
+        const thirtyDaysFromNow = new Date(todayForDueDate);
+        thirtyDaysFromNow.setDate(todayForDueDate.getDate() + 30);
+        form.setValue("dueDate", thirtyDaysFromNow, { shouldValidate: true });
+      }
+    }
+  }, [defaultValues, form]);
+
 
   const handleSuggestGst = async (index: number) => {
     const itemDescription = form.getValues(`items.${index}.description`);
@@ -160,7 +187,7 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={(date) => date < new Date("1900-01-01")}/>
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
@@ -179,7 +206,7 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={(date) => date < new Date("1900-01-01")}/>
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
@@ -237,7 +264,7 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
                 </div>
               ))}
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 1, price: 0 })} className="mt-4">
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 1, price: 0, gstCategory: "" })} className="mt-4">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Item
             </Button>
           </CardContent>
@@ -290,3 +317,4 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
     </Form>
   );
 }
+

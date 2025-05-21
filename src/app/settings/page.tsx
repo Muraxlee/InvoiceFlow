@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { 
   loadFromLocalStorage, 
@@ -18,14 +18,17 @@ import {
   type InvoiceConfig, 
   GOOGLE_AI_API_KEY_STORAGE_KEY,
   COMPANY_NAME_STORAGE_KEY,
-  DEFAULT_COMPANY_NAME 
+  DEFAULT_COMPANY_NAME,
+  CUSTOM_THEME_STORAGE_KEY,
+  type CustomThemeValues,
+  DEFAULT_CUSTOM_THEME_VALUES
 } from "@/lib/localStorage";
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
 import { format } from "date-fns"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils"; // Added missing import
+import { cn } from "@/lib/utils";
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";
@@ -42,6 +45,9 @@ export default function SettingsPage() {
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME);
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME);
   const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState("DDMMYYYY");
+
+  const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
+  const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
 
 
   useEffect(() => {
@@ -62,8 +68,11 @@ export default function SettingsPage() {
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyNameInput(storedCompanyName);
     setCurrentCompanyName(storedCompanyName);
+    
+    const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
+    setCustomThemeValues(storedCustomTheme);
+    setOriginalCustomThemeValues(storedCustomTheme);
 
-    // Client-side only date formatting for example
     setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
 
   }, []);
@@ -74,10 +83,9 @@ export default function SettingsPage() {
         if (Array.isArray(storageKey)) {
           storageKey.forEach(key => {
             localStorage.removeItem(key);
-            if (key === COMPANY_NAME_STORAGE_KEY) { // Reset company name on factory reset
+            if (key === COMPANY_NAME_STORAGE_KEY) { 
                  setCompanyNameInput(DEFAULT_COMPANY_NAME);
                  setCurrentCompanyName(DEFAULT_COMPANY_NAME);
-                 // Also update document title immediately if possible
                  if (document) document.title = DEFAULT_COMPANY_NAME;
             }
              if (key === GOOGLE_AI_API_KEY_STORAGE_KEY) {
@@ -91,9 +99,17 @@ export default function SettingsPage() {
                 setOriginalInvoicePrefix(defaultConfig.prefix);
             }
              if (key === THEME_STORAGE_KEY) {
-                handleThemeChange(DEFAULT_THEME_KEY); // Reset theme to default
+                handleThemeChange(DEFAULT_THEME_KEY); 
             }
-
+            if (key === CUSTOM_THEME_STORAGE_KEY) {
+                setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
+                setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
+                // If current theme is custom, re-apply to clear old custom vars
+                if (selectedThemeKey === 'custom') {
+                    // This will trigger re-application with defaults in layout.tsx
+                    saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES); 
+                }
+            }
           });
         } else {
           localStorage.removeItem(storageKey);
@@ -105,13 +121,6 @@ export default function SettingsPage() {
       title: `${actionName} Successful`,
       description: `The ${actionName.toLowerCase()} operation has been completed. Data cleared from local storage.`,
     });
-    // Special handling for factory reset to ensure all states are reset
-    if (actionName === "Factory Reset") {
-        // States already handled inside the loop for specific keys.
-        // Trigger a reload to ensure all components pick up default states if necessary, especially layout.
-        // window.location.reload(); // Consider if a full reload is desired or just state resets.
-        // For now, individual state resets are done above.
-    }
   };
 
   const handleSaveInvoiceSettings = () => {
@@ -124,14 +133,14 @@ export default function SettingsPage() {
     
     if (newPrefix.length === 0 && invoicePrefix.length > 0) {
         toast({title: "Invalid Prefix", description: "Invoice prefix must contain letters and be 3 characters long.", variant: "destructive"});
-        setInvoicePrefix(originalInvoicePrefix); // Revert to original if invalid attempt
+        setInvoicePrefix(originalInvoicePrefix); 
         return;
     }
-    if (newPrefix.length === 0 && invoicePrefix.length === 0) { // Allow empty to reset to default (implicitly)
+    if (newPrefix.length === 0 && invoicePrefix.length === 0) { 
       newPrefix = DEFAULT_INVOICE_PREFIX;
     } else if (newPrefix.length < 3) {
        toast({title: "Prefix Too Short", description: "Invoice prefix must be 3 letters.", variant: "destructive"});
-       setInvoicePrefix(originalInvoicePrefix); // Revert
+       setInvoicePrefix(originalInvoicePrefix); 
        return;
     }
 
@@ -148,7 +157,6 @@ export default function SettingsPage() {
   
   const handleSaveApiKey = () => {
     if (!googleApiKey.trim()) {
-      // Allow clearing the API key
       saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, "");
       setOriginalGoogleApiKey("");
       toast({
@@ -176,7 +184,7 @@ export default function SettingsPage() {
     }
     saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, companyNameInput);
     setCurrentCompanyName(companyNameInput);
-    if (document) { // Update title immediately
+    if (document) { 
         document.title = companyNameInput;
     }
     toast({
@@ -189,7 +197,7 @@ export default function SettingsPage() {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
       htmlElement.setAttribute('data-theme', themeKey);
-      localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+      localStorage.setItem(THEME_STORAGE_KEY, themeKey); // This will trigger layout.tsx's effect
       setSelectedThemeKey(themeKey);
       toast({
         title: "Theme Updated",
@@ -198,12 +206,27 @@ export default function SettingsPage() {
     }
   }, [toast]);
 
+  const handleSaveCustomTheme = () => {
+    // Basic validation for HSL format can be added here if needed
+    saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, customThemeValues);
+    setOriginalCustomThemeValues(customThemeValues);
+    toast({
+      title: "Custom Theme Saved",
+      description: "Your custom theme values have been saved.",
+    });
+    // If the current theme is 'custom', force re-application
+    if (selectedThemeKey === 'custom') {
+       // This relies on layout.tsx's storage event listener or its own effect to re-apply
+       // For immediate effect without relying on storage event, we can call applyTheme in layout.tsx
+       // but for now, saving to localStorage should trigger it.
+    }
+  };
 
   const dataManagementActions = [
     { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage.", key: INVOICES_KEY },
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage.", key: CUSTOMERS_KEY },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage.", key: PRODUCTS_KEY },
-    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, invoice settings, API key, company name and theme to default.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY] },
+    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, settings, API key, company name, and themes to default.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY] },
   ];
 
 
@@ -212,16 +235,11 @@ export default function SettingsPage() {
       <PageHeader title="Application Settings" description="Manage your application configurations and preferences." />
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 mb-6">
-          <TabsTrigger value="general">
-            <SettingsIcon className="mr-2 h-4 w-4" /> General
-          </TabsTrigger>
-          <TabsTrigger value="invoice-ai">
-            <FileCog className="mr-2 h-4 w-4" /> Invoice & AI
-          </TabsTrigger>
-          <TabsTrigger value="data-security">
-            <ShieldCheck className="mr-2 h-4 w-4" /> Data & Security
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-4 mb-6">
+          <TabsTrigger value="general"><Building className="mr-2 h-4 w-4" /> Company</TabsTrigger>
+          <TabsTrigger value="theme"><Palette className="mr-2 h-4 w-4" /> Theme</TabsTrigger>
+          <TabsTrigger value="invoice-ai"><FileCog className="mr-2 h-4 w-4" /> Invoice & AI</TabsTrigger>
+          <TabsTrigger value="data-security"><ShieldCheck className="mr-2 h-4 w-4" /> Data & Security</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -253,13 +271,15 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
-          <Card className="shadow-lg">
+        <TabsContent value="theme" className="space-y-6">
+           <Card className="shadow-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Palette className="h-8 w-8 text-primary" />
                 <div>
-                  <CardTitle className="text-xl">Theme Settings</CardTitle>
+                  <CardTitle className="text-xl">Theme Selection</CardTitle>
                   <CardDescription>Choose your preferred application theme.</CardDescription>
                 </div>
               </div>
@@ -278,12 +298,11 @@ export default function SettingsPage() {
                     <RadioGroupItem value={key} id={`theme-${key}`} className="sr-only" />
                     <div className="w-full h-10 rounded mb-2 relative overflow-hidden" 
                          style={{ 
-                            backgroundColor: `hsl(var(--${key}-background, var(--background)))`, // Fallback to current bg
-                            border: `2px solid hsl(var(--${key}-primary, var(--primary)))` // Fallback to current primary
+                            backgroundColor: `hsl(var(--${key}-background, var(--background)))`, 
+                            border: `2px solid hsl(var(--${key}-primary, var(--primary)))` 
                          }}
-                         data-theme-preview={key} // For potential CSS targeting
+                         data-theme-preview={key} 
                     >
-                        {/* Simplified visual cue for sidebar and header */}
                         <div className="absolute left-0 top-0 h-full w-1/3" style={{backgroundColor: `hsl(var(--${key}-sidebar-background, var(--sidebar-background)))`}}></div>
                         <div className="absolute right-0 top-0 h-1/4 w-2/3" style={{backgroundColor: `hsl(var(--${key}-header-background, var(--header-background)))`}}></div>
                      </div>
@@ -293,6 +312,54 @@ export default function SettingsPage() {
               </RadioGroup>
             </CardContent>
           </Card>
+
+          {selectedThemeKey === 'custom' && (
+            <Card className="shadow-lg border-primary/50">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Edit3 className="h-8 w-8 text-primary" />
+                  <div>
+                    <CardTitle className="text-xl">Custom Theme Configuration</CardTitle>
+                    <CardDescription>Define your custom theme colors (use HSL format: e.g., "220 15% 15%").</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="customBg">Background HSL (e.g., 220 15% 15%)</Label>
+                  <Input 
+                    id="customBg" 
+                    value={customThemeValues.background || ""} 
+                    onChange={(e) => setCustomThemeValues(prev => ({...prev, background: e.target.value}))}
+                    placeholder="e.g., 220 15% 15%" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="customFg">Foreground HSL (e.g., 220 10% 85%)</Label>
+                  <Input 
+                    id="customFg" 
+                    value={customThemeValues.foreground || ""} 
+                    onChange={(e) => setCustomThemeValues(prev => ({...prev, foreground: e.target.value}))}
+                    placeholder="e.g., 220 10% 85%" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="customPrimary">Primary Accent HSL (e.g., 180 60% 45%)</Label>
+                  <Input 
+                    id="customPrimary" 
+                    value={customThemeValues.primary || ""} 
+                    onChange={(e) => setCustomThemeValues(prev => ({...prev, primary: e.target.value}))}
+                    placeholder="e.g., 180 60% 45%" 
+                  />
+                </div>
+                {/* Add more inputs for other CSS variables like --card, --secondary, --accent, --border etc. here */}
+                <Button onClick={handleSaveCustomTheme} 
+                        disabled={JSON.stringify(customThemeValues) === JSON.stringify(originalCustomThemeValues)}>
+                  <Save className="mr-2 h-4 w-4" /> Save Custom Theme
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="invoice-ai" className="space-y-6">
@@ -442,4 +509,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

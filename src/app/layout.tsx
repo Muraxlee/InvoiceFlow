@@ -16,8 +16,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
 import { useEffect, useState, useCallback } from 'react'; 
-import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME } from '@/lib/localStorage';
-import { Building2 } from 'lucide-react'; // Using a generic building icon
+import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,9 +28,8 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-// Static metadata can still be defined
 export const metadataBase: Metadata = {
-  title: 'Dynamic Company App', // Will be updated dynamically if companyName is set
+  title: 'Dynamic Company App', 
   description: 'Advanced Analytics Dashboard.',
 };
 
@@ -47,6 +45,8 @@ export const AVAILABLE_THEMES = {
   'sunny-citrus': 'Sunny Citrus (Light Orange)',
   'high-contrast-dark': 'High Contrast Dark',
   'high-contrast-light': 'High Contrast Light',
+  'vscode-dark': 'VS Code Dark',
+  'custom': 'Custom User Theme',
 };
 export const DEFAULT_THEME_KEY = 'quanti-dark';
 
@@ -60,6 +60,22 @@ export default function RootLayout({
   const [companyName, setCompanyName] = useState<string>(DEFAULT_COMPANY_NAME);
   const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
 
+  const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
+    const root = document.documentElement;
+    if (customTheme.background) root.style.setProperty('--background', customTheme.background);
+    if (customTheme.foreground) root.style.setProperty('--foreground', customTheme.foreground);
+    if (customTheme.primary) root.style.setProperty('--primary', customTheme.primary);
+    // Add more variables here if custom theme expands
+  }, []);
+
+  const resetCustomThemeVariables = useCallback(() => {
+    const root = document.documentElement;
+    root.style.removeProperty('--background');
+    root.style.removeProperty('--foreground');
+    root.style.removeProperty('--primary');
+    // Add more variables here if custom theme expands
+  }, []);
+
   const applyTheme = useCallback((themeKey: string) => {
     const htmlElement = document.documentElement;
     Object.keys(AVAILABLE_THEMES).forEach(key => {
@@ -68,7 +84,14 @@ export default function RootLayout({
     htmlElement.setAttribute('data-theme', themeKey);
     localStorage.setItem(THEME_STORAGE_KEY, themeKey);
     setCurrentThemeKey(themeKey);
-  }, []);
+
+    if (themeKey === 'custom') {
+      const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
+      applyCustomThemeVariables(storedCustomTheme);
+    } else {
+      resetCustomThemeVariables(); // Clear any inline styles if not custom
+    }
+  }, [applyCustomThemeVariables, resetCustomThemeVariables]);
 
   useEffect(() => {
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
@@ -99,12 +122,16 @@ export default function RootLayout({
             document.title = newName;
         }
       }
+      if (event.key === CUSTOM_THEME_STORAGE_KEY && currentThemeKey === 'custom') {
+        const newCustomTheme = event.newValue ? JSON.parse(event.newValue) : DEFAULT_CUSTOM_THEME_VALUES;
+        applyCustomThemeVariables(newCustomTheme);
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [applyTheme]);
+  }, [applyTheme, currentThemeKey, applyCustomThemeVariables]);
 
 
   return (
@@ -127,7 +154,6 @@ export default function RootLayout({
                    {companyInitial}
                  </span>
               </div>
-              {/* Search input removed from sidebar header */}
             </SidebarHeader>
             <SidebarContent className="flex-1 mt-2">
               <AppNav />

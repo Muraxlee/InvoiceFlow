@@ -39,6 +39,14 @@ export const THEME_STORAGE_KEY = 'app-theme';
 export const AVAILABLE_THEMES = {
   'quanti-dark': 'Quanti Dark (Default)',
   'oceanic-blue': 'Oceanic Blue',
+  'crimson-peak': 'Crimson Peak (Dark Red)',
+  'forest-whisper': 'Forest Whisper (Dark Green)',
+  'midnight-purple': 'Midnight Purple (Dark Purple)',
+  'daybreak-classic': 'Daybreak Classic (Light Blue)',
+  'minty-fresh': 'Minty Fresh (Light Green)',
+  'sunny-citrus': 'Sunny Citrus (Light Orange)',
+  'high-contrast-dark': 'High Contrast Dark',
+  'high-contrast-light': 'High Contrast Light',
 };
 export const DEFAULT_THEME_KEY = 'quanti-dark';
 

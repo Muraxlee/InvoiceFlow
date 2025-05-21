@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink, Palette, Building } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { 
   loadFromLocalStorage, 
@@ -24,6 +24,7 @@ import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/la
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
 import { format } from "date-fns"; 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";
@@ -186,198 +187,235 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Application Settings" description="Manage your application data, company info, AI, theme, and other configurations." />
+      <PageHeader title="Application Settings" description="Manage your application configurations and preferences." />
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Building className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-xl">Company Settings</CardTitle>
-              <CardDescription>Set your company name that appears in the application.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-           <div className="space-y-2">
-            <Label htmlFor="companyNameInput">Company Name</Label>
-            <div className="flex gap-2 items-center">
-                <Input 
-                    id="companyNameInput" 
-                    value={companyNameInput} 
-                    onChange={(e) => setCompanyNameInput(e.target.value)}
-                    className="max-w-xs"
-                    placeholder="Your Company Name"
-                />
-                <Button onClick={handleSaveCompanyName} disabled={companyNameInput === currentCompanyName || companyNameInput.trim() === ""}>
-                    <Save className="mr-2 h-4 w-4" /> Save Name
-                </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsTrigger value="general">
+            <Settings2 className="mr-2 h-4 w-4" /> General
+          </TabsTrigger>
+          <TabsTrigger value="invoice-ai">
+            <FileCog className="mr-2 h-4 w-4" /> Invoice & AI
+          </TabsTrigger>
+          <TabsTrigger value="data-security">
+            <ShieldCheck className="mr-2 h-4 w-4" /> Data & Security
+          </TabsTrigger>
+        </TabsList>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Palette className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-xl">Theme Settings</CardTitle>
-              <CardDescription>Choose your preferred application theme.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <RadioGroup value={selectedThemeKey} onValueChange={handleThemeChange}>
-            {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
-              <div key={key} className="flex items-center space-x-2">
-                <RadioGroupItem value={key} id={`theme-${key}`} />
-                <Label htmlFor={`theme-${key}`}>{name}</Label>
+        <TabsContent value="general" className="space-y-6">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Building className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Company Settings</CardTitle>
+                  <CardDescription>Set your company name that appears in the application.</CardDescription>
+                </div>
               </div>
-            ))}
-          </RadioGroup>
-        </CardContent>
-      </Card>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Settings2 className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-xl">Invoice Settings</CardTitle>
-              <CardDescription>Configure invoice numbering.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="invoicePrefix">Invoice Prefix (3 uppercase letters)</Label>
-            <div className="flex gap-2 items-center">
-                <Input 
-                    id="invoicePrefix" 
-                    value={invoicePrefix} 
-                    onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))}
-                    maxLength={3}
-                    className="max-w-xs"
-                    placeholder="e.g. INV"
-                />
-                <Button onClick={handleSaveInvoiceSettings} disabled={invoicePrefix === originalInvoicePrefix && invoicePrefix.length === 3}>
-                    <Save className="mr-2 h-4 w-4" /> Save Prefix
-                </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Example: {invoicePrefix || 'INV'}{exampleInvoiceDateString}0001
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyNameInput">Company Name</Label>
+                <div className="flex gap-2 items-center">
+                    <Input 
+                        id="companyNameInput" 
+                        value={companyNameInput} 
+                        onChange={(e) => setCompanyNameInput(e.target.value)}
+                        className="max-w-xs"
+                        placeholder="Your Company Name"
+                    />
+                    <Button onClick={handleSaveCompanyName} disabled={companyNameInput === currentCompanyName || companyNameInput.trim() === ""}>
+                        <Save className="mr-2 h-4 w-4" /> Save Name
+                    </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Brain className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-xl">AI Settings</CardTitle>
-              <CardDescription>Configure AI-powered features.</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="googleApiKey">Google AI API Key</Label>
-            <div className="flex gap-2 items-center">
-              <Input
-                id="googleApiKey"
-                type="password"
-                value={googleApiKey}
-                onChange={(e) => setGoogleApiKey(e.target.value)}
-                className="max-w-md"
-                placeholder="Enter your Google AI API Key"
-              />
-              <Button onClick={handleSaveApiKey} disabled={googleApiKey === originalGoogleApiKey}>
-                <Save className="mr-2 h-4 w-4" /> Save API Key
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Your API key is stored locally in your browser's local storage.
-            </p>
-          </div>
-          <div className="text-sm space-y-2 p-4 border rounded-md bg-muted/50">
-            <h4 className="font-semibold text-md flex items-center gap-2"><KeyRound className="h-5 w-5"/> Using Your Google AI API Key</h4>
-            <p>
-              The AI features use Google AI models through Genkit. To enable them, you need a Google AI API Key.
-            </p>
-            <p>
-              <strong>How to get an API Key:</strong>
-              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-1 text-primary hover:underline inline-flex items-center">
-                 Visit Google AI Studio <ExternalLink className="h-3 w-3 ml-1"/>
-              </Link>
-              and create a new API key.
-            </p>
-            <p className="font-semibold text-destructive">
-              <strong>Important:</strong> For the AI features to use your saved key:
-            </p>
-            <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
-              <li>Save your API key using the button above.</li>
-              <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the root of this project.</li>
-              <li>Add: <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre></li>
-              <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code>).</li>
-            </ol>
-          </div>
-        </CardContent>
-      </Card>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Palette className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Theme Settings</CardTitle>
+                  <CardDescription>Choose your preferred application theme.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup value={selectedThemeKey} onValueChange={handleThemeChange} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
+                  <Label 
+                    key={key} 
+                    htmlFor={`theme-${key}`} 
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                      selectedThemeKey === key && "border-primary ring-2 ring-primary"
+                    )}
+                  >
+                    <RadioGroupItem value={key} id={`theme-${key}`} className="sr-only" />
+                    <div className="w-full h-10 rounded mb-2" style={{ 
+                        // TODO: Get actual theme colors for preview. This is a simplified preview.
+                        // For a real preview, you would need to access CSS variables, which is complex here.
+                        // Using placeholder generic colors related to the theme key.
+                        backgroundColor: key.includes('dark') || key.includes('quanti') || key.includes('oceanic') || key.includes('crimson') || key.includes('forest') || key.includes('midnight') ? 'hsl(var(--card))' : 'hsl(var(--background))',
+                        border: `2px solid ${key.includes('contrast') ? 'hsl(var(--foreground))' : 'hsl(var(--primary))'}`
+                     }}>
+                        <div className="w-1/3 h-full float-left" style={{backgroundColor: `hsl(var(--sidebar-background))`}}></div>
+                        <div className="w-2/3 h-1/4 float-left" style={{backgroundColor: `hsl(var(--header-background))`}}></div>
+                     </div>
+                    <span className="text-sm font-medium">{name}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card className="shadow-lg border-destructive">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <DatabaseZap className="h-8 w-8 text-destructive" />
-            <div>
-              <CardTitle className="text-xl">Data Management (Local Storage)</CardTitle>
-              <CardDescription className="text-destructive flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {dataManagementActions.map(action => (
-             <div key={action.id} className="rounded-md border border-border p-4 shadow-sm bg-card hover:shadow-md transition-shadow">
-              <h3 className="font-semibold text-lg mb-1">{action.label}</h3>
-              <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
-              <ConfirmDialog
-                triggerButton={
-                  <Button variant="destructive" className="w-full sm:w-auto">
-                    <Trash2 className="mr-2 h-4 w-4" /> {action.label.replace(/\s\(.*\)/, '')}
+        <TabsContent value="invoice-ai" className="space-y-6">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Settings2 className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Invoice Settings</CardTitle>
+                  <CardDescription>Configure invoice numbering.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoicePrefix">Invoice Prefix (3 uppercase letters)</Label>
+                <div className="flex gap-2 items-center">
+                    <Input 
+                        id="invoicePrefix" 
+                        value={invoicePrefix} 
+                        onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))}
+                        maxLength={3}
+                        className="max-w-xs"
+                        placeholder="e.g. INV"
+                    />
+                    <Button onClick={handleSaveInvoiceSettings} disabled={invoicePrefix === originalInvoicePrefix && invoicePrefix.length === 3}>
+                        <Save className="mr-2 h-4 w-4" /> Save Prefix
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Example: {invoicePrefix || 'INV'}{exampleInvoiceDateString}0001
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Brain className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">AI Settings</CardTitle>
+                  <CardDescription>Configure AI-powered features.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="googleApiKey">Google AI API Key</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="googleApiKey"
+                    type="password"
+                    value={googleApiKey}
+                    onChange={(e) => setGoogleApiKey(e.target.value)}
+                    className="max-w-md"
+                    placeholder="Enter your Google AI API Key"
+                  />
+                  <Button onClick={handleSaveApiKey} disabled={googleApiKey === originalGoogleApiKey}>
+                    <Save className="mr-2 h-4 w-4" /> Save API Key
                   </Button>
-                }
-                title={`Confirm ${action.label}`}
-                description={`Are you sure? This cannot be undone.`}
-                onConfirm={() => handleDataAction(action.label, action.key)}
-                confirmText="Yes, Proceed"
-                confirmVariant="destructive"
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your API key is stored locally in your browser's local storage.
+                </p>
+              </div>
+              <div className="text-sm space-y-2 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-md flex items-center gap-2"><KeyRound className="h-5 w-5"/> Using Your Google AI API Key</h4>
+                <p>
+                  The AI features use Google AI models through Genkit. To enable them, you need a Google AI API Key.
+                </p>
+                <p>
+                  <strong>How to get an API Key:</strong>
+                  <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-1 text-primary hover:underline inline-flex items-center">
+                    Visit Google AI Studio <ExternalLink className="h-3 w-3 ml-1"/>
+                  </Link>
+                  and create a new API key.
+                </p>
+                <p className="font-semibold text-destructive">
+                  <strong>Important:</strong> For the AI features to use your saved key:
+                </p>
+                <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
+                  <li>Save your API key using the button above.</li>
+                  <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the root of this project.</li>
+                  <li>Add: <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre></li>
+                  <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code>).</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="data-security" className="space-y-6">
+          <Card className="shadow-lg border-destructive">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <DatabaseZap className="h-8 w-8 text-destructive" />
+                <div>
+                  <CardTitle className="text-xl">Data Management (Local Storage)</CardTitle>
+                  <CardDescription className="text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {dataManagementActions.map(action => (
+                <div key={action.id} className="rounded-md border border-border p-4 shadow-sm bg-card hover:shadow-md transition-shadow">
+                  <h3 className="font-semibold text-lg mb-1">{action.label}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
+                  <ConfirmDialog
+                    triggerButton={
+                      <Button variant="destructive" className="w-full sm:w-auto">
+                        <Trash2 className="mr-2 h-4 w-4" /> {action.label.replace(/\s\(.*\)/, '')}
+                      </Button>
+                    }
+                    title={`Confirm ${action.label}`}
+                    description={`Are you sure? This cannot be undone.`}
+                    onConfirm={() => handleDataAction(action.label, action.key)}
+                    confirmText="Yes, Proceed"
+                    confirmVariant="destructive"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <UsersRound className="h-8 w-8 text-primary" />
-            <div>
-              <CardTitle className="text-xl">Role Management</CardTitle>
-              <CardDescription>Define user roles and permissions (placeholder).</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
-            <UsersRound className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-2 text-sm text-muted-foreground">User role management interface coming soon.</p>
-          </div>
-        </CardContent>
-      </Card>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <UsersRound className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Role Management</CardTitle>
+                  <CardDescription>Define user roles and permissions (placeholder).</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
+                <UsersRound className="mx-auto h-12 w-12 text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">User role management interface coming soon.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

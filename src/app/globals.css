@@ -1,102 +1,123 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    /* New Dark Theme based on Quanti Analytics */
-    --background: 220 15% 15%; /* Main dark background */
-    --foreground: 220 10% 85%; /* Light grey text */
+/* Default Theme: Quanti Dark */
+html[data-theme="quanti-dark"] {
+  --background: 220 15% 15%; /* Main dark background */
+  --foreground: 220 10% 85%; /* Light grey text */
 
-    --card: 220 15% 20%; /* Card background, slightly lighter than main */
-    --card-foreground: 220 10% 85%;
+  --card: 220 15% 20%; /* Card background, slightly lighter than main */
+  --card-foreground: 220 10% 85%;
 
-    --popover: 220 15% 18%;
-    --popover-foreground: 220 10% 85%;
+  --popover: 220 15% 18%;
+  --popover-foreground: 220 10% 85%;
 
-    --primary: 180 60% 45%; /* Teal accent */
-    --primary-foreground: 220 10% 95%; /* Almost white for text on primary */
+  --primary: 180 60% 45%; /* Teal accent */
+  --primary-foreground: 220 10% 95%; /* Almost white for text on primary */
 
-    --secondary: 210 15% 40%; /* A muted blue/grey for secondary elements or borders */
-    --secondary-foreground: 220 10% 90%;
+  --secondary: 210 15% 40%; /* A muted blue/grey for secondary elements or borders */
+  --secondary-foreground: 220 10% 90%;
 
-    --muted: 220 15% 25%; /* For subtle backgrounds or dividers */
-    --muted-foreground: 220 10% 60%; /* Muted text */
+  --muted: 220 15% 25%; /* For subtle backgrounds or dividers */
+  --muted-foreground: 220 10% 60%; /* Muted text */
 
-    --accent: 180 50% 35%; /* Darker teal for hover/active states */
-    --accent-foreground: 0 0% 100%;
+  --accent: 180 50% 35%; /* Darker teal for hover/active states */
+  --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 60% 50%;
-    --destructive-foreground: 0 0% 100%;
+  --destructive: 0 60% 50%;
+  --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 30%; /* Borders for cards, inputs */
-    --input: 220 15% 22%; /* Input background */
-    --ring: 180 60% 55%; /* Focus ring, lighter teal */
+  --border: 220 15% 30%; /* Borders for cards, inputs */
+  --input: 220 15% 22%; /* Input background */
+  --ring: 180 60% 55%; /* Focus ring, lighter teal */
 
-    --chart-1: 180 60% 45%; /* Teal for charts */
-    --chart-2: 300 60% 60%; /* Magenta/Purple for charts */
-    --chart-3: 39 90% 55%;  /* Orange for charts */
-    --chart-4: 210 70% 60%; /* Blue for charts */
-    --chart-5: 0 0% 60%;    /* Grey for charts */
+  --chart-1: 180 60% 45%; /* Teal for charts */
+  --chart-2: 300 60% 60%; /* Magenta/Purple for charts */
+  --chart-3: 39 90% 55%;  /* Orange for charts */
+  --chart-4: 210 70% 60%; /* Blue for charts */
+  --chart-5: 0 0% 60%;    /* Grey for charts */
 
-    --radius: 0.5rem;
+  --radius: 0.5rem;
 
-    /* Sidebar specific colors */
-    --sidebar-background: 220 20% 12%; /* Very dark charcoal */
-    --sidebar-foreground: 220 10% 75%; /* Lighter grey for sidebar text */
-    --sidebar-primary: 180 60% 45%; /* Teal for active item indicator/icon */
-    --sidebar-primary-foreground: 0 0% 100%; /* White for active item text */
-    --sidebar-accent: 220 15% 20%; /* Hover bg for sidebar items */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 15% 25%; /* Border for sidebar elements */
-    --sidebar-ring: 180 60% 55%;
+  /* Sidebar specific colors */
+  --sidebar-background: 220 20% 12%; /* Very dark charcoal */
+  --sidebar-foreground: 220 10% 75%; /* Lighter grey for sidebar text */
+  --sidebar-primary: 180 60% 45%; /* Teal for active item indicator/icon */
+  --sidebar-primary-foreground: 0 0% 100%; /* White for active item text */
+  --sidebar-accent: 220 15% 20%; /* Hover bg for sidebar items */
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 220 15% 25%; /* Border for sidebar elements */
+  --sidebar-ring: 180 60% 55%;
 
-    /* Top Header bar specific colors */
-    --header-background: 220 20% 12%; /* Same as sidebar or slightly different */
-    --header-foreground: 220 10% 85%;
-  }
-
-  .dark {
-    /* Making dark theme the default, so these vars mirror the :root */
-    --background: 220 15% 15%;
-    --foreground: 220 10% 85%;
-    --card: 220 15% 20%;
-    --card-foreground: 220 10% 85%;
-    --popover: 220 15% 18%;
-    --popover-foreground: 220 10% 85%;
-    --primary: 180 60% 45%;
-    --primary-foreground: 220 10% 95%;
-    --secondary: 210 15% 40%;
-    --secondary-foreground: 220 10% 90%;
-    --muted: 220 15% 25%;
-    --muted-foreground: 220 10% 60%;
-    --accent: 180 50% 35%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 60% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 30%;
-    --input: 220 15% 22%;
-    --ring: 180 60% 55%;
-
-    --sidebar-background: 220 20% 12%;
-    --sidebar-foreground: 220 10% 75%;
-    --sidebar-primary: 180 60% 45%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 20%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 15% 25%;
-    --sidebar-ring: 180 60% 55%;
-
-    --header-background: 220 20% 12%;
-    --header-foreground: 220 10% 85%;
-  }
+  /* Top Header bar specific colors */
+  --header-background: 220 20% 12%; /* Same as sidebar or slightly different */
+  --header-foreground: 220 10% 85%;
 }
+
+/* Oceanic Blue Theme */
+html[data-theme="oceanic-blue"] {
+  --background: 210 40% 10%; 
+  --foreground: 200 15% 90%; 
+
+  --card: 210 35% 14%; 
+  --card-foreground: 200 15% 90%;
+
+  --popover: 210 40% 12%;
+  --popover-foreground: 200 15% 90%;
+
+  --primary: 190 70% 55%; /* Bright cyan */
+  --primary-foreground: 210 40% 10%;
+
+  --secondary: 220 30% 35%; /* Muted dark blue */
+  --secondary-foreground: 200 15% 92%;
+
+  --muted: 210 30% 20%; 
+  --muted-foreground: 200 15% 65%; 
+
+  --accent: 190 60% 45%; /* Darker cyan */
+  --accent-foreground: 200 15% 98%;
+
+  --destructive: 0 65% 55%; /* Vibrant red */
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 210 30% 25%; 
+  --input: 210 30% 18%; 
+  --ring: 190 70% 65%; /* Lighter cyan for focus */
+
+  --chart-1: 190 70% 55%; 
+  --chart-2: 230 70% 65%; /* Complementary blue/purple */
+  --chart-3: 30 80% 60%;  /* Warm accent - orange */
+  --chart-4: 160 60% 50%; /* Teal/Greenish */
+  --chart-5: 200 15% 70%;   /* Light Grey/Blue */
+
+  --radius: 0.5rem;
+
+  --sidebar-background: 210 45% 7%; 
+  --sidebar-foreground: 200 15% 80%; 
+  --sidebar-primary: 190 70% 55%; 
+  --sidebar-primary-foreground: 0 0% 100%; 
+  --sidebar-accent: 210 30% 18%; 
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 210 30% 22%; 
+  --sidebar-ring: 190 70% 65%;
+
+  --header-background: 210 45% 7%; 
+  --header-foreground: 200 15% 90%;
+}
+
+
+/* Add more themes here following the html[data-theme="theme-name"] pattern */
+/* e.g., html[data-theme="crimson-peak"] { ... } */
+/* e.g., html[data-theme="forest-whisper"] { ... } */
+
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border; /* Uses CSS var --border, will change with theme */
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground; /* Uses CSS vars, will change with theme */
   }
 }

@@ -1,3 +1,5 @@
+"use client"; // Converted to Client Component
+
 import PageHeader from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,12 @@ export default function ReportsPage() {
       imageHint: "invoice list"
     },
   ];
+
+  const handleGenerateReport = (reportTitle: string) => {
+    // Placeholder function for generating reports
+    // In a real app, this would trigger a download or navigate to a detailed report view
+    alert(`Generating ${reportTitle}... (This is a placeholder)`);
+  };
 
   return (
     <div className="space-y-6">
@@ -67,7 +75,11 @@ export default function ReportsPage() {
               </p>
             </CardContent>
             <CardContent className="border-t pt-4">
-               <Button variant="outline" className="w-full sm:w-auto">
+               <Button 
+                 variant="outline" 
+                 className="w-full sm:w-auto"
+                 onClick={() => handleGenerateReport(report.title)} // Added onClick handler
+               >
                 <Download className="mr-2 h-4 w-4" /> Generate Report
               </Button>
             </CardContent>

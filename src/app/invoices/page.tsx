@@ -1,3 +1,5 @@
+"use client"; // Added to make this a Client Component
+
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,7 +94,7 @@ export default function InvoicesPage() {
                          <DropdownMenuItem onClick={() => alert(`Printing Transport Bill for ${invoice.id}... This is a placeholder.`)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Transport Bill
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => alert(`Deleting ${invoice.id}... This is a placeholder.`)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

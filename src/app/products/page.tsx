@@ -1,3 +1,5 @@
+"use client"; // Added to make this a Client Component
+
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +22,7 @@ export default function ProductsPage() {
         title="Manage Products" 
         description="View, add, and manage your product catalog."
         actions={
-          <Button> {/* In a real app, this would open a modal or navigate to a create page */}
+          <Button onClick={() => alert("Add New Product clicked. This is a placeholder.")}> {/* In a real app, this would open a modal or navigate to a create page */}
             <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
           </Button>
         }
@@ -71,10 +73,10 @@ export default function ProductsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => alert(`Edit product ${product.id}. This is a placeholder.`)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => alert(`Delete product ${product.id}. This is a placeholder.`)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

@@ -104,7 +104,7 @@ export default function InvoicesPage() {
                   <TableCell>{invoice.customerName}</TableCell>
                   <TableCell>{invoice.invoiceDate.toLocaleDateString()}</TableCell>
                   <TableCell>{invoice.dueDate.toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">₹{invoice.amount?.toFixed(2) || '0.00'}</TableCell>
+                  <TableCell className="text-right">₹{(invoice.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>
                   </TableCell>

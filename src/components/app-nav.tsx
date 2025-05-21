@@ -1,3 +1,4 @@
+// src/components/app-nav.tsx
 "use client";
 
 import Link from 'next/link';
@@ -6,9 +7,9 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  // SidebarMenuSub, // Keep if sub-menus might come back
+  // SidebarMenuSubButton,
+  // SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard,
@@ -17,49 +18,32 @@ import {
   Package,
   BarChart3,
   SettingsIcon,
-  FilePlus2,
-  FileArchive,
-  LineChart,
-  UsersRound,
-  FileBox,
+  MessageSquare, // Icon for Chat
+  // FilePlus2, // Already used, for create invoice
+  // FileArchive, // Already used for manage invoices
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+// Accordion imports removed as the new design implies simpler navigation
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   tooltip: string;
-  subItems?: NavItem[];
+  // subItems?: NavItem[]; // Removed for simplicity, matching Creatio's flat nav
   isSubItem?: boolean;
 };
 
+// Simplified nav items to match the Creatio example structure (Home, Feed, Leads, Opportunities, Activities, Chat)
+// Assuming current pages map to these broadly.
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard' },
-  {
-    href: '/invoices',
-    label: 'Invoices',
-    icon: FileText,
-    tooltip: 'Invoices',
-    subItems: [
-      { href: '/invoices', label: 'Manage Invoices', icon: FileArchive, tooltip: 'Manage Invoices', isSubItem: true },
-      { href: '/invoices/create', label: 'Create Invoice', icon: FilePlus2, tooltip: 'Create Invoice', isSubItem: true },
-    ],
-  },
-  { href: '/customers', label: 'Customers', icon: Users, tooltip: 'Customers' },
-  { href: '/products', label: 'Products', icon: Package, tooltip: 'Products' },
-  {
-    href: '/reports',
-    label: 'Reports',
-    icon: BarChart3,
-    tooltip: 'Reports',
-    // Sub-items could be direct links or handled on the /reports page
-    // For now, let's make them distinct for clarity in nav if desired
-    // Or they can be sections on the /reports page itself.
-    // Let's keep it simple, sub-reports are sections on /reports page.
-  },
+  { href: '/dashboard', label: 'Home page', icon: LayoutDashboard, tooltip: 'Dashboard' },
+  // { href: '/feed', label: 'Feed', icon: Rss, tooltip: 'Activity Feed' }, // Example, if a feed page exists
+  { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Invoices' }, // Was "Leads" in Creatio example
+  { href: '/customers', label: 'Customers', icon: Users, tooltip: 'Customers' }, // Was "Opportunities"
+  { href: '/products', label: 'Products', icon: Package, tooltip: 'Products' }, // Was "Activities"
+  { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'Reports' }, // Was "Chat" - using a more generic icon
   { href: '/settings', label: 'Settings', icon: SettingsIcon, tooltip: 'Settings' },
 ];
 
@@ -67,50 +51,13 @@ const navItems: NavItem[] = [
 export function AppNav() {
   const pathname = usePathname();
 
-  const renderNavItem = (item: NavItem, isSub?: boolean) => {
-    const isActive = item.subItems 
-      ? pathname.startsWith(item.href) 
-      : pathname === item.href;
+  const renderNavItem = (item: NavItem) => {
+    const isActive = pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/');
+    // Simplified active check: if href is /dashboard, it's active only if pathname is exactly /dashboard.
+    // For other routes, if pathname starts with item.href, it's active.
+    // This handles /invoices being active for /invoices/create too.
 
-    if (item.subItems && item.subItems.length > 0) {
-      return (
-        <Accordion type="single" collapsible className="w-full" key={item.href}>
-          <AccordionItem value={item.href} className="border-none">
-            <SidebarMenuItem className="p-0">
-              <AccordionTrigger 
-                className={cn(
-                  "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg:first-child]:size-4 [&>svg:first-child]:shrink-0",
-                  isActive && "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
-                  "[&[data-state=open]>svg:last-child]:rotate-180"
-                )}
-              >
-                <item.icon />
-                <span className="group-[[data-state=collapsed]]:hidden">{item.label}</span>
-              </AccordionTrigger>
-            </SidebarMenuItem>
-            <AccordionContent className="pb-0 pl-3 group-[[data-state=collapsed]]:hidden">
-              <SidebarMenuSub>
-                {item.subItems.map((subItem) => (
-                  <SidebarMenuSubItem key={subItem.href}>
-                    <Link href={subItem.href} legacyBehavior passHref>
-                      <SidebarMenuSubButton
-                        isActive={pathname === subItem.href}
-                        aria-label={subItem.tooltip}
-                        className="justify-start"
-                      >
-                        <subItem.icon className="mr-2 h-4 w-4 shrink-0" />
-                        <span className="group-[[data-state=collapsed]]:hidden">{subItem.label}</span>
-                      </SidebarMenuSubButton>
-                    </Link>
-                  </SidebarMenuSubItem>
-                ))}
-              </SidebarMenuSub>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      );
-    }
-
+    // Direct rendering without accordion for a flatter navigation like Creatio
     return (
       <SidebarMenuItem key={item.href}>
         <Link href={item.href} legacyBehavior passHref>
@@ -118,9 +65,12 @@ export function AppNav() {
             isActive={isActive}
             tooltip={{ children: item.tooltip, className: "group-[[data-state=expanded]]:hidden" }}
             aria-label={item.tooltip}
-            className="justify-start"
+            className={cn(
+              "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              isActive && "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
+            )}
           >
-            <item.icon />
+            <item.icon className={cn(isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/80")} />
             <span className="group-[[data-state=collapsed]]:hidden">{item.label}</span>
           </SidebarMenuButton>
         </Link>
@@ -129,7 +79,8 @@ export function AppNav() {
   };
 
   return (
-    <SidebarMenu>
+    // Added px-2 for padding around the menu items, adjust as needed
+    <SidebarMenu className="px-2 group-[[data-state=collapsed]]:px-0"> 
       {navItems.map(item => renderNavItem(item))}
     </SidebarMenu>
   );

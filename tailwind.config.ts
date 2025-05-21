@@ -4,7 +4,6 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 const config: Config = {
     darkMode: ["class"],
     content: [
-    // Removed "./src/pages/**/..." as it's an App Router project
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
@@ -64,7 +63,11 @@ const config: Config = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+        header: { // New section for header colors
+          DEFAULT: 'hsl(var(--header-background))',
+          foreground: 'hsl(var(--header-foreground))',
+        }
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

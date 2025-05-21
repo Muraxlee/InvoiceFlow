@@ -2,29 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Removed explicit body font-family to allow next/font and Tailwind to manage it */
-
 @layer base {
   :root {
-    --background: 150 11% 95%;
-    --foreground: 210 10% 23%;
+    --background: 220 20% 97%; /* Light gray for main content */
+    --foreground: 220 10% 25%; /* Dark gray for text */
     --card: 0 0% 100%;
-    --card-foreground: 210 10% 23%;
+    --card-foreground: 220 10% 23%;
     --popover: 0 0% 100%;
-    --popover-foreground: 210 10% 23%;
-    --primary: 167 18% 55%;
+    --popover-foreground: 220 10% 23%;
+    --primary: 210 90% 58%; /* Vibrant blue for primary actions */
     --primary-foreground: 0 0% 100%;
-    --secondary: 160 15% 88%;
-    --secondary-foreground: 167 15% 35%;
-    --muted: 150 10% 90%;
-    --muted-foreground: 150 8% 55%;
-    --accent: 205 34% 60%;
+    --secondary: 220 15% 88%;
+    --secondary-foreground: 220 15% 35%;
+    --muted: 220 10% 90%;
+    --muted-foreground: 220 8% 55%;
+    --accent: 210 80% 65%; /* Lighter blue for accents */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 150 10% 85%;
-    --input: 150 10% 90%;
-    --ring: 205 34% 60%;
+    --border: 220 10% 85%;
+    --input: 220 10% 90%; /* Input background on light themes */
+    --ring: 210 90% 58%; /* Primary blue for focus rings */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -32,52 +30,60 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar specific colors for light theme */
-    --sidebar-background: 210 10% 98%;
-    --sidebar-foreground: 210 10% 30%;
-    --sidebar-primary: 167 18% 55%; /* Use app's primary for active */
+    /* Sidebar specific colors */
+    --sidebar-background: 265 35% 28%; /* Dark purple */
+    --sidebar-foreground: 265 20% 88%; /* Light lavender/gray for text */
+    --sidebar-primary: 265 40% 45%; /* Brighter purple for active item background */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 150 11% 92%; /* Lighter shade of main background for hover */
-    --sidebar-accent-foreground: 167 18% 50%; /* Darker teal for text on hover */
-    --sidebar-border: 150 10% 88%;
-    --sidebar-ring: 205 34% 60%; /* Use app's accent for focus */
+    --sidebar-accent: 265 35% 38%; /* Slightly lighter/different purple for hover */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 265 30% 22%; /* Darker border for sidebar elements */
+    --sidebar-ring: 265 50% 60%;
+
+    /* Top Header bar specific colors */
+    --header-background: 265 40% 38%; /* Lighter purple than sidebar */
+    --header-foreground: 0 0% 100%; /* White text */
   }
 
   .dark {
-    --background: 210 10% 15%;
-    --foreground: 150 10% 90%;
-    --card: 210 10% 20%;
-    --card-foreground: 150 10% 90%;
-    --popover: 210 10% 18%;
-    --popover-foreground: 150 10% 90%;
-    --primary: 167 25% 65%;
-    --primary-foreground: 210 20% 10%;
-    --secondary: 210 10% 25%;
-    --secondary-foreground: 150 10% 85%;
-    --muted: 210 10% 22%;
-    --muted-foreground: 150 10% 65%;
-    --accent: 205 40% 70%;
-    --accent-foreground: 210 20% 10%;
-    --destructive: 0 60% 60%;
+    /* For dark mode, we'll invert some of these or use a predefined dark theme.
+       For now, focusing on the light theme provided in the image.
+       A full dark theme replication of Creatio would need specific dark variant colors.
+       Let's make a simpler dark theme for now.
+    */
+    --background: 220 10% 10%;
+    --foreground: 220 10% 85%;
+    --card: 220 10% 15%;
+    --card-foreground: 220 10% 85%;
+    --popover: 220 10% 12%;
+    --popover-foreground: 220 10% 85%;
+    --primary: 210 80% 65%;
+    --primary-foreground: 220 10% 10%;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 220 10% 80%;
+    --muted: 220 10% 18%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 210 70% 70%;
+    --accent-foreground: 220 10% 10%;
+    --destructive: 0 60% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 10% 28%;
-    --input: 210 10% 25%;
-    --ring: 205 40% 70%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --border: 220 10% 25%;
+    --input: 220 10% 20%; /* Input background on dark themes */
+    --ring: 210 80% 65%;
 
     /* Sidebar specific colors for dark theme */
-    --sidebar-background: 210 10% 12%;
-    --sidebar-foreground: 150 10% 85%;
-    --sidebar-primary: 167 25% 65%; /* Use app's primary for active */
-    --sidebar-primary-foreground: 210 20% 10%;
-    --sidebar-accent: 210 10% 18%; /* Slightly lighter than sidebar bg for hover */
-    --sidebar-accent-foreground: 167 25% 70%;
-    --sidebar-border: 210 10% 20%;
-    --sidebar-ring: 205 40% 70%; /* Use app's accent for focus */
+    --sidebar-background: 265 25% 18%; /* Even darker purple */
+    --sidebar-foreground: 265 20% 80%;
+    --sidebar-primary: 265 30% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 265 25% 28%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 265 20% 12%;
+    --sidebar-ring: 265 40% 55%;
+
+    /* Top Header bar specific colors for dark theme */
+    --header-background: 265 30% 28%;
+    --header-foreground: 0 0% 100%;
   }
 }
 
@@ -87,5 +93,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-geist-sans);
   }
 }

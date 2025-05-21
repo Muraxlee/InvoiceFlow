@@ -15,9 +15,9 @@ import {
 import { Toaster } from '@/components/ui/toaster';
 import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
-import { Input } from '@/components/ui/input';
-import { SearchIcon } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react'; // Added useState, useEffect, useCallback
+import { useEffect, useState, useCallback } from 'react'; 
+import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME } from '@/lib/localStorage';
+import { Building2 } from 'lucide-react'; // Using a generic building icon
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,7 +31,7 @@ const geistMono = Geist_Mono({
 
 // Static metadata can still be defined
 export const metadataBase: Metadata = {
-  title: 'Quanti Analytics',
+  title: 'Dynamic Company App', // Will be updated dynamically if companyName is set
   description: 'Advanced Analytics Dashboard.',
 };
 
@@ -39,7 +39,6 @@ export const THEME_STORAGE_KEY = 'app-theme';
 export const AVAILABLE_THEMES = {
   'quanti-dark': 'Quanti Dark (Default)',
   'oceanic-blue': 'Oceanic Blue',
-  // Add more themes here as 'key': 'Display Name'
 };
 export const DEFAULT_THEME_KEY = 'quanti-dark';
 
@@ -50,12 +49,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const [currentThemeKey, setCurrentThemeKey] = useState<string>(DEFAULT_THEME_KEY);
+  const [companyName, setCompanyName] = useState<string>(DEFAULT_COMPANY_NAME);
+  const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
 
   const applyTheme = useCallback((themeKey: string) => {
     const htmlElement = document.documentElement;
-    // Remove any existing theme attributes to prevent conflicts
     Object.keys(AVAILABLE_THEMES).forEach(key => {
-      htmlElement.removeAttribute(`data-theme-${key}`); // Clean up old way if any
+      htmlElement.removeAttribute(`data-theme-${key}`); 
     });
     htmlElement.setAttribute('data-theme', themeKey);
     localStorage.setItem(THEME_STORAGE_KEY, themeKey);
@@ -63,21 +63,32 @@ export default function RootLayout({
   }, []);
 
   useEffect(() => {
-    // On initial load, try to get theme from localStorage or use default
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
     if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
       applyTheme(storedThemeKey);
     } else {
       applyTheme(DEFAULT_THEME_KEY);
     }
-  }, [applyTheme]);
 
-  // Listen for theme changes from other tabs/windows (optional but good practice)
-  useEffect(() => {
+    const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
+    setCompanyName(storedCompanyName);
+    setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || 'Q');
+    if (document) {
+        document.title = storedCompanyName;
+    }
+
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY && event.newValue) {
         if (AVAILABLE_THEMES[event.newValue as keyof typeof AVAILABLE_THEMES]) {
           applyTheme(event.newValue);
+        }
+      }
+      if (event.key === COMPANY_NAME_STORAGE_KEY && event.newValue) {
+        const newName = event.newValue ? JSON.parse(event.newValue) : DEFAULT_COMPANY_NAME;
+        setCompanyName(newName);
+        setCompanyInitial(newName.substring(0,1).toUpperCase() || 'Q');
+        if (document) {
+            document.title = newName;
         }
       }
     };
@@ -91,31 +102,24 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* You can spread metadataBase if needed, or set title directly */}
-        <title>{String(metadataBase.title)}</title>
+        {/* Title is now set dynamically in useEffect */}
         <meta name="description" content={String(metadataBase.description)} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SidebarProvider defaultOpen>
+        <SidebarProvider defaultOpen> {/* `defaultOpen` controls initial state on desktop */}
           <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
             <SidebarHeader className="p-3 border-b border-sidebar-border">
               <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
-                <h1 className="text-xl font-semibold text-sidebar-primary-foreground">Quanti Analytics</h1>
+                <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
               </div>
               <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
-                 <svg className="h-6 w-6 mx-auto text-sidebar-foreground/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
-                </svg>
+                 <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
+                   {companyInitial}
+                 </span>
               </div>
-              <div className="mt-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
-                <Input 
-                  type="search" 
-                  placeholder="Search..." 
-                  className="h-9 bg-input border-sidebar-border placeholder:text-muted-foreground focus:bg-sidebar-accent text-sm"
-                />
-              </div>
+              {/* Search input removed from sidebar header */}
             </SidebarHeader>
             <SidebarContent className="flex-1 mt-2">
               <AppNav />
@@ -127,22 +131,15 @@ export default function RootLayout({
               <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
               
               <div className="flex-1 flex justify-center px-4">
-                <div className="w-full max-w-md relative">
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="search" 
-                    placeholder="Search anything..." 
-                    className="h-9 bg-input border-border pl-10 text-foreground placeholder:text-muted-foreground focus:bg-accent/10"
-                  />
-                </div>
+                {/* Global search input removed from top header */}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto"> {/* Added ml-auto to push UserNav to the right */}
                 <UserNav />
               </div>
             </header>
 
-            <SidebarInset className="bg-background"> {/* Ensures main content area also gets theme background */}
+            <SidebarInset className="bg-background"> 
               <main className="flex-1 p-4 sm:p-6 md:p-8">
                 {children}
               </main>

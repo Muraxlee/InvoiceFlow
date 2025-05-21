@@ -8,13 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink, Palette } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink, Palette, Building } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY } from "@/lib/localStorage";
-import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; // Import theme constants
+import { 
+  loadFromLocalStorage, 
+  saveToLocalStorage, 
+  INVOICE_CONFIG_KEY, 
+  DEFAULT_INVOICE_PREFIX, 
+  type InvoiceConfig, 
+  GOOGLE_AI_API_KEY_STORAGE_KEY,
+  COMPANY_NAME_STORAGE_KEY,
+  DEFAULT_COMPANY_NAME 
+} from "@/lib/localStorage";
+import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
-import { format } from "date-fns"; // Added import
+import { format } from "date-fns"; 
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";
@@ -28,6 +37,8 @@ export default function SettingsPage() {
   const [googleApiKey, setGoogleApiKey] = useState("");
   const [originalGoogleApiKey, setOriginalGoogleApiKey] = useState("");
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
+  const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME);
+  const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME);
 
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
@@ -43,13 +54,24 @@ export default function SettingsPage() {
 
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY;
     setSelectedThemeKey(storedTheme);
+
+    const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
+    setCompanyNameInput(storedCompanyName);
+    setCurrentCompanyName(storedCompanyName);
+
   }, []);
 
   const handleDataAction = (actionName: string, storageKey?: string | string[]) => {
     if (typeof window !== 'undefined') {
       if (storageKey) {
         if (Array.isArray(storageKey)) {
-          storageKey.forEach(key => localStorage.removeItem(key));
+          storageKey.forEach(key => {
+            localStorage.removeItem(key);
+            if (key === COMPANY_NAME_STORAGE_KEY) { // Reset company name on factory reset
+                 setCompanyNameInput(DEFAULT_COMPANY_NAME);
+                 setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+            }
+          });
         } else {
           localStorage.removeItem(storageKey);
         }
@@ -67,7 +89,6 @@ export default function SettingsPage() {
         saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
         setInvoicePrefix(defaultConfig.prefix);
         setOriginalInvoicePrefix(defaultConfig.prefix);
-        // Reset theme to default on factory reset
         handleThemeChange(DEFAULT_THEME_KEY);
     }
   };
@@ -119,6 +140,25 @@ export default function SettingsPage() {
     });
   };
 
+  const handleSaveCompanyName = () => {
+    if (!companyNameInput.trim()) {
+      toast({
+        title: "Company Name Empty",
+        description: "Please enter a company name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, companyNameInput);
+    setCurrentCompanyName(companyNameInput);
+    toast({
+      title: "Company Name Saved",
+      description: `Company name updated to ${companyNameInput}. This will reflect on next page load or refresh.`,
+    });
+    // Optionally force a reload or notify layout to update, for now, rely on refresh/navigation
+    // window.dispatchEvent(new Event('storage')); // This might work for layout if it listens
+  };
+
   const handleThemeChange = useCallback((themeKey: string) => {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
@@ -137,13 +177,42 @@ export default function SettingsPage() {
     { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage.", key: INVOICES_KEY },
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage.", key: CUSTOMERS_KEY },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage.", key: PRODUCTS_KEY },
-    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, invoice settings, API key, and theme to default.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY] },
+    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, invoice settings, API key, company name and theme to default.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY] },
   ];
 
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Application Settings" description="Manage your application data, AI, theme, and other configurations." />
+      <PageHeader title="Application Settings" description="Manage your application data, company info, AI, theme, and other configurations." />
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Building className="h-8 w-8 text-primary" />
+            <div>
+              <CardTitle className="text-xl">Company Settings</CardTitle>
+              <CardDescription>Set your company name that appears in the application.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <div className="space-y-2">
+            <Label htmlFor="companyNameInput">Company Name</Label>
+            <div className="flex gap-2 items-center">
+                <Input 
+                    id="companyNameInput" 
+                    value={companyNameInput} 
+                    onChange={(e) => setCompanyNameInput(e.target.value)}
+                    className="max-w-xs"
+                    placeholder="Your Company Name"
+                />
+                <Button onClick={handleSaveCompanyName} disabled={companyNameInput === currentCompanyName || companyNameInput.trim() === ""}>
+                    <Save className="mr-2 h-4 w-4" /> Save Name
+                </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -194,7 +263,7 @@ export default function SettingsPage() {
                 </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Example: INV{format(new Date(), 'ddMMyyyy')}0001
+              Example: {invoicePrefix || 'INV'}{format(new Date(), 'ddMMyyyy')}0001
             </p>
           </div>
         </CardContent>

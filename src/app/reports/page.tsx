@@ -185,53 +185,59 @@ export default function ReportsPage() {
 
       {/* Table Card */}
       <Card>
-        <CardHeader className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <Tabs defaultValue="table" className="w-auto">
-              <TabsList>
+        <Tabs defaultValue="table" className="w-full">
+          <CardHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <TabsList className="w-auto">
                 <TabsTrigger value="table">Table</TabsTrigger>
                 <TabsTrigger value="chart" disabled>Chart</TabsTrigger> 
               </TabsList>
-            </Tabs>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon"><ListTree className="h-4 w-4" /></Button>
-              <div className="relative ml-2">
-                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search..." className="pl-8 h-9 w-40 lg:w-56" />
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon"><ListTree className="h-4 w-4" /></Button>
+                <div className="relative ml-2">
+                  <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search..." className="pl-8 h-9 w-40 lg:w-56" />
+                </div>
               </div>
             </div>
-          </div>
-        </CardHeader>
-        <TabsContent value="table" className="mt-0"> {/* mt-0 because CardHeader has padding */}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Day</TableHead>
-                <TableHead>Active User</TableHead>
-                <TableHead>Active Searches</TableHead>
-                <TableHead>Search Attempts</TableHead>
-                <TableHead>Search Completed</TableHead>
-                <TableHead>Ad Clicks</TableHead>
-                <TableHead>CTR</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tableData.map((row, index) => (
-                <TableRow key={index}>
-                  <TableCell>{row.day}</TableCell>
-                  <TableCell>{row.activeUser}</TableCell>
-                  <TableCell>{row.activeSearches}</TableCell>
-                  <TableCell>{row.searchAttempts}</TableCell>
-                  <TableCell>{row.searchCompleted}</TableCell>
-                  <TableCell>{row.adClicks}</TableCell>
-                  <TableCell>{row.ctr}</TableCell>
+          </CardHeader>
+          <TabsContent value="table" className="mt-0"> {/* mt-0 because CardHeader has padding */}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Day</TableHead>
+                  <TableHead>Active User</TableHead>
+                  <TableHead>Active Searches</TableHead>
+                  <TableHead>Search Attempts</TableHead>
+                  <TableHead>Search Completed</TableHead>
+                  <TableHead>Ad Clicks</TableHead>
+                  <TableHead>CTR</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TabsContent>
+              </TableHeader>
+              <TableBody>
+                {tableData.map((row, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{row.day}</TableCell>
+                    <TableCell>{row.activeUser}</TableCell>
+                    <TableCell>{row.activeSearches}</TableCell>
+                    <TableCell>{row.searchAttempts}</TableCell>
+                    <TableCell>{row.searchCompleted}</TableCell>
+                    <TableCell>{row.adClicks}</TableCell>
+                    <TableCell>{row.ctr}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
+          {/* 
+          <TabsContent value="chart" className="mt-0">
+             Placeholder for chart view 
+            <div className="p-4 text-center text-muted-foreground">Chart view not yet implemented.</div>
+          </TabsContent>
+          */}
+        </Tabs>
       </Card>
 
       {/* AI Sales Advisor Card */}

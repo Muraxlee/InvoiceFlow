@@ -254,7 +254,7 @@ html[data-theme="daybreak-classic"] {
   --sidebar-background: 220 20% 95%;
   --sidebar-foreground: 220 10% 30%;
   --sidebar-primary: 210 70% 55%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-foreground: 220 10% 15%; /* Adjusted for visibility on light sidebar */
   --sidebar-accent: 220 15% 88%;
   --sidebar-accent-foreground: 220 10% 15%;
   --sidebar-border: 220 15% 85%;
@@ -293,7 +293,7 @@ html[data-theme="minty-fresh"] {
   --sidebar-background: 150 35% 94%;
   --sidebar-foreground: 150 15% 35%;
   --sidebar-primary: 160 60% 45%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-foreground: 150 20% 25%; /* Adjusted for visibility on light sidebar */
   --sidebar-accent: 155 25% 88%;
   --sidebar-accent-foreground: 150 15% 20%;
   --sidebar-border: 155 20% 85%;
@@ -332,7 +332,7 @@ html[data-theme="sunny-citrus"] {
   --sidebar-background: 40 60% 93%;
   --sidebar-foreground: 30 15% 32%;
   --sidebar-primary: 35 85% 60%;
-  --sidebar-primary-foreground: 30 20% 10%;
+  --sidebar-primary-foreground: 30 20% 10%; /* Adjusted for visibility */
   --sidebar-accent: 45 40% 88%;
   --sidebar-accent-foreground: 30 15% 18%;
   --sidebar-border: 45 30% 85%;
@@ -371,7 +371,7 @@ html[data-theme="high-contrast-dark"] {
   --sidebar-background: 0 0% 3%;
   --sidebar-foreground: 0 0% 85%;
   --sidebar-primary: 60 100% 50%;
-  --sidebar-primary-foreground: 0 0% 5%;
+  --sidebar-primary-foreground: 0 0% 95%; /* Adjusted for visibility on dark sidebar */
   --sidebar-accent: 0 0% 8%;
   --sidebar-accent-foreground: 0 0% 95%;
   --sidebar-border: 0 0% 18%;
@@ -410,7 +410,7 @@ html[data-theme="high-contrast-light"] {
   --sidebar-background: 0 0% 96%;
   --sidebar-foreground: 0 0% 10%;
   --sidebar-primary: 240 70% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-foreground: 0 0% 5%; /* Adjusted for visibility on light sidebar */
   --sidebar-accent: 0 0% 88%;
   --sidebar-accent-foreground: 0 0% 5%;
   --sidebar-border: 0 0% 82%;
@@ -461,7 +461,7 @@ html[data-theme="vscode-dark"] {
   --sidebar-background: 220 15% 20%; /* Activity Bar background: hsl(220, 15%, 20%) - #2a2a2a */
   --sidebar-foreground: 210 10% 70%; 
   --sidebar-primary: 205 70% 55%; /* Active icon in sidebar */
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-foreground: 0 0% 100%; /* Company name text */
   --sidebar-accent: 220 15% 28%; /* Hover bg for sidebar items */
   --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-border: 220 10% 10%; /* Panel border: hsl(220, 10%, 10%) - #1a1a1a */
@@ -521,3 +521,4 @@ html[data-theme="custom"] {
     @apply bg-background text-foreground; /* Uses CSS vars, will change with theme */
   }
 }
+

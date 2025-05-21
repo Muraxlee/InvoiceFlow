@@ -1,17 +1,11 @@
+"use client";
+
+import { useState, useEffect } from 'react';
 import PageHeader from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DollarSign, Users, CreditCard, Activity, TrendingUp, TrendingDown } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts';
-
-const salesData = [
-  { month: "Jan", sales: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Feb", sales: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Mar", sales: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Apr", sales: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "May", sales: Math.floor(Math.random() * 5000) + 1000 },
-  { month: "Jun", sales: Math.floor(Math.random() * 5000) + 1000 },
-];
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts'; // Keep this import as is
 
 const chartConfig = {
   sales: {
@@ -20,13 +14,38 @@ const chartConfig = {
   },
 };
 
-
 export default function DashboardPage() {
-  // Placeholder data
+  const [salesData, setSalesData] = useState<Array<{ month: string; sales: number }>>([]);
+  const [recentActivityData, setRecentActivityData] = useState<Array<{ id: number; description: string; amount: string; timeAgo: string }>>([]);
+
+  // Placeholder data (can be fetched or remain static)
   const totalRevenue = 78250.00;
   const newCustomers = 132;
   const invoicesSent = 450;
   const outstandingAmount = 12500.00;
+
+  useEffect(() => {
+    // Generate sales data on the client
+    const generatedSalesData = [
+      { month: "Jan", sales: Math.floor(Math.random() * 4000) + 1000 },
+      { month: "Feb", sales: Math.floor(Math.random() * 4000) + 1000 },
+      { month: "Mar", sales: Math.floor(Math.random() * 4000) + 1000 },
+      { month: "Apr", sales: Math.floor(Math.random() * 4000) + 1000 },
+      { month: "May", sales: Math.floor(Math.random() * 4000) + 1000 },
+      { month: "Jun", sales: Math.floor(Math.random() * 4000) + 1000 },
+    ];
+    setSalesData(generatedSalesData);
+
+    // Generate recent activity data on the client
+    const generatedActivityData = Array.from({ length: 5 }).map((_, i) => ({
+        id: i,
+        description: `Invoice #INV-2024-00${7 - i} sent to Client ${String.fromCharCode(65 + i)}`,
+        amount: `$${(Math.random() * 1000 + 500).toFixed(2)}`,
+        timeAgo: `${i+1} day${i > 0 ? 's' : ''} ago`
+    }));
+    setRecentActivityData(generatedActivityData);
+
+  }, []); // Empty dependency array ensures this runs once on mount
 
   return (
     <div className="space-y-6">
@@ -82,18 +101,22 @@ export default function DashboardPage() {
             <CardDescription>Revenue generated per month for the last 6 months.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000}k`} />
-                  <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {salesData.length > 0 ? (
+              <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={salesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000}k`} />
+                    <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">Loading chart data...</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -102,17 +125,21 @@ export default function DashboardPage() {
             <CardDescription>A log of recent invoices and payments.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] overflow-y-auto">
-            <ul className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <li key={i} className="flex items-center justify-between text-sm p-2 rounded-md hover:bg-muted/50">
-                  <div>
-                    <p className="font-medium">Invoice #INV-2024-00{7 - i} sent to Client {String.fromCharCode(65 + i)}</p>
-                    <p className="text-xs text-muted-foreground">Amount: ${(Math.random() * 1000 + 500).toFixed(2)}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{i+1} day{i > 0 ? 's' : ''} ago</span>
-                </li>
-              ))}
-            </ul>
+            {recentActivityData.length > 0 ? (
+              <ul className="space-y-3">
+                {recentActivityData.map((activity) => (
+                  <li key={activity.id} className="flex items-center justify-between text-sm p-2 rounded-md hover:bg-muted/50">
+                    <div>
+                      <p className="font-medium">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground">Amount: {activity.amount}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{activity.timeAgo}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+               <div className="h-full flex items-center justify-center text-muted-foreground">Loading activity...</div>
+            )}
           </CardContent>
         </Card>
       </div>

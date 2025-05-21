@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig } from "@/lib/localStorage";
+import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY } from "@/lib/localStorage";
+import Link from "next/link";
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";
@@ -21,6 +22,8 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
+  const [googleApiKey, setGoogleApiKey] = useState("");
+  const [originalGoogleApiKey, setOriginalGoogleApiKey] = useState("");
 
 
   useEffect(() => {
@@ -30,6 +33,10 @@ export default function SettingsPage() {
     });
     setInvoicePrefix(config.prefix);
     setOriginalInvoicePrefix(config.prefix);
+
+    const storedApiKey = loadFromLocalStorage<string>(GOOGLE_AI_API_KEY_STORAGE_KEY, "");
+    setGoogleApiKey(storedApiKey);
+    setOriginalGoogleApiKey(storedApiKey);
   }, []);
 
   const handleDataAction = (actionName: string, storageKey?: string | string[]) => {
@@ -47,6 +54,16 @@ export default function SettingsPage() {
       title: `${actionName} Successful`,
       description: `The ${actionName.toLowerCase()} operation has been completed. Data cleared from local storage.`,
     });
+    // Special case for factory reset to also clear API key from state
+    if (actionName === "Factory Reset") {
+        setGoogleApiKey("");
+        setOriginalGoogleApiKey("");
+        // Reset invoice prefix to default
+        const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
+        saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
+        setInvoicePrefix(defaultConfig.prefix);
+        setOriginalInvoicePrefix(defaultConfig.prefix);
+    }
   };
 
   const handleSaveInvoiceSettings = () => {
@@ -79,13 +96,30 @@ export default function SettingsPage() {
       description: `Invoice prefix updated to ${currentConfig.prefix}.`,
     });
   };
+  
+  const handleSaveApiKey = () => {
+    if (!googleApiKey.trim()) {
+      toast({
+        title: "API Key Empty",
+        description: "Please enter a valid Google AI API Key.",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, googleApiKey);
+    setOriginalGoogleApiKey(googleApiKey);
+    toast({
+      title: "API Key Saved",
+      description: "Google AI API Key has been saved to local storage.",
+    });
+  };
 
 
   const dataManagementActions = [
     { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage. This action cannot be undone.", key: INVOICES_KEY },
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage. This action cannot be undone.", key: CUSTOMERS_KEY },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage. This action cannot be undone.", key: PRODUCTS_KEY },
-    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data (invoices, customers, products) and settings to their default state from local storage. This will erase everything. This action cannot be undone.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY] },
+    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data (invoices, customers, products), invoice settings, and saved API key to their default state from local storage. This will erase everything. This action cannot be undone.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY] },
   ];
 
 
@@ -126,6 +160,67 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Brain className="h-8 w-8 text-primary" />
+            <div>
+              <CardTitle className="text-xl">AI Settings</CardTitle>
+              <CardDescription>Configure AI-powered features like GST suggestions and Sales Advisor.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="googleApiKey">Google AI API Key</Label>
+            <div className="flex gap-2 items-center">
+              <Input
+                id="googleApiKey"
+                type="password"
+                value={googleApiKey}
+                onChange={(e) => setGoogleApiKey(e.target.value)}
+                className="max-w-md"
+                placeholder="Enter your Google AI API Key"
+              />
+              <Button onClick={handleSaveApiKey} disabled={googleApiKey === originalGoogleApiKey}>
+                <Save className="mr-2 h-4 w-4" /> Save API Key
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your API key is stored locally in your browser's local storage.
+            </p>
+          </div>
+          <div className="text-sm space-y-2 p-4 border rounded-md bg-muted/50">
+            <h4 className="font-semibold text-md flex items-center gap-2"><KeyRound className="h-5 w-5"/> Using Your Google AI API Key</h4>
+            <p>
+              The AI features in this application (GST Suggestions, Sales Advisor) use Google AI models through Genkit.
+              To enable these features, you need a Google AI API Key.
+            </p>
+            <p>
+              <strong>How to get an API Key:</strong>
+              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="ml-1 text-primary hover:underline inline-flex items-center">
+                 Visit Google AI Studio <ExternalLink className="h-3 w-3 ml-1"/>
+              </Link>
+              and create a new API key.
+            </p>
+            <p className="font-semibold text-destructive">
+              <strong>Important:</strong> For the AI features to use your saved key:
+            </p>
+            <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
+              <li>Save your API key using the button above.</li>
+              <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the root of this project.</li>
+              <li>Add the following line, replacing <code className="bg-secondary px-1 py-0.5 rounded text-foreground">YOUR_API_KEY_HERE</code> with your actual key:
+                <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre>
+              </li>
+              <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code> if applicable).</li>
+            </ol>
+            <p className="mt-2 text-xs">
+              The application's Genkit setup will then use this environment variable.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
 
       <Card className="shadow-lg border-destructive">
         <CardHeader>
@@ -147,7 +242,7 @@ export default function SettingsPage() {
               <ConfirmDialog
                 triggerButton={
                   <Button variant="destructive" className="w-full sm:w-auto">
-                    <Trash2 className="mr-2 h-4 w-4" /> {action.label}
+                    <Trash2 className="mr-2 h-4 w-4" /> {action.label.replace(/\s\(.*\)/, '')} {/* Remove text in brackets for shorter button label */}
                   </Button>
                 }
                 title={`Confirm ${action.label}`}
@@ -182,45 +277,47 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       
+      {/* Sales Enhancement Suggestions Card is a duplicate from Reports page, might be removed or repurposed if settings focus on AI _configuration_ */}
+      {/* For now, keeping it as it was previously. */}
       <div className="grid md:grid-cols-2 gap-8">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Brain className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle className="text-xl">AI Settings</CardTitle>
-                <CardDescription>Configure AI-powered features like GST suggestions.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Manage settings related to AI-driven functionalities. Currently, GST suggestions are active. Future options for tuning AI behavior or enabling/disabling specific AI features will appear here.
-            </p>
-            <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
-              <Brain className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">AI configuration options will be available here.</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
+         <Card className="shadow-lg">
           <CardHeader>
             <div className="flex items-center gap-3">
               <Sparkles className="h-8 w-8 text-primary" />
               <div>
                 <CardTitle className="text-xl">Sales Enhancement Suggestions</CardTitle>
-                <CardDescription>Get AI-powered suggestions to improve your sales strategies.</CardDescription>
+                <CardDescription>Configuration for AI-powered sales strategy suggestions.</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              This feature is planned for a future update. It will provide actionable insights and suggestions based on your sales data to help you enhance performance and identify new opportunities.
+              Manage settings for the AI Sales Advisor feature. Future options might include setting business context preferences or tuning suggestion frequency. The Sales Advisor itself is available on the Reports page.
             </p>
             <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
               <Sparkles className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">Sales enhancement suggestions will appear here.</p>
+              <p className="mt-2 text-sm text-muted-foreground">AI Sales Advisor configuration options will be here.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Placeholder for other settings if needed */}
+         <Card className="shadow-lg opacity-50">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Settings2 className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-xl">Other Settings (Placeholder)</CardTitle>
+                <CardDescription>Future application settings will appear here.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              This is a placeholder for additional application settings as they are developed.
+            </p>
+             <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
+              <Settings2 className="mx-auto h-12 w-12 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>

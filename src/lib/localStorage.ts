@@ -44,3 +44,6 @@ export interface InvoiceConfig {
     [dateKey: string]: number; // dateKey will be "DDMMYYYY"
   };
 }
+
+// Key for storing Google AI API Key
+export const GOOGLE_AI_API_KEY_STORAGE_KEY = "app_google_ai_api_key";

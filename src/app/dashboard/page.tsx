@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'; // Removed RechartsTooltip as ChartTooltip is used
 import { DollarSign, Users, ListChecks, FileWarning, Activity, ShoppingBag } from "lucide-react";
 import { loadFromLocalStorage } from "@/lib/localStorage";
 import type { InvoiceFormValues } from "@/components/invoice-form";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import PageHeader from '@/components/page-header'; // Added PageHeader import
 
 const INVOICES_STORAGE_KEY = "app_invoices";
 const CUSTOMERS_STORAGE_KEY = "app_customers";
@@ -46,7 +48,7 @@ export default function DashboardPage() {
     const monthlySales: { [key: string]: number } = {};
 
     storedInvoices.forEach(invoice => {
-      const invoiceDate = new Date(invoice.invoiceDate); // Ensure invoiceDate is a Date object
+      const invoiceDate = new Date(invoice.invoiceDate); 
       if (invoice.status === "Paid") {
         revenue += invoice.amount;
       } else if (invoice.status === "Pending" || invoice.status === "Overdue") {
@@ -56,7 +58,6 @@ export default function DashboardPage() {
         pendingCount++;
       }
 
-      // Aggregate sales by month (e.g., "Jan 2024")
       if (invoice.status === "Paid" && !isNaN(invoiceDate.getTime())) {
           const monthYear = format(invoiceDate, "MMM yyyy");
           monthlySales[monthYear] = (monthlySales[monthYear] || 0) + invoice.amount;
@@ -69,14 +70,14 @@ export default function DashboardPage() {
     setNewCustomersCount(storedCustomers.length);
 
     const sortedInvoices = [...storedInvoices]
-        .map(inv => ({...inv, invoiceDate: new Date(inv.invoiceDate)})) // ensure date objects
+        .map(inv => ({...inv, invoiceDate: new Date(inv.invoiceDate)})) 
         .sort((a, b) => b.invoiceDate.getTime() - a.invoiceDate.getTime());
     setRecentInvoices(sortedInvoices.slice(0, 5));
     
     const chartSalesData = Object.entries(monthlySales)
       .map(([month, sales]) => ({ month, sales }))
-      .sort((a,b) => new Date(a.month).getTime() - new Date(b.month).getTime()) // Sort by month
-      .slice(-6); // Show last 6 months or fewer
+      .sort((a,b) => new Date(a.month).getTime() - new Date(b.month).getTime()) 
+      .slice(-6); 
 
     setSalesData(chartSalesData);
     setIsLoading(false);
@@ -102,7 +103,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="space-y-6"> {/* Added space-y-6 for consistent spacing */}
+      <PageHeader 
+        title="Dashboard Overview" 
+        description="A summary of your key business metrics and recent activities."
+      />
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -126,11 +131,11 @@ export default function DashboardPage() {
         </Card>
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Customers</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Customers</CardTitle> {/* Changed from "New Customers" */}
             <Users className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">+{newCustomersCount}</div>
+            <div className="text-3xl font-bold">{newCustomersCount}</div> {/* Kept variable name, but title reflects total */}
             <p className="text-xs text-muted-foreground">Total customers registered</p>
           </CardContent>
         </Card>
@@ -250,3 +255,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

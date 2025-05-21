@@ -14,6 +14,7 @@ import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_I
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; // Import theme constants
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
+import { format } from "date-fns"; // Added import
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";

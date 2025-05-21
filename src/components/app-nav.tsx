@@ -1,3 +1,4 @@
+
 // src/components/app-nav.tsx
 "use client";
 
@@ -7,18 +8,20 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard,
   Zap, // For Shortcuts
   ListChecks, // For Events
   Activity, // For Real Time
-  Users, // For Audience
+  Users, // For Audience (Quanti)
   Target, // For Conversion
-  SettingsIcon, // Keeping settings
-  FileText, // Keeping invoices
-  Package, // Keeping products
-  BarChart3, // Keeping reports
+  Settings as SettingsIcon, // For Settings
+  FileText, // For Invoices
+  Package, // For Products
+  BarChart3, // For Reports
+  UsersRound, // For Customers
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,25 +43,20 @@ const quantiNavItems: NavItem[] = [
   { href: '/conversion', label: 'Conversion', icon: Target, tooltip: 'Conversion Funnels' },
 ];
 
-// Keeping original app pages for now, can be removed or integrated later
-const originalAppNavItems: NavItem[] = [
+// Original app pages for business management
+const businessManagementNavItems: NavItem[] = [
   { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
-  { href: '/customers', label: 'Customers', icon: Users, tooltip: 'Manage Customers' },
+  { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
-  { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports' },
+  { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & AI Advisor' },
   { href: '/settings', label: 'Settings', icon: SettingsIcon, tooltip: 'Application Settings' },
 ];
-
-// For this UI overhaul, we prioritize QuantiNavItems.
-// If you want to integrate the original items, they can be added to this list or a separate menu.
-const navItems = quantiNavItems; 
 
 export function AppNav() {
   const pathname = usePathname();
 
   const renderNavItem = (item: NavItem) => {
     const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
-
 
     return (
       <SidebarMenuItem key={item.href} className="relative">
@@ -69,7 +67,7 @@ export function AppNav() {
             aria-label={item.tooltip}
             className={cn(
               "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",
-              isActive && "bg-sidebar-accent text-sidebar-primary-foreground font-medium",
+              isActive && "bg-sidebar-primary text-sidebar-primary-foreground font-medium", // Updated active style
               !isActive && "font-normal"
             )}
           >
@@ -85,9 +83,13 @@ export function AppNav() {
   };
 
   return (
-    // Removed px-2 from SidebarMenu to allow full-width control for items
     <SidebarMenu className="group-[[data-state=collapsed]]:px-0 gap-0.5"> 
-      {navItems.map(item => renderNavItem(item))}
+      {quantiNavItems.map(item => renderNavItem(item))}
+      <SidebarSeparator className="my-2 group-data-[collapsible=icon]:hidden" />
+      <div className="px-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden mb-1">
+        <span className="text-xs font-semibold text-sidebar-foreground/60">Management</span>
+      </div>
+      {businessManagementNavItems.map(item => renderNavItem(item))}
     </SidebarMenu>
   );
 }

@@ -4,12 +4,12 @@
 import { useState, useEffect } from 'react';
 import PageHeader from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DollarSign, Users, CreditCard, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, Users, CreditCard, Activity, TrendingUp, TrendingDown } from "lucide-react"; // Using DollarSign as a generic currency icon
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { loadFromLocalStorage } from '@/lib/localStorage';
 import type { InvoiceFormValues } from '@/components/invoice-form';
-import type { Customer } from '@/app/customers/page'; // Assuming Customer type is exported
+import type { Customer } from '@/app/customers/page';
 
 const INVOICES_STORAGE_KEY = "app_invoices";
 const CUSTOMERS_STORAGE_KEY = "app_customers";
@@ -64,23 +64,22 @@ export default function DashboardPage() {
     setNewCustomersCount(storedCustomers.length); // Simplified: all stored customers are "new" in this context
 
     // Format sales data for chart
-    const currentYear = new Date().getFullYear();
     const monthsOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const generatedSalesData = monthsOrder.slice(0,6).map(month => ({ // Show first 6 months for demo
       month: month,
-      sales: monthlySales[month] || Math.floor(Math.random() * 100) + 50, // Fallback to random if no sales
+      sales: monthlySales[month] || Math.floor(Math.random() * 10000) + 5000, // Fallback to random if no sales, in rupees
     }));
     setSalesData(generatedSalesData);
 
     // Populate recent activity (last 5 invoices)
     const sortedInvoices = [...storedInvoices].sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime());
-    const generatedActivityData = sortedInvoices.slice(0, 5).map((invoice, i) => {
+    const generatedActivityData = sortedInvoices.slice(0, 5).map((invoice) => {
         const timeDiff = new Date().getTime() - new Date(invoice.invoiceDate).getTime();
         const daysAgo = Math.floor(timeDiff / (1000 * 3600 * 24));
         return {
             id: invoice.id,
             description: `Invoice #${invoice.invoiceNumber} sent to ${invoice.customerName}`,
-            amount: `$${invoice.amount.toFixed(2)}`,
+            amount: `₹${invoice.amount.toFixed(2)}`,
             timeAgo: daysAgo <=0 ? 'Today' : `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`
         }
     });
@@ -96,10 +95,10 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" /> {/* Using DollarSign as a generic currency icon, context implies Rupees */}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</div>
             {/* Trend data is placeholder for now */}
             <p className="text-xs text-muted-foreground">+10.2% from last month <TrendingUp className="inline h-3 w-3" /></p>
           </CardContent>
@@ -130,7 +129,7 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${outstandingAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₹{outstandingAmount.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">-2.5% from last week <TrendingDown className="inline h-3 w-3" /></p>
           </CardContent>
         </Card>
@@ -149,7 +148,7 @@ export default function DashboardPage() {
                   <BarChart data={salesData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000}k`} />
+                    <YAxis tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value/1000}k`} />
                     <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
                     <ChartLegend content={<ChartLegendContent />} />
                     <Bar dataKey="sales" fill="var(--color-sales)" radius={4} />

@@ -25,7 +25,7 @@ const productSchema = z.object({
     .transform(value => value === "" ? `https://placehold.co/60x60.png?text=${value || "Product"}` : value),
   description: z.string().min(1, "Description is required"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
-  gstCategory: z.string().min(1, "GST Category is required (e.g., HSN 8471)"),
+  gstCategory: z.string().min(1, "Tax Category is required (e.g., HSN 8471)"),
 });
 
 export type ProductFormValues = z.infer<typeof productSchema>;
@@ -119,9 +119,9 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price</FormLabel>
+                <FormLabel>Price (₹)</FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.01" placeholder="e.g., 19.99" {...field} />
+                  <Input type="number" step="0.01" placeholder="e.g., 1999.99" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -132,7 +132,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
             name="gstCategory"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>GST Category</FormLabel>
+                <FormLabel>Tax Category (HSN/SAC)</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g., HSN 8471" {...field} />
                 </FormControl>

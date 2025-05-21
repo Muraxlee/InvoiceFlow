@@ -24,10 +24,10 @@ interface StoredInvoice extends InvoiceFormValues {
 }
 
 const defaultInvoices: StoredInvoice[] = [
-  { id: "INV001", customerName: "Alpha Inc.", customerEmail: "contact@alpha.com", invoiceDate: new Date("2024-07-15"), dueDate: new Date("2024-08-14"), amount: 1250.00, status: "Paid", items: [], invoiceNumber:"INV001" },
-  { id: "INV002", customerName: "Beta LLC", customerEmail: "info@betallc.dev", invoiceDate: new Date("2024-07-18"), dueDate: new Date("2024-08-17"), amount: 850.50, status: "Pending", items: [], invoiceNumber:"INV002" },
-  { id: "INV003", customerName: "Gamma Co.", customerEmail: "support@gammaco.io", invoiceDate: new Date("2024-07-20"), dueDate: new Date("2024-08-19"), amount: 2400.75, status: "Overdue", items: [], invoiceNumber:"INV003" },
-  { id: "INV004", customerName: "Delta Solutions", customerEmail: "solutions@delta.com", invoiceDate: new Date("2024-07-22"), dueDate: new Date("2024-08-21"), amount: 500.00, status: "Draft", items: [], invoiceNumber:"INV004" },
+  { id: "INV001", customerName: "Alpha Inc.", customerEmail: "contact@alpha.com", invoiceDate: new Date("2024-07-15"), dueDate: new Date("2024-08-14"), amount: 12500.00, status: "Paid", items: [], invoiceNumber:"INV001" },
+  { id: "INV002", customerName: "Beta LLC", customerEmail: "info@betallc.dev", invoiceDate: new Date("2024-07-18"), dueDate: new Date("2024-08-17"), amount: 8500.50, status: "Pending", items: [], invoiceNumber:"INV002" },
+  { id: "INV003", customerName: "Gamma Co.", customerEmail: "support@gammaco.io", invoiceDate: new Date("2024-07-20"), dueDate: new Date("2024-08-19"), amount: 24000.75, status: "Overdue", items: [], invoiceNumber:"INV003" },
+  { id: "INV004", customerName: "Delta Solutions", customerEmail: "solutions@delta.com", invoiceDate: new Date("2024-07-22"), dueDate: new Date("2024-08-21"), amount: 5000.00, status: "Draft", items: [], invoiceNumber:"INV004" },
 ];
 
 
@@ -104,7 +104,7 @@ export default function InvoicesPage() {
                   <TableCell>{invoice.customerName}</TableCell>
                   <TableCell>{invoice.invoiceDate.toLocaleDateString()}</TableCell>
                   <TableCell>{invoice.dueDate.toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">${invoice.amount?.toFixed(2) || '0.00'}</TableCell>
+                  <TableCell className="text-right">₹{invoice.amount?.toFixed(2) || '0.00'}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>
                   </TableCell>

@@ -18,9 +18,9 @@ import { ProductForm, type ProductFormValues } from "@/components/product-form";
 const LOCAL_STORAGE_KEY = "app_products";
 
 const defaultProducts = [
-  { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/60x60.png", description: "A high-quality widget for all your needs.", price: 29.99, gstCategory: "HSN 8471" },
-  { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/60x60.png", description: "Reliable and affordable gadget.", price: 15.50, gstCategory: "HSN 8517" },
-  { id: "PROD003", name: "Luxury Gizmo", imageUrl:"https://placehold.co/60x60.png", description: "Top-of-the-line gizmo with advanced features.", price: 99.00, gstCategory: "HSN 9006" },
+  { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/60x60.png", description: "A high-quality widget for all your needs.", price: 2999.99, gstCategory: "HSN 8471" },
+  { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/60x60.png", description: "Reliable and affordable gadget.", price: 1550.50, gstCategory: "HSN 8517" },
+  { id: "PROD003", name: "Luxury Gizmo", imageUrl:"https://placehold.co/60x60.png", description: "Top-of-the-line gizmo with advanced features.", price: 9900.00, gstCategory: "HSN 9006" },
 ];
 
 export type Product = typeof defaultProducts[0];
@@ -141,7 +141,7 @@ export default function ProductsPage() {
                   <TableCell>{product.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground truncate max-w-sm">{product.description}</TableCell>
                   <TableCell>{product.gstCategory}</TableCell>
-                  <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

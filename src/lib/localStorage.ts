@@ -33,3 +33,14 @@ export function saveToLocalStorage<T>(key: string, value: T): void {
     console.warn(`Error writing to localStorage key "${key}":`, error);
   }
 }
+
+// Configuration for invoice numbering
+export const INVOICE_CONFIG_KEY = "app_invoice_config";
+export const DEFAULT_INVOICE_PREFIX = "INV";
+
+export interface InvoiceConfig {
+  prefix: string;
+  dailyCounters: {
+    [dateKey: string]: number; // dateKey will be "DDMMYYYY"
+  };
+}

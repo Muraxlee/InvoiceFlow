@@ -1,4 +1,5 @@
-"use client"; // Added to make this a Client Component
+
+"use client"; 
 
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -7,22 +8,44 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 
-// Placeholder data
-const customers = [
+const LOCAL_STORAGE_KEY = "app_customers";
+
+// Default placeholder data
+const defaultCustomers = [
   { id: "CUST001", name: "Alpha Inc.", email: "contact@alpha.com", phone: "555-0101", address: "123 Tech Road, Silicon Valley, CA" },
   { id: "CUST002", name: "Beta LLC", email: "info@betallc.dev", phone: "555-0102", address: "456 Code Lane, Austin, TX" },
   { id: "CUST003", name: "Gamma Co.", email: "support@gammaco.io", phone: "555-0103", address: "789 Byte Street, New York, NY" },
 ];
 
+export type Customer = typeof defaultCustomers[0];
+
 export default function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    const storedCustomers = loadFromLocalStorage<Customer[]>(LOCAL_STORAGE_KEY, defaultCustomers);
+    setCustomers(storedCustomers);
+  }, []);
+
+  // Placeholder for delete action - in a real app, this would update state and localStorage
+  const handleDeleteCustomer = (customerId: string) => {
+    alert(`Delete customer ${customerId}. This is a placeholder. Implement actual deletion and update localStorage.`);
+    // Example: 
+    // const updatedCustomers = customers.filter(c => c.id !== customerId);
+    // setCustomers(updatedCustomers);
+    // saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Customers" 
         description="View, add, and manage your customer information."
         actions={
-          <Button onClick={() => alert("Add New Customer clicked. This is a placeholder.")}> {/* In a real app, this would open a modal or navigate to a create page */}
+          <Button onClick={() => alert("Add New Customer clicked. This is a placeholder. Implement form and update localStorage.")}>
             <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
           </Button>
         }
@@ -65,7 +88,7 @@ export default function CustomersPage() {
                         <DropdownMenuItem onClick={() => alert(`Edit customer ${customer.id}. This is a placeholder.`)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => alert(`Delete customer ${customer.id}. This is a placeholder.`)}>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteCustomer(customer.id)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -75,6 +98,9 @@ export default function CustomersPage() {
               ))}
             </TableBody>
           </Table>
+           {customers.length === 0 && (
+            <p className="py-4 text-center text-muted-foreground">No customers found. Add a new customer to get started.</p>
+          )}
         </CardContent>
       </Card>
     </div>

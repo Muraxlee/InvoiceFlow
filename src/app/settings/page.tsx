@@ -1,3 +1,4 @@
+
 "use client";
 
 import PageHeader from "@/components/page-header";
@@ -7,23 +8,38 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2 } from "lucide-react";
 
+const CUSTOMERS_KEY = "app_customers";
+const PRODUCTS_KEY = "app_products";
+const INVOICES_KEY = "app_invoices";
+
+
 export default function SettingsPage() {
   const { toast } = useToast();
 
-  const handleDataAction = (actionName: string) => {
-    // Placeholder for actual data clearing logic
+  const handleDataAction = (actionName: string, storageKey?: string | string[]) => {
+    if (typeof window !== 'undefined') {
+      if (storageKey) {
+        if (Array.isArray(storageKey)) {
+          storageKey.forEach(key => localStorage.removeItem(key));
+        } else {
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
     console.log(`${actionName} initiated`);
     toast({
       title: `${actionName} Successful`,
-      description: `The ${actionName.toLowerCase()} operation has been completed. (This is a placeholder)`,
+      description: `The ${actionName.toLowerCase()} operation has been completed. Data cleared from local storage.`,
     });
+    // Optionally, force a reload or redirect to reflect cleared data immediately
+    // window.location.reload(); 
   };
 
   const dataManagementActions = [
-    { id: "clearSales", label: "Clear Sales Data", description: "Permanently delete all sales records and reports. This action cannot be undone." },
-    { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information. This action cannot be undone." },
-    { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information. This action cannot be undone." },
-    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data and settings to their default state. This will erase everything. This action cannot be undone." },
+    { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage. This action cannot be undone.", key: INVOICES_KEY },
+    { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage. This action cannot be undone.", key: CUSTOMERS_KEY },
+    { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage. This action cannot be undone.", key: PRODUCTS_KEY },
+    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data (invoices, customers, products) and settings to their default state from local storage. This will erase everything. This action cannot be undone.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY] },
   ];
 
 
@@ -36,9 +52,9 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3">
             <DatabaseZap className="h-8 w-8 text-destructive" />
             <div>
-              <CardTitle className="text-xl">Data Management</CardTitle>
+              <CardTitle className="text-xl">Data Management (Local Storage)</CardTitle>
               <CardDescription className="text-destructive flex items-center gap-1">
-                <AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible and will result in permanent data loss.
+                <AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible and will result in permanent data loss from your browser's local storage.
               </CardDescription>
             </div>
           </div>
@@ -56,7 +72,7 @@ export default function SettingsPage() {
                 }
                 title={`Confirm ${action.label}`}
                 description={`Are you absolutely sure you want to ${action.label.toLowerCase()}? This action cannot be undone.`}
-                onConfirm={() => handleDataAction(action.label)}
+                onConfirm={() => handleDataAction(action.label, action.key)}
                 confirmText="Yes, Proceed"
                 confirmVariant="destructive"
               />
@@ -79,7 +95,6 @@ export default function SettingsPage() {
           <p className="text-muted-foreground">
             Role management features are currently under development. This section will allow administrators to create, assign, and manage user roles and their respective permissions within InvoiceFlow.
           </p>
-          {/* Placeholder for role management UI */}
           <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
             <UsersRound className="mx-auto h-12 w-12 text-muted-foreground" />
             <p className="mt-2 text-sm text-muted-foreground">User role management interface will be available here soon.</p>
@@ -102,7 +117,6 @@ export default function SettingsPage() {
             <p className="text-muted-foreground">
               Manage settings related to AI-driven functionalities. Currently, GST suggestions are active. Future options for tuning AI behavior or enabling/disabling specific AI features will appear here.
             </p>
-            {/* Placeholder for AI settings UI */}
             <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
               <Brain className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-2 text-sm text-muted-foreground">AI configuration options will be available here.</p>
@@ -124,7 +138,6 @@ export default function SettingsPage() {
             <p className="text-muted-foreground">
               This feature is planned for a future update. It will provide actionable insights and suggestions based on your sales data to help you enhance performance and identify new opportunities.
             </p>
-             {/* Placeholder for Sales Enhancement UI */}
             <div className="mt-4 p-6 border-2 border-dashed border-border rounded-md text-center">
               <Sparkles className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-2 text-sm text-muted-foreground">Sales enhancement suggestions will appear here.</p>

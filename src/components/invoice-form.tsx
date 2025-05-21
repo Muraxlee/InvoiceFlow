@@ -48,7 +48,7 @@ const invoiceSchema = z.object({
   invoiceImage: z.string().optional().describe("URL or path to an image for invoice formatting"),
 });
 
-type InvoiceFormValues = z.infer<typeof invoiceSchema>;
+export type InvoiceFormValues = z.infer<typeof invoiceSchema>; // Exporting this type
 
 interface InvoiceFormProps {
   onSubmit: (data: InvoiceFormValues) => void;
@@ -60,15 +60,13 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: defaultValues || {
-      // Initialize with null for dates to prevent hydration mismatch when creating new
-      // These will be set client-side in useEffect
       invoiceDate: null as any, 
       dueDate: null as any,
       items: [{ description: "", quantity: 1, price: 0, gstCategory: "" }],
       customerName: "",
       customerEmail: "",
       customerAddress: "",
-      invoiceNumber: "",
+      invoiceNumber: `INV-${Date.now().toString().slice(-6)}`, // Auto-generate invoice number
       notes: "",
       termsAndConditions: "",
       invoiceImage: "",
@@ -90,12 +88,12 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
   }, [fields.length]);
 
   useEffect(() => {
-    // If defaultValues prop was NOT provided (i.e., we are creating a new invoice)
-    // and the dates in the form are still null, then initialize them on the client-side.
-    if (!defaultValues) {
+    if (!defaultValues || (defaultValues && !defaultValues.invoiceDate)) {
       if (form.getValues('invoiceDate') === null) {
         form.setValue("invoiceDate", new Date(), { shouldValidate: true });
       }
+    }
+    if (!defaultValues || (defaultValues && !defaultValues.dueDate)) {
       if (form.getValues('dueDate') === null) {
         const todayForDueDate = new Date();
         const thirtyDaysFromNow = new Date(todayForDueDate);
@@ -103,6 +101,14 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
         form.setValue("dueDate", thirtyDaysFromNow, { shouldValidate: true });
       }
     }
+     // Auto-generate invoice number if not provided in defaultValues and current is empty or just the placeholder prefix
+     if (!defaultValues || (defaultValues && !defaultValues.invoiceNumber)) {
+      if (!form.getValues('invoiceNumber') || form.getValues('invoiceNumber') === 'INV-') {
+        form.setValue("invoiceNumber", `INV-${Date.now().toString().slice(-6)}`, { shouldValidate: true });
+      }
+    }
+
+
   }, [defaultValues, form]);
 
 
@@ -129,7 +135,6 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
   
   const watchItems = form.watch("items");
   const subtotal = watchItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
-  // Placeholder GST calculation - this would be more complex in a real app
   const gstAmount = subtotal * 0.18; // Assuming a flat 18% GST for now
   const total = subtotal + gstAmount;
 
@@ -307,7 +312,18 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
         </Card>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => form.reset()} disabled={isLoading}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => form.reset(defaultValues || { // Reset to initial defaults if provided, else to new form defaults
+            invoiceDate: new Date(), 
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+            items: [{ description: "", quantity: 1, price: 0, gstCategory: "" }],
+            customerName: "",
+            customerEmail: "",
+            customerAddress: "",
+            invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+            notes: "",
+            termsAndConditions: "",
+            invoiceImage: "",
+          })} disabled={isLoading}>Cancel</Button>
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {defaultValues ? "Save Changes" : "Create Invoice"}
@@ -317,4 +333,3 @@ export function InvoiceForm({ onSubmit, defaultValues, isLoading }: InvoiceFormP
     </Form>
   );
 }
-

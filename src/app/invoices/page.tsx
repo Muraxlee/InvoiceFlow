@@ -1,4 +1,5 @@
-"use client"; // Added to make this a Client Component
+
+"use client"; 
 
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -8,19 +9,31 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
+import type { InvoiceFormValues } from "@/components/invoice-form"; // Assuming InvoiceFormValues is exported
 
-// Placeholder data
-const invoices = [
-  { id: "INV001", customer: "Alpha Inc.", date: "2024-07-15", dueDate: "2024-08-14", amount: 1250.00, status: "Paid" },
-  { id: "INV002", customer: "Beta LLC", date: "2024-07-18", dueDate: "2024-08-17", amount: 850.50, status: "Pending" },
-  { id: "INV003", customer: "Gamma Co.", date: "2024-07-20", dueDate: "2024-08-19", amount: 2400.75, status: "Overdue" },
-  { id: "INV004", customer: "Delta Solutions", date: "2024-07-22", dueDate: "2024-08-21", amount: 500.00, status: "Draft" },
+const LOCAL_STORAGE_KEY = "app_invoices";
+
+interface StoredInvoice extends InvoiceFormValues {
+  id: string; // Ensure invoices have an ID for listing and actions
+  status: "Paid" | "Pending" | "Overdue" | "Draft"; // Add status
+  amount: number; // Add amount
+}
+
+// Default placeholder data
+const defaultInvoices: StoredInvoice[] = [
+  { id: "INV001", customerName: "Alpha Inc.", customerEmail: "contact@alpha.com", invoiceDate: new Date("2024-07-15"), dueDate: new Date("2024-08-14"), amount: 1250.00, status: "Paid", items: [], invoiceNumber:"INV001" },
+  { id: "INV002", customerName: "Beta LLC", customerEmail: "info@betallc.dev", invoiceDate: new Date("2024-07-18"), dueDate: new Date("2024-08-17"), amount: 850.50, status: "Pending", items: [], invoiceNumber:"INV002" },
+  { id: "INV003", customerName: "Gamma Co.", customerEmail: "support@gammaco.io", invoiceDate: new Date("2024-07-20"), dueDate: new Date("2024-08-19"), amount: 2400.75, status: "Overdue", items: [], invoiceNumber:"INV003" },
+  { id: "INV004", customerName: "Delta Solutions", customerEmail: "solutions@delta.com", invoiceDate: new Date("2024-07-22"), dueDate: new Date("2024-08-21"), amount: 500.00, status: "Draft", items: [], invoiceNumber:"INV004" },
 ];
+
 
 const statusVariant = (status: string) => {
   switch (status.toLowerCase()) {
-    case "paid": return "default"; // Greenish if customized, or use primary
-    case "pending": return "secondary"; // Bluish/Yellowish
+    case "paid": return "default"; 
+    case "pending": return "secondary"; 
     case "overdue": return "destructive";
     case "draft": return "outline";
     default: return "outline";
@@ -28,6 +41,28 @@ const statusVariant = (status: string) => {
 }
 
 export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
+
+  useEffect(() => {
+    // Dates from localStorage will be strings, so we need to parse them back to Date objects
+    const storedInvoices = loadFromLocalStorage<StoredInvoice[]>(LOCAL_STORAGE_KEY, defaultInvoices).map(inv => ({
+        ...inv,
+        invoiceDate: new Date(inv.invoiceDate),
+        dueDate: new Date(inv.dueDate)
+    }));
+    setInvoices(storedInvoices);
+  }, []);
+
+  // Placeholder for delete action
+  const handleDeleteInvoice = (invoiceId: string) => {
+    alert(`Deleting ${invoiceId}... This is a placeholder. Implement actual deletion and update localStorage.`);
+    // Example:
+    // const updatedInvoices = invoices.filter(inv => inv.id !== invoiceId);
+    // setInvoices(updatedInvoices);
+    // saveToLocalStorage(LOCAL_STORAGE_KEY, updatedInvoices);
+  };
+
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -63,11 +98,11 @@ export default function InvoicesPage() {
             <TableBody>
               {invoices.map((invoice) => (
                 <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.id}</TableCell>
-                  <TableCell>{invoice.customer}</TableCell>
-                  <TableCell>{invoice.date}</TableCell>
-                  <TableCell>{invoice.dueDate}</TableCell>
-                  <TableCell className="text-right">${invoice.amount.toFixed(2)}</TableCell>
+                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                  <TableCell>{invoice.customerName}</TableCell>
+                  <TableCell>{invoice.invoiceDate.toLocaleDateString()}</TableCell>
+                  <TableCell>{invoice.dueDate.toLocaleDateString()}</TableCell>
+                  <TableCell className="text-right">${invoice.amount?.toFixed(2) || '0.00'}</TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>
                   </TableCell>
@@ -81,7 +116,8 @@ export default function InvoicesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>
-                          <Link href={`/invoices/${invoice.id}/edit`} className="flex items-center w-full"> {/* Placeholder edit link */}
+                           {/* Placeholder edit link - needs /invoices/[id]/edit page and functionality */}
+                          <Link href={`/invoices/${invoice.id}/edit`} className="flex items-center w-full">
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </DropdownMenuItem>
@@ -94,7 +130,7 @@ export default function InvoicesPage() {
                          <DropdownMenuItem onClick={() => alert(`Printing Transport Bill for ${invoice.id}... This is a placeholder.`)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Transport Bill
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => alert(`Deleting ${invoice.id}... This is a placeholder.`)}>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteInvoice(invoice.id)}>
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -104,6 +140,9 @@ export default function InvoicesPage() {
               ))}
             </TableBody>
           </Table>
+          {invoices.length === 0 && (
+            <p className="py-4 text-center text-muted-foreground">No invoices found. Create a new invoice to get started.</p>
+          )}
         </CardContent>
       </Card>
     </div>

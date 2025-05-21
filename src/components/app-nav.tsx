@@ -7,71 +7,77 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  // SidebarMenuSub, // Keep if sub-menus might come back
-  // SidebarMenuSubButton,
-  // SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard,
-  FileText,
-  Users,
-  Package,
-  BarChart3,
-  SettingsIcon,
-  MessageSquare, // Icon for Chat
-  // FilePlus2, // Already used, for create invoice
-  // FileArchive, // Already used for manage invoices
+  Zap, // For Shortcuts
+  ListChecks, // For Events
+  Activity, // For Real Time
+  Users, // For Audience
+  Target, // For Conversion
+  SettingsIcon, // Keeping settings
+  FileText, // Keeping invoices
+  Package, // Keeping products
+  BarChart3, // Keeping reports
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// Accordion imports removed as the new design implies simpler navigation
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   tooltip: string;
-  // subItems?: NavItem[]; // Removed for simplicity, matching Creatio's flat nav
-  isSubItem?: boolean;
 };
 
-// Simplified nav items to match the Creatio example structure (Home, Feed, Leads, Opportunities, Activities, Chat)
-// Assuming current pages map to these broadly.
-const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Home page', icon: LayoutDashboard, tooltip: 'Dashboard' },
-  // { href: '/feed', label: 'Feed', icon: Rss, tooltip: 'Activity Feed' }, // Example, if a feed page exists
-  { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Invoices' }, // Was "Leads" in Creatio example
-  { href: '/customers', label: 'Customers', icon: Users, tooltip: 'Customers' }, // Was "Opportunities"
-  { href: '/products', label: 'Products', icon: Package, tooltip: 'Products' }, // Was "Activities"
-  { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'Reports' }, // Was "Chat" - using a more generic icon
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, tooltip: 'Settings' },
+// Nav items based on Quanti Analytics screenshot
+const quantiNavItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Dashboard Overview' },
+  { href: '/shortcuts', label: 'Shortcuts', icon: Zap, tooltip: 'Your Shortcuts' },
+  { href: '/events', label: 'Events', icon: ListChecks, tooltip: 'Track Events' },
+  { href: '/real-time', label: 'Real Time', icon: Activity, tooltip: 'Real Time Analytics' },
+  { href: '/audience', label: 'Audience', icon: Users, tooltip: 'Audience Insights' },
+  { href: '/conversion', label: 'Conversion', icon: Target, tooltip: 'Conversion Funnels' },
 ];
 
+// Keeping original app pages for now, can be removed or integrated later
+const originalAppNavItems: NavItem[] = [
+  { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
+  { href: '/customers', label: 'Customers', icon: Users, tooltip: 'Manage Customers' },
+  { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
+  { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports' },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon, tooltip: 'Application Settings' },
+];
+
+// For this UI overhaul, we prioritize QuantiNavItems.
+// If you want to integrate the original items, they can be added to this list or a separate menu.
+const navItems = quantiNavItems; 
 
 export function AppNav() {
   const pathname = usePathname();
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/');
-    // Simplified active check: if href is /dashboard, it's active only if pathname is exactly /dashboard.
-    // For other routes, if pathname starts with item.href, it's active.
-    // This handles /invoices being active for /invoices/create too.
+    const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
 
-    // Direct rendering without accordion for a flatter navigation like Creatio
+
     return (
-      <SidebarMenuItem key={item.href}>
+      <SidebarMenuItem key={item.href} className="relative">
         <Link href={item.href} legacyBehavior passHref>
           <SidebarMenuButton
             isActive={isActive}
             tooltip={{ children: item.tooltip, className: "group-[[data-state=expanded]]:hidden" }}
             aria-label={item.tooltip}
             className={cn(
-              "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              isActive && "bg-sidebar-primary text-sidebar-primary-foreground font-semibold"
+              "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",
+              isActive && "bg-sidebar-accent text-sidebar-primary-foreground font-medium",
+              !isActive && "font-normal"
             )}
           >
-            <item.icon className={cn(isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/80")} />
-            <span className="group-[[data-state=collapsed]]:hidden">{item.label}</span>
+            {isActive && (
+              <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-sm group-[[data-state=collapsed]]:hidden"></span>
+            )}
+            <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-primary" : "text-sidebar-foreground/70")} />
+            <span className="group-[[data-state=collapsed]]:hidden ml-2">{item.label}</span>
           </SidebarMenuButton>
         </Link>
       </SidebarMenuItem>
@@ -79,8 +85,8 @@ export function AppNav() {
   };
 
   return (
-    // Added px-2 for padding around the menu items, adjust as needed
-    <SidebarMenu className="px-2 group-[[data-state=collapsed]]:px-0"> 
+    // Removed px-2 from SidebarMenu to allow full-width control for items
+    <SidebarMenu className="group-[[data-state=collapsed]]:px-0 gap-0.5"> 
       {navItems.map(item => renderNavItem(item))}
     </SidebarMenu>
   );

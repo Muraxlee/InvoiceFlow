@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,28 +12,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Settings as SettingsIcon } from "lucide-react"; // Renamed to avoid conflict
+import { LogOut, User, Settings as SettingsIcon, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export function UserNav() {
-  // Placeholder for user data. In a real app, this would come from auth state.
   const [user, setUser] = useState<{ name: string; email: string; avatarInitial: string } | null>(null);
 
   useEffect(() => {
-    // Simulate fetching user data
     setUser({ 
-      name: "Admin User", 
-      email: "admin@invoiceflow.com",
-      avatarInitial: "AU" 
+      name: "Dunder Mifflin", // Updated to match image
+      email: "sales@dundermifflin.com", // Example email
+      avatarInitial: "DM" 
     });
   }, []);
 
   if (!user) {
     return (
-      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-        <Avatar className="h-9 w-9">
-          <AvatarFallback>?</AvatarFallback>
+      <Button variant="ghost" className="relative h-10 w-10 rounded-full text-foreground hover:bg-accent/20">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback>
         </Avatar>
       </Button>
     );
@@ -41,11 +40,13 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${user.avatarInitial}`} alt={user.name} data-ai-hint="user avatar" />
-            <AvatarFallback>{user.avatarInitial}</AvatarFallback>
+        <Button variant="ghost" className="relative h-auto p-1 rounded-full text-foreground hover:bg-accent/10 flex items-center gap-2">
+          <Avatar className="h-8 w-8">
+            {/* Using a simple colored fallback as placeholder images might not fit dark theme well */}
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{user.avatarInitial}</AvatarFallback>
           </Avatar>
+          <span className="text-sm font-medium hidden md:inline">{user.name}</span>
+          <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:inline" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -70,7 +71,6 @@ export function UserNav() {
         <DropdownMenuItem className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
-          {/* Add logout functionality here, e.g., onClick={() => signOut()} */}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

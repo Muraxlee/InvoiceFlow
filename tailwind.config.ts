@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 import defaultTheme from 'tailwindcss/defaultTheme';
 
 const config: Config = {
-    darkMode: ["class"],
+    darkMode: "class", // Keep class strategy, but globals.css makes dark default
     content: [
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
@@ -64,7 +64,7 @@ const config: Config = {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			},
-        header: { // New section for header colors
+        header: { 
           DEFAULT: 'hsl(var(--header-background))',
           foreground: 'hsl(var(--header-foreground))',
         }

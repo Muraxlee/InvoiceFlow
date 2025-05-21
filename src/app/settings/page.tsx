@@ -39,6 +39,8 @@ export default function SettingsPage() {
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME);
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME);
+  const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState("DDMMYYYY");
+
 
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
@@ -58,6 +60,9 @@ export default function SettingsPage() {
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyNameInput(storedCompanyName);
     setCurrentCompanyName(storedCompanyName);
+
+    // Client-side only date formatting for example
+    setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
 
   }, []);
 
@@ -155,8 +160,6 @@ export default function SettingsPage() {
       title: "Company Name Saved",
       description: `Company name updated to ${companyNameInput}. This will reflect on next page load or refresh.`,
     });
-    // Optionally force a reload or notify layout to update, for now, rely on refresh/navigation
-    // window.dispatchEvent(new Event('storage')); // This might work for layout if it listens
   };
 
   const handleThemeChange = useCallback((themeKey: string) => {
@@ -263,7 +266,7 @@ export default function SettingsPage() {
                 </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Example: {invoicePrefix || 'INV'}{format(new Date(), 'ddMMyyyy')}0001
+              Example: {invoicePrefix || 'INV'}{exampleInvoiceDateString}0001
             </p>
           </div>
         </CardContent>

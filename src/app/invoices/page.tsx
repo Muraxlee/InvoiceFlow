@@ -11,17 +11,18 @@ import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
-import type { InvoiceFormValues } from "@/components/invoice-form"; // Assuming InvoiceFormValues is exported
+import type { InvoiceFormValues } from "@/components/invoice-form";
+import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const LOCAL_STORAGE_KEY = "app_invoices";
 
 interface StoredInvoice extends InvoiceFormValues {
-  id: string; // Ensure invoices have an ID for listing and actions
-  status: "Paid" | "Pending" | "Overdue" | "Draft"; // Add status
-  amount: number; // Add amount
+  id: string; 
+  status: "Paid" | "Pending" | "Overdue" | "Draft"; 
+  amount: number; 
 }
 
-// Default placeholder data
 const defaultInvoices: StoredInvoice[] = [
   { id: "INV001", customerName: "Alpha Inc.", customerEmail: "contact@alpha.com", invoiceDate: new Date("2024-07-15"), dueDate: new Date("2024-08-14"), amount: 1250.00, status: "Paid", items: [], invoiceNumber:"INV001" },
   { id: "INV002", customerName: "Beta LLC", customerEmail: "info@betallc.dev", invoiceDate: new Date("2024-07-18"), dueDate: new Date("2024-08-17"), amount: 850.50, status: "Pending", items: [], invoiceNumber:"INV002" },
@@ -42,9 +43,9 @@ const statusVariant = (status: string) => {
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Dates from localStorage will be strings, so we need to parse them back to Date objects
     const storedInvoices = loadFromLocalStorage<StoredInvoice[]>(LOCAL_STORAGE_KEY, defaultInvoices).map(inv => ({
         ...inv,
         invoiceDate: new Date(inv.invoiceDate),
@@ -53,13 +54,14 @@ export default function InvoicesPage() {
     setInvoices(storedInvoices);
   }, []);
 
-  // Placeholder for delete action
   const handleDeleteInvoice = (invoiceId: string) => {
-    alert(`Deleting ${invoiceId}... This is a placeholder. Implement actual deletion and update localStorage.`);
-    // Example:
-    // const updatedInvoices = invoices.filter(inv => inv.id !== invoiceId);
-    // setInvoices(updatedInvoices);
-    // saveToLocalStorage(LOCAL_STORAGE_KEY, updatedInvoices);
+    const updatedInvoices = invoices.filter(inv => inv.id !== invoiceId);
+    setInvoices(updatedInvoices);
+    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedInvoices);
+    toast({
+      title: "Invoice Deleted",
+      description: `Invoice ${invoiceId} has been successfully deleted.`,
+    });
   };
 
 
@@ -115,24 +117,33 @@ export default function InvoicesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                           {/* Placeholder edit link - needs /invoices/[id]/edit page and functionality */}
-                          <Link href={`/invoices/${invoice.id}/edit`} className="flex items-center w-full">
+                        <DropdownMenuItem onClick={() => alert(`Edit invoice ${invoice.id}. This is a placeholder. Implement /invoices/${invoice.id}/edit page and functionality.`)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
-                          </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => alert(`Printing Original for ${invoice.id}... This is a placeholder.`)}>
+                        <DropdownMenuItem onClick={() => alert(`Printing Original for ${invoice.id}... This is a placeholder for advanced print formatting.`)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Original
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => alert(`Printing Duplicate for ${invoice.id}... This is a placeholder.`)}>
+                        <DropdownMenuItem onClick={() => alert(`Printing Duplicate for ${invoice.id}... This is a placeholder for advanced print formatting.`)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Duplicate
                         </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => alert(`Printing Transport Bill for ${invoice.id}... This is a placeholder.`)}>
+                         <DropdownMenuItem onClick={() => alert(`Printing Transport Bill for ${invoice.id}... This is a placeholder for advanced print formatting.`)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Transport Bill
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteInvoice(invoice.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        <ConfirmDialog
+                          triggerButton={
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full"
+                              onSelect={(e) => e.preventDefault()} // Prevent menu closing on select
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          }
+                          title={`Delete Invoice ${invoice.invoiceNumber}`}
+                          description="Are you sure you want to delete this invoice? This action cannot be undone."
+                          onConfirm={() => handleDeleteInvoice(invoice.id)}
+                          confirmText="Yes, Delete"
+                          confirmVariant="destructive"
+                        />
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

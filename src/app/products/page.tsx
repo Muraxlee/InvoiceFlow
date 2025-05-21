@@ -10,10 +10,11 @@ import { PackagePlus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
+import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const LOCAL_STORAGE_KEY = "app_products";
 
-// Default placeholder data
 const defaultProducts = [
   { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/40x40.png", description: "A high-quality widget for all your needs.", price: 29.99, gstCategory: "HSN 8471" },
   { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/40x40.png", description: "Reliable and affordable gadget.", price: 15.50, gstCategory: "HSN 8517" },
@@ -25,19 +26,21 @@ export type Product = typeof defaultProducts[0];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedProducts = loadFromLocalStorage<Product[]>(LOCAL_STORAGE_KEY, defaultProducts);
     setProducts(storedProducts);
   }, []);
 
-  // Placeholder for delete action
   const handleDeleteProduct = (productId: string) => {
-    alert(`Delete product ${productId}. This is a placeholder. Implement actual deletion and update localStorage.`);
-    // Example:
-    // const updatedProducts = products.filter(p => p.id !== productId);
-    // setProducts(updatedProducts);
-    // saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
+    const updatedProducts = products.filter(p => p.id !== productId);
+    setProducts(updatedProducts);
+    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
+    toast({
+      title: "Product Deleted",
+      description: `Product ${productId} has been successfully deleted.`,
+    });
   };
 
   return (
@@ -46,7 +49,7 @@ export default function ProductsPage() {
         title="Manage Products" 
         description="View, add, and manage your product catalog."
         actions={
-          <Button onClick={() => alert("Add New Product clicked. This is a placeholder. Implement form and update localStorage.")}>
+          <Button onClick={() => alert("Add New Product: This is a placeholder. Implement form and update localStorage.")}>
             <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
           </Button>
         }
@@ -97,12 +100,24 @@ export default function ProductsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => alert(`Edit product ${product.id}. This is a placeholder.`)}>
+                        <DropdownMenuItem onClick={() => alert(`Edit product ${product.id}. This is a placeholder. Implement edit form and functionality.`)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteProduct(product.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        <ConfirmDialog
+                          triggerButton={
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full"
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          }
+                          title={`Delete Product ${product.name}`}
+                          description="Are you sure you want to delete this product? This action cannot be undone."
+                          onConfirm={() => handleDeleteProduct(product.id)}
+                          confirmText="Yes, Delete"
+                          confirmVariant="destructive"
+                        />
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

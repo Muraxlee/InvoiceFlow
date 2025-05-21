@@ -10,10 +10,11 @@ import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin } from "luc
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
+import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const LOCAL_STORAGE_KEY = "app_customers";
 
-// Default placeholder data
 const defaultCustomers = [
   { id: "CUST001", name: "Alpha Inc.", email: "contact@alpha.com", phone: "555-0101", address: "123 Tech Road, Silicon Valley, CA" },
   { id: "CUST002", name: "Beta LLC", email: "info@betallc.dev", phone: "555-0102", address: "456 Code Lane, Austin, TX" },
@@ -24,19 +25,21 @@ export type Customer = typeof defaultCustomers[0];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedCustomers = loadFromLocalStorage<Customer[]>(LOCAL_STORAGE_KEY, defaultCustomers);
     setCustomers(storedCustomers);
   }, []);
 
-  // Placeholder for delete action - in a real app, this would update state and localStorage
   const handleDeleteCustomer = (customerId: string) => {
-    alert(`Delete customer ${customerId}. This is a placeholder. Implement actual deletion and update localStorage.`);
-    // Example: 
-    // const updatedCustomers = customers.filter(c => c.id !== customerId);
-    // setCustomers(updatedCustomers);
-    // saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
+    const updatedCustomers = customers.filter(c => c.id !== customerId);
+    setCustomers(updatedCustomers);
+    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
+    toast({
+      title: "Customer Deleted",
+      description: `Customer ${customerId} has been successfully deleted.`,
+    });
   };
 
   return (
@@ -45,7 +48,7 @@ export default function CustomersPage() {
         title="Manage Customers" 
         description="View, add, and manage your customer information."
         actions={
-          <Button onClick={() => alert("Add New Customer clicked. This is a placeholder. Implement form and update localStorage.")}>
+          <Button onClick={() => alert("Add New Customer: This is a placeholder. Implement form and update localStorage.")}>
             <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
           </Button>
         }
@@ -85,12 +88,24 @@ export default function CustomersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => alert(`Edit customer ${customer.id}. This is a placeholder.`)}>
+                        <DropdownMenuItem onClick={() => alert(`Edit customer ${customer.id}. This is a placeholder. Implement edit form and functionality.`)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteCustomer(customer.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        <ConfirmDialog
+                          triggerButton={
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full"
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          }
+                          title={`Delete Customer ${customer.name}`}
+                          description="Are you sure you want to delete this customer? This action cannot be undone."
+                          onConfirm={() => handleDeleteCustomer(customer.id)}
+                          confirmText="Yes, Delete"
+                          confirmVariant="destructive"
+                        />
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

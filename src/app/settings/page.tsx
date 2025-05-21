@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { 
   loadFromLocalStorage, 
   saveToLocalStorage, 
@@ -21,7 +21,12 @@ import {
   DEFAULT_COMPANY_NAME,
   CUSTOM_THEME_STORAGE_KEY,
   type CustomThemeValues,
-  DEFAULT_CUSTOM_THEME_VALUES
+  DEFAULT_CUSTOM_THEME_VALUES,
+  CUSTOMERS_STORAGE_KEY,
+  PRODUCTS_STORAGE_KEY,
+  INVOICES_STORAGE_KEY,
+  LAST_BACKUP_TIMESTAMP_KEY,
+  type AllApplicationData
 } from "@/lib/localStorage";
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -29,11 +34,6 @@ import Link from "next/link";
 import { format } from "date-fns"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-
-const CUSTOMERS_KEY = "app_customers";
-const PRODUCTS_KEY = "app_products";
-const INVOICES_KEY = "app_invoices";
-
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -48,6 +48,8 @@ export default function SettingsPage() {
 
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
+  const [lastBackupTimestamp, setLastBackupTimestamp] = useState<number | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
 
   useEffect(() => {
@@ -73,6 +75,9 @@ export default function SettingsPage() {
     setCustomThemeValues(storedCustomTheme);
     setOriginalCustomThemeValues(storedCustomTheme);
 
+    const storedBackupTimestamp = loadFromLocalStorage<number | null>(LAST_BACKUP_TIMESTAMP_KEY, null);
+    setLastBackupTimestamp(storedBackupTimestamp);
+
     setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
 
   }, []);
@@ -80,40 +85,37 @@ export default function SettingsPage() {
   const handleDataAction = (actionName: string, storageKey?: string | string[]) => {
     if (typeof window !== 'undefined') {
       if (storageKey) {
-        if (Array.isArray(storageKey)) {
-          storageKey.forEach(key => {
-            localStorage.removeItem(key);
-            if (key === COMPANY_NAME_STORAGE_KEY) { 
-                 setCompanyNameInput(DEFAULT_COMPANY_NAME);
-                 setCurrentCompanyName(DEFAULT_COMPANY_NAME);
-                 if (document) document.title = DEFAULT_COMPANY_NAME;
-            }
-             if (key === GOOGLE_AI_API_KEY_STORAGE_KEY) {
-                 setGoogleApiKey("");
-                 setOriginalGoogleApiKey("");
-            }
-            if (key === INVOICE_CONFIG_KEY) {
-                const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
-                saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
-                setInvoicePrefix(defaultConfig.prefix);
-                setOriginalInvoicePrefix(defaultConfig.prefix);
-            }
-             if (key === THEME_STORAGE_KEY) {
-                handleThemeChange(DEFAULT_THEME_KEY); 
-            }
-            if (key === CUSTOM_THEME_STORAGE_KEY) {
-                setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
-                setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
-                // If current theme is custom, re-apply to clear old custom vars
-                if (selectedThemeKey === 'custom') {
-                    // This will trigger re-application with defaults in layout.tsx
-                    saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES); 
-                }
-            }
-          });
-        } else {
-          localStorage.removeItem(storageKey);
-        }
+        const keysToClear = Array.isArray(storageKey) ? storageKey : [storageKey];
+        keysToClear.forEach(key => {
+          localStorage.removeItem(key);
+          // Reset specific states if their corresponding key is cleared
+          if (key === COMPANY_NAME_STORAGE_KEY) { 
+               setCompanyNameInput(DEFAULT_COMPANY_NAME);
+               setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+               if (document) document.title = DEFAULT_COMPANY_NAME;
+          }
+           if (key === GOOGLE_AI_API_KEY_STORAGE_KEY) {
+               setGoogleApiKey("");
+               setOriginalGoogleApiKey("");
+          }
+          if (key === INVOICE_CONFIG_KEY) {
+              const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
+              saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
+              setInvoicePrefix(defaultConfig.prefix);
+              setOriginalInvoicePrefix(defaultConfig.prefix);
+          }
+           if (key === THEME_STORAGE_KEY) {
+              handleThemeChange(DEFAULT_THEME_KEY); 
+          }
+          if (key === CUSTOM_THEME_STORAGE_KEY) {
+              setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
+              setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
+              saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES); 
+          }
+           if (key === LAST_BACKUP_TIMESTAMP_KEY) {
+              setLastBackupTimestamp(null);
+          }
+        });
       }
     }
     console.log(`${actionName} initiated`);
@@ -197,7 +199,7 @@ export default function SettingsPage() {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
       htmlElement.setAttribute('data-theme', themeKey);
-      localStorage.setItem(THEME_STORAGE_KEY, themeKey); // This will trigger layout.tsx's effect
+      localStorage.setItem(THEME_STORAGE_KEY, themeKey); 
       setSelectedThemeKey(themeKey);
       toast({
         title: "Theme Updated",
@@ -207,27 +209,126 @@ export default function SettingsPage() {
   }, [toast]);
 
   const handleSaveCustomTheme = () => {
-    // Basic validation for HSL format can be added here if needed
     saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, customThemeValues);
     setOriginalCustomThemeValues(customThemeValues);
     toast({
       title: "Custom Theme Saved",
       description: "Your custom theme values have been saved.",
     });
-    // If the current theme is 'custom', force re-application
     if (selectedThemeKey === 'custom') {
-       // This relies on layout.tsx's storage event listener or its own effect to re-apply
-       // For immediate effect without relying on storage event, we can call applyTheme in layout.tsx
-       // but for now, saving to localStorage should trigger it.
+       // Trigger layout.tsx's storage event listener or its own effect
+       window.dispatchEvent(new StorageEvent('storage', { key: CUSTOM_THEME_STORAGE_KEY }));
     }
   };
 
   const dataManagementActions = [
-    { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage.", key: INVOICES_KEY },
-    { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage.", key: CUSTOMERS_KEY },
-    { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage.", key: PRODUCTS_KEY },
-    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, settings, API key, company name, and themes to default.", key: [INVOICES_KEY, CUSTOMERS_KEY, PRODUCTS_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY] },
+    { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices) from local storage.", key: INVOICES_STORAGE_KEY },
+    { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from local storage.", key: CUSTOMERS_STORAGE_KEY },
+    { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from local storage.", key: PRODUCTS_STORAGE_KEY },
+    { id: "factoryReset", label: "Factory Reset", description: "Reset all application data, settings, API key, company name, and themes to default.", key: [INVOICES_STORAGE_KEY, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICE_CONFIG_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, THEME_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY] },
   ];
+
+  // --- Import/Export Logic ---
+  const downloadJSON = (data: any, filename: string) => {
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = filename;
+    link.click();
+    link.remove();
+  };
+
+  const createExportData = (dataType: 'customers' | 'products' | 'invoices' | 'all'): any => {
+    switch (dataType) {
+      case 'customers':
+        return loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, []);
+      case 'products':
+        return loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []);
+      case 'invoices':
+        return loadFromLocalStorage(INVOICES_STORAGE_KEY, []);
+      case 'all':
+        const allData: AllApplicationData = {
+          [CUSTOMERS_STORAGE_KEY]: loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, []),
+          [PRODUCTS_STORAGE_KEY]: loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
+          [INVOICES_STORAGE_KEY]: loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
+          [INVOICE_CONFIG_KEY]: loadFromLocalStorage(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} }),
+          [GOOGLE_AI_API_KEY_STORAGE_KEY]: loadFromLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""),
+          [COMPANY_NAME_STORAGE_KEY]: loadFromLocalStorage(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME),
+          appThemeKey: localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY,
+          [CUSTOM_THEME_STORAGE_KEY]: loadFromLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES),
+          [LAST_BACKUP_TIMESTAMP_KEY]: loadFromLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null),
+          appVersion: "1.0.0" // Example version
+        };
+        return allData;
+      default:
+        return {};
+    }
+  };
+
+  const handleExportClick = (dataType: 'customers' | 'products' | 'invoices' | 'all') => {
+    const data = createExportData(dataType);
+    const dateStr = format(new Date(), 'yyyy-MM-dd');
+    const filename = `${dataType}_export_${dateStr}.json`;
+    downloadJSON(data, filename);
+    toast({ title: "Export Successful", description: `${filename} has been downloaded.` });
+  };
+
+  const handleCreateBackupClick = () => {
+    const data = createExportData('all');
+    const dateStr = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
+    const filename = `app_backup_${dateStr}.json`;
+    downloadJSON(data, filename);
+    const timestamp = Date.now();
+    saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, timestamp);
+    setLastBackupTimestamp(timestamp);
+    toast({ title: "Manual Backup Created", description: `${filename} has been downloaded.` });
+  };
+
+  const handleImportFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      toast({ title: "No file selected", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const importedData = JSON.parse(text) as AllApplicationData;
+
+        // Validate and apply data
+        if (importedData[CUSTOMERS_STORAGE_KEY]) saveToLocalStorage(CUSTOMERS_STORAGE_KEY, importedData[CUSTOMERS_STORAGE_KEY]);
+        if (importedData[PRODUCTS_STORAGE_KEY]) saveToLocalStorage(PRODUCTS_STORAGE_KEY, importedData[PRODUCTS_STORAGE_KEY]);
+        if (importedData[INVOICES_STORAGE_KEY]) saveToLocalStorage(INVOICES_STORAGE_KEY, importedData[INVOICES_STORAGE_KEY]);
+        if (importedData[INVOICE_CONFIG_KEY]) saveToLocalStorage(INVOICE_CONFIG_KEY, importedData[INVOICE_CONFIG_KEY]);
+        if (importedData[GOOGLE_AI_API_KEY_STORAGE_KEY] !== undefined) saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]);
+        if (importedData[COMPANY_NAME_STORAGE_KEY]) saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, importedData[COMPANY_NAME_STORAGE_KEY]);
+        if (importedData.appThemeKey) {
+            localStorage.setItem(THEME_STORAGE_KEY, importedData.appThemeKey); // Directly set to localStorage
+        }
+        if (importedData[CUSTOM_THEME_STORAGE_KEY]) saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, importedData[CUSTOM_THEME_STORAGE_KEY]);
+        if (importedData[LAST_BACKUP_TIMESTAMP_KEY]) saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, importedData[LAST_BACKUP_TIMESTAMP_KEY]);
+        
+        toast({ title: "Import Successful", description: "Application data and settings have been imported. Please reload the page to apply all changes." });
+        // Consider forcing a reload: window.location.reload();
+        // For now, prompt user or rely on individual component re-renders where possible.
+        // Re-fetch initial values after import:
+        setTimeout(() => window.location.reload(), 1000);
+
+
+      } catch (err) {
+        console.error("Import error:", err);
+        toast({ title: "Import Failed", description: "The selected file is not valid JSON or has an incorrect format.", variant: "destructive" });
+      } finally {
+        // Reset file input
+        if (importFileRef.current) {
+          importFileRef.current.value = "";
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
 
 
   return (
@@ -235,7 +336,7 @@ export default function SettingsPage() {
       <PageHeader title="Application Settings" description="Manage your application configurations and preferences." />
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <TabsTrigger value="general"><Building className="mr-2 h-4 w-4" /> Company</TabsTrigger>
           <TabsTrigger value="theme"><Palette className="mr-2 h-4 w-4" /> Theme</TabsTrigger>
           <TabsTrigger value="invoice-ai"><FileCog className="mr-2 h-4 w-4" /> Invoice & AI</TabsTrigger>
@@ -301,8 +402,9 @@ export default function SettingsPage() {
                             backgroundColor: `hsl(var(--${key}-background, var(--background)))`, 
                             border: `2px solid hsl(var(--${key}-primary, var(--primary)))` 
                          }}
-                         data-theme-preview={key} 
+                         data-theme-preview={key} // Custom attribute for theme preview styling via CSS
                     >
+                         {/* Simple visual cue for sidebar and header areas */}
                         <div className="absolute left-0 top-0 h-full w-1/3" style={{backgroundColor: `hsl(var(--${key}-sidebar-background, var(--sidebar-background)))`}}></div>
                         <div className="absolute right-0 top-0 h-1/4 w-2/3" style={{backgroundColor: `hsl(var(--${key}-header-background, var(--header-background)))`}}></div>
                      </div>
@@ -320,7 +422,7 @@ export default function SettingsPage() {
                   <Edit3 className="h-8 w-8 text-primary" />
                   <div>
                     <CardTitle className="text-xl">Custom Theme Configuration</CardTitle>
-                    <CardDescription>Define your custom theme colors (use HSL format: e.g., "220 15% 15%").</CardDescription>
+                    <CardDescription>Define your custom theme colors (use HSL format: e.g., "220 15% 15%"). Changes apply after saving and if "Custom User Theme" is active.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -352,7 +454,6 @@ export default function SettingsPage() {
                     placeholder="e.g., 180 60% 45%" 
                   />
                 </div>
-                {/* Add more inputs for other CSS variables like --card, --secondary, --accent, --border etc. here */}
                 <Button onClick={handleSaveCustomTheme} 
                         disabled={JSON.stringify(customThemeValues) === JSON.stringify(originalCustomThemeValues)}>
                   <Save className="mr-2 h-4 w-4" /> Save Custom Theme
@@ -453,6 +554,68 @@ export default function SettingsPage() {
         </TabsContent>
         
         <TabsContent value="data-security" className="space-y-6">
+           <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Archive className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Import/Export Data & Backup</CardTitle>
+                  <CardDescription>Manage your application data. Exports are in JSON format.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <h4 className="font-semibold mb-2 text-md">Export Data</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2">
+                  <Button variant="outline" onClick={() => handleExportClick('customers')}>
+                    <Download className="mr-2 h-4 w-4" /> Customers
+                  </Button>
+                  <Button variant="outline" onClick={() => handleExportClick('products')}>
+                    <Download className="mr-2 h-4 w-4" /> Products
+                  </Button>
+                  <Button variant="outline" onClick={() => handleExportClick('invoices')}>
+                    <Download className="mr-2 h-4 w-4" /> Invoices
+                  </Button>
+                  <Button variant="outline" onClick={() => handleExportClick('all')}>
+                    <Download className="mr-2 h-4 w-4" /> All Data
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2 text-md">Import Data</h4>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    id="importFile" 
+                    type="file" 
+                    accept=".json" 
+                    ref={importFileRef}
+                    className="flex-grow max-w-xs"
+                    onChange={handleImportFileSelected}
+                  />
+                  {/* The button is implicit through the onChange of the file input */}
+                </div>
+                 <p className="text-xs text-muted-foreground mt-1">Import an "All Application Data" JSON file. This will overwrite existing data and settings.</p>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2 text-md">Manual Backup</h4>
+                 <Button variant="default" onClick={handleCreateBackupClick}>
+                    <Archive className="mr-2 h-4 w-4" /> Create Manual Backup
+                  </Button>
+                {lastBackupTimestamp && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last backup created: {format(new Date(lastBackupTimestamp), "PPP p")}
+                  </p>
+                )}
+                {!lastBackupTimestamp && (
+                    <p className="text-xs text-muted-foreground mt-1">No manual backups created yet.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="shadow-lg border-destructive">
             <CardHeader>
               <div className="flex items-center gap-3">

@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { CustomerForm, type CustomerFormValues } from "@/components/customer-form";
 
 const LOCAL_STORAGE_KEY = "app_customers";
 
@@ -25,6 +27,8 @@ export type Customer = typeof defaultCustomers[0];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -42,15 +46,61 @@ export default function CustomersPage() {
     });
   };
 
+  const handleAddCustomer = async (data: CustomerFormValues) => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (customers.some(c => c.id === data.id)) {
+      toast({
+        title: "Error: Customer ID Exists",
+        description: `A customer with ID ${data.id} already exists. Please use a unique ID.`,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const newCustomer: Customer = { ...data };
+    const updatedCustomers = [...customers, newCustomer];
+    setCustomers(updatedCustomers);
+    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
+    
+    setIsLoading(false);
+    setIsAddCustomerDialogOpen(false);
+    toast({
+      title: "Customer Added",
+      description: `Customer ${data.name} has been successfully added.`,
+    });
+  };
+
+
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Customers" 
         description="View, add, and manage your customer information."
         actions={
-          <Button onClick={() => alert("Add New Customer: This is a placeholder. Implement form and update localStorage.")}>
-            <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
-          </Button>
+           <Dialog open={isAddCustomerDialogOpen} onOpenChange={setIsAddCustomerDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px]">
+              <DialogHeader>
+                <DialogTitle>Add New Customer</DialogTitle>
+                <DialogDescription>
+                  Fill in the details below to add a new customer.
+                </DialogDescription>
+              </DialogHeader>
+              <CustomerForm 
+                onSubmit={handleAddCustomer} 
+                isLoading={isLoading}
+                onCancel={() => setIsAddCustomerDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         }
       />
 
@@ -121,3 +171,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

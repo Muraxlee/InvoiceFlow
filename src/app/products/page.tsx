@@ -12,13 +12,15 @@ import { useEffect, useState } from "react";
 import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { ProductForm, type ProductFormValues } from "@/components/product-form";
 
 const LOCAL_STORAGE_KEY = "app_products";
 
 const defaultProducts = [
-  { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/40x40.png", description: "A high-quality widget for all your needs.", price: 29.99, gstCategory: "HSN 8471" },
-  { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/40x40.png", description: "Reliable and affordable gadget.", price: 15.50, gstCategory: "HSN 8517" },
-  { id: "PROD003", name: "Luxury Gizmo", imageUrl:"https://placehold.co/40x40.png", description: "Top-of-the-line gizmo with advanced features.", price: 99.00, gstCategory: "HSN 9006" },
+  { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/60x60.png", description: "A high-quality widget for all your needs.", price: 29.99, gstCategory: "HSN 8471" },
+  { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/60x60.png", description: "Reliable and affordable gadget.", price: 15.50, gstCategory: "HSN 8517" },
+  { id: "PROD003", name: "Luxury Gizmo", imageUrl:"https://placehold.co/60x60.png", description: "Top-of-the-line gizmo with advanced features.", price: 99.00, gstCategory: "HSN 9006" },
 ];
 
 export type Product = typeof defaultProducts[0];
@@ -26,6 +28,8 @@ export type Product = typeof defaultProducts[0];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,15 +47,61 @@ export default function ProductsPage() {
     });
   };
 
+  const handleAddProduct = async (data: ProductFormValues) => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (products.some(p => p.id === data.id)) {
+      toast({
+        title: "Error: Product ID Exists",
+        description: `A product with ID ${data.id} already exists. Please use a unique ID.`,
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    const newProduct: Product = { ...data };
+    const updatedProducts = [...products, newProduct];
+    setProducts(updatedProducts);
+    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
+    
+    setIsLoading(false);
+    setIsAddProductDialogOpen(false);
+    toast({
+      title: "Product Added",
+      description: `Product ${data.name} has been successfully added.`,
+    });
+  };
+
+
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Products" 
         description="View, add, and manage your product catalog."
         actions={
-          <Button onClick={() => alert("Add New Product: This is a placeholder. Implement form and update localStorage.")}>
-            <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
-          </Button>
+          <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[525px]">
+              <DialogHeader>
+                <DialogTitle>Add New Product</DialogTitle>
+                <DialogDescription>
+                  Fill in the details below to add a new product to your catalog.
+                </DialogDescription>
+              </DialogHeader>
+              <ProductForm 
+                onSubmit={handleAddProduct} 
+                isLoading={isLoading}
+                onCancel={() => setIsAddProductDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         }
       />
 
@@ -78,12 +128,13 @@ export default function ProductsPage() {
                 <TableRow key={product.id}>
                    <TableCell>
                     <Image 
-                      src={product.imageUrl} 
+                      src={product.imageUrl || "https://placehold.co/60x60.png"} 
                       alt={product.name} 
-                      width={40} 
-                      height={40} 
-                      className="rounded-sm"
-                      data-ai-hint="product item" 
+                      width={60} 
+                      height={60} 
+                      className="rounded-md object-cover aspect-square"
+                      data-ai-hint="product item"
+                      onError={(e) => (e.currentTarget.src = "https://placehold.co/60x60.png?text=Error")} 
                     />
                   </TableCell>
                   <TableCell className="font-medium">{product.id}</TableCell>
@@ -133,3 +184,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+

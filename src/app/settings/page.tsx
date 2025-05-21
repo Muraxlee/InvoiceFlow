@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { 
   loadFromLocalStorage, 
@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
 import { format } from "date-fns"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils"; // Added missing import
 
 const CUSTOMERS_KEY = "app_customers";
 const PRODUCTS_KEY = "app_products";
@@ -76,7 +77,23 @@ export default function SettingsPage() {
             if (key === COMPANY_NAME_STORAGE_KEY) { // Reset company name on factory reset
                  setCompanyNameInput(DEFAULT_COMPANY_NAME);
                  setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+                 // Also update document title immediately if possible
+                 if (document) document.title = DEFAULT_COMPANY_NAME;
             }
+             if (key === GOOGLE_AI_API_KEY_STORAGE_KEY) {
+                 setGoogleApiKey("");
+                 setOriginalGoogleApiKey("");
+            }
+            if (key === INVOICE_CONFIG_KEY) {
+                const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
+                saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
+                setInvoicePrefix(defaultConfig.prefix);
+                setOriginalInvoicePrefix(defaultConfig.prefix);
+            }
+             if (key === THEME_STORAGE_KEY) {
+                handleThemeChange(DEFAULT_THEME_KEY); // Reset theme to default
+            }
+
           });
         } else {
           localStorage.removeItem(storageKey);
@@ -88,14 +105,12 @@ export default function SettingsPage() {
       title: `${actionName} Successful`,
       description: `The ${actionName.toLowerCase()} operation has been completed. Data cleared from local storage.`,
     });
+    // Special handling for factory reset to ensure all states are reset
     if (actionName === "Factory Reset") {
-        setGoogleApiKey("");
-        setOriginalGoogleApiKey("");
-        const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
-        saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
-        setInvoicePrefix(defaultConfig.prefix);
-        setOriginalInvoicePrefix(defaultConfig.prefix);
-        handleThemeChange(DEFAULT_THEME_KEY);
+        // States already handled inside the loop for specific keys.
+        // Trigger a reload to ensure all components pick up default states if necessary, especially layout.
+        // window.location.reload(); // Consider if a full reload is desired or just state resets.
+        // For now, individual state resets are done above.
     }
   };
 
@@ -105,20 +120,22 @@ export default function SettingsPage() {
       dailyCounters: {},
     });
     
-    const newPrefix = invoicePrefix.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
+    let newPrefix = invoicePrefix.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
     
-    if (newPrefix.length === 0) {
-        toast({title: "Invalid Prefix", description: "Invoice prefix cannot be empty and must contain letters.", variant: "destructive"});
-        setInvoicePrefix(currentConfig.prefix); 
+    if (newPrefix.length === 0 && invoicePrefix.length > 0) {
+        toast({title: "Invalid Prefix", description: "Invoice prefix must contain letters and be 3 characters long.", variant: "destructive"});
+        setInvoicePrefix(originalInvoicePrefix); // Revert to original if invalid attempt
         return;
     }
-     if (newPrefix.length < 3 && invoicePrefix.length > 0) { 
-      toast({title: "Prefix Too Short", description: "Invoice prefix should ideally be 3 letters.", variant: "destructive"});
-       setInvoicePrefix(currentConfig.prefix); 
-      return;
+    if (newPrefix.length === 0 && invoicePrefix.length === 0) { // Allow empty to reset to default (implicitly)
+      newPrefix = DEFAULT_INVOICE_PREFIX;
+    } else if (newPrefix.length < 3) {
+       toast({title: "Prefix Too Short", description: "Invoice prefix must be 3 letters.", variant: "destructive"});
+       setInvoicePrefix(originalInvoicePrefix); // Revert
+       return;
     }
 
-    currentConfig.prefix = newPrefix.padEnd(3, 'X'); 
+    currentConfig.prefix = newPrefix; 
 
     saveToLocalStorage(INVOICE_CONFIG_KEY, currentConfig);
     setInvoicePrefix(currentConfig.prefix); 
@@ -131,10 +148,12 @@ export default function SettingsPage() {
   
   const handleSaveApiKey = () => {
     if (!googleApiKey.trim()) {
+      // Allow clearing the API key
+      saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, "");
+      setOriginalGoogleApiKey("");
       toast({
-        title: "API Key Empty",
-        description: "Please enter a valid Google AI API Key.",
-        variant: "destructive",
+        title: "API Key Cleared",
+        description: "Google AI API Key has been cleared from local storage. Restart server for changes to take effect.",
       });
       return;
     }
@@ -157,9 +176,12 @@ export default function SettingsPage() {
     }
     saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, companyNameInput);
     setCurrentCompanyName(companyNameInput);
+    if (document) { // Update title immediately
+        document.title = companyNameInput;
+    }
     toast({
       title: "Company Name Saved",
-      description: `Company name updated to ${companyNameInput}. This will reflect on next page load or refresh.`,
+      description: `Company name updated to ${companyNameInput}.`,
     });
   };
 
@@ -190,9 +212,9 @@ export default function SettingsPage() {
       <PageHeader title="Application Settings" description="Manage your application configurations and preferences." />
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 mb-6">
           <TabsTrigger value="general">
-            <Settings2 className="mr-2 h-4 w-4" /> General
+            <SettingsIcon className="mr-2 h-4 w-4" /> General
           </TabsTrigger>
           <TabsTrigger value="invoice-ai">
             <FileCog className="mr-2 h-4 w-4" /> Invoice & AI
@@ -216,12 +238,12 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="companyNameInput">Company Name</Label>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center flex-wrap">
                     <Input 
                         id="companyNameInput" 
                         value={companyNameInput} 
                         onChange={(e) => setCompanyNameInput(e.target.value)}
-                        className="max-w-xs"
+                        className="max-w-xs flex-grow"
                         placeholder="Your Company Name"
                     />
                     <Button onClick={handleSaveCompanyName} disabled={companyNameInput === currentCompanyName || companyNameInput.trim() === ""}>
@@ -243,28 +265,29 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <RadioGroup value={selectedThemeKey} onValueChange={handleThemeChange} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <RadioGroup value={selectedThemeKey} onValueChange={handleThemeChange} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
                   <Label 
                     key={key} 
                     htmlFor={`theme-${key}`} 
                     className={cn(
-                      "flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                      "flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer min-h-[100px]",
                       selectedThemeKey === key && "border-primary ring-2 ring-primary"
                     )}
                   >
                     <RadioGroupItem value={key} id={`theme-${key}`} className="sr-only" />
-                    <div className="w-full h-10 rounded mb-2" style={{ 
-                        // TODO: Get actual theme colors for preview. This is a simplified preview.
-                        // For a real preview, you would need to access CSS variables, which is complex here.
-                        // Using placeholder generic colors related to the theme key.
-                        backgroundColor: key.includes('dark') || key.includes('quanti') || key.includes('oceanic') || key.includes('crimson') || key.includes('forest') || key.includes('midnight') ? 'hsl(var(--card))' : 'hsl(var(--background))',
-                        border: `2px solid ${key.includes('contrast') ? 'hsl(var(--foreground))' : 'hsl(var(--primary))'}`
-                     }}>
-                        <div className="w-1/3 h-full float-left" style={{backgroundColor: `hsl(var(--sidebar-background))`}}></div>
-                        <div className="w-2/3 h-1/4 float-left" style={{backgroundColor: `hsl(var(--header-background))`}}></div>
+                    <div className="w-full h-10 rounded mb-2 relative overflow-hidden" 
+                         style={{ 
+                            backgroundColor: `hsl(var(--${key}-background, var(--background)))`, // Fallback to current bg
+                            border: `2px solid hsl(var(--${key}-primary, var(--primary)))` // Fallback to current primary
+                         }}
+                         data-theme-preview={key} // For potential CSS targeting
+                    >
+                        {/* Simplified visual cue for sidebar and header */}
+                        <div className="absolute left-0 top-0 h-full w-1/3" style={{backgroundColor: `hsl(var(--${key}-sidebar-background, var(--sidebar-background)))`}}></div>
+                        <div className="absolute right-0 top-0 h-1/4 w-2/3" style={{backgroundColor: `hsl(var(--${key}-header-background, var(--header-background)))`}}></div>
                      </div>
-                    <span className="text-sm font-medium">{name}</span>
+                    <span className="text-sm font-medium text-center">{name}</span>
                   </Label>
                 ))}
               </RadioGroup>
@@ -276,7 +299,7 @@ export default function SettingsPage() {
           <Card className="shadow-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <Settings2 className="h-8 w-8 text-primary" />
+                <FileCog className="h-8 w-8 text-primary" />
                 <div>
                   <CardTitle className="text-xl">Invoice Settings</CardTitle>
                   <CardDescription>Configure invoice numbering.</CardDescription>
@@ -286,13 +309,13 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="invoicePrefix">Invoice Prefix (3 uppercase letters)</Label>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center flex-wrap">
                     <Input 
                         id="invoicePrefix" 
                         value={invoicePrefix} 
                         onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))}
                         maxLength={3}
-                        className="max-w-xs"
+                        className="max-w-[100px] flex-grow sm:flex-grow-0"
                         placeholder="e.g. INV"
                     />
                     <Button onClick={handleSaveInvoiceSettings} disabled={invoicePrefix === originalInvoicePrefix && invoicePrefix.length === 3}>
@@ -300,7 +323,7 @@ export default function SettingsPage() {
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Example: {invoicePrefix || 'INV'}{exampleInvoiceDateString}0001
+                  Example: {(invoicePrefix || 'INV').padEnd(3,'X')}{exampleInvoiceDateString}0001
                 </p>
               </div>
             </CardContent>
@@ -319,17 +342,17 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="googleApiKey">Google AI API Key</Label>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center flex-wrap">
                   <Input
                     id="googleApiKey"
                     type="password"
                     value={googleApiKey}
                     onChange={(e) => setGoogleApiKey(e.target.value)}
-                    className="max-w-md"
+                    className="max-w-md flex-grow"
                     placeholder="Enter your Google AI API Key"
                   />
                   <Button onClick={handleSaveApiKey} disabled={googleApiKey === originalGoogleApiKey}>
-                    <Save className="mr-2 h-4 w-4" /> Save API Key
+                    <Save className="mr-2 h-4 w-4" /> {googleApiKey ? "Save" : "Clear"} Key
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -352,10 +375,10 @@ export default function SettingsPage() {
                   <strong>Important:</strong> For the AI features to use your saved key:
                 </p>
                 <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
-                  <li>Save your API key using the button above.</li>
+                  <li>Save your API key using the button above (or clear it if you intend to remove it).</li>
                   <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the root of this project.</li>
-                  <li>Add: <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre></li>
-                  <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code>).</li>
+                  <li>Add (or modify/remove): <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre>If clearing, you can remove this line or set it to empty: <code className="bg-secondary px-1 py-0.5 rounded text-foreground">GOOGLE_API_KEY=</code></li>
+                  <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code> if it's running).</li>
                 </ol>
               </div>
             </CardContent>
@@ -419,3 +442,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

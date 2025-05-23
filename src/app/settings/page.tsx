@@ -1,3 +1,4 @@
+
 "use client";
 
 import PageHeader from "@/components/page-header";
@@ -10,8 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData} from "@/lib/localStorage";
-import { getCompanyInfo } from "@/lib/database-wrapper";
-import { CompanySettingsForm } from "@/components/company-settings-form";
+
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
@@ -19,6 +19,9 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
+import { CompanySettingsForm } from "@/components/company-settings-form";
+import { getCompanyInfo } from "@/lib/database-wrapper";
+
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -29,8 +32,9 @@ export default function SettingsPage() {
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME);
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME);
-  const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState("DDMMYYYY");
+  const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState(""); // Initialize as empty
   const [companyInfo, setCompanyInfo] = useState<any>(null);
+
 
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
@@ -63,9 +67,10 @@ export default function SettingsPage() {
 
     const storedBackupTimestamp = loadFromLocalStorage<number | null>(LAST_BACKUP_TIMESTAMP_KEY, null);
     setLastBackupTimestamp(storedBackupTimestamp);
-
-    setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
     
+    // Set example date string on client-side only
+    setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
+
     // Load company info from database
     const loadCompanyInfo = async () => {
       try {
@@ -102,6 +107,7 @@ export default function SettingsPage() {
     };
     
     loadCompanyInfo();
+
 
   }, []);
 
@@ -194,7 +200,7 @@ export default function SettingsPage() {
     setOriginalGoogleApiKey(googleApiKey);
     toast({
       title: "API Key Saved",
-      description: "Google AI API Key has been saved to local storage. Restart server for changes to take effect.",
+      description: "Google AI API Key has been saved to local storage. Remember to set it in your .env file and restart the server.",
     });
   };
 
@@ -359,18 +365,17 @@ export default function SettingsPage() {
       <PageHeader 
         title="Settings" 
         description="Manage your application settings and preferences." 
-        icon={<SettingsIcon className="h-6 w-6" />}
       />
 
-      <Tabs defaultValue="appearance" className="space-y-4">
-        <TabsList className="w-full md:w-auto">
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Appearance</span>
-          </TabsTrigger>
+      <Tabs defaultValue="company" className="space-y-4">
+        <TabsList className="w-full grid md:w-auto md:grid-cols-5">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building className="h-4 w-4" />
             <span className="hidden sm:inline">Company</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            <span className="hidden sm:inline">Appearance</span>
           </TabsTrigger>
           <TabsTrigger value="invoices" className="flex items-center gap-2">
             <FileCog className="h-4 w-4" />
@@ -385,6 +390,43 @@ export default function SettingsPage() {
             <span className="hidden sm:inline">Data</span>
           </TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="company" className="space-y-6">
+         <CompanySettingsForm 
+            defaultValues={companyInfo} 
+            onSuccess={() => {
+              getCompanyInfo().then(info => setCompanyInfo(info));
+            }} 
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Name</CardTitle>
+              <CardDescription>Update the name displayed in the browser tab and application title</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Application Title</Label>
+                  <div className="flex w-full items-center gap-2">
+                    <Input
+                      id="companyName"
+                      placeholder="Enter your company name"
+                      value={companyNameInput}
+                      onChange={(e) => setCompanyNameInput(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleSaveCompanyName} size="sm">
+                      <Save className="mr-2 h-4 w-4" /> Save
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Current: <span className="font-medium">{currentCompanyName}</span>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="appearance" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -418,8 +460,8 @@ export default function SettingsPage() {
                         >
                           <div className="mb-2 h-5 w-5 rounded-full border" style={{
                             background: key === 'custom' 
-                              ? `hsl(${customThemeValues.primary || '180 60% 45%'})`
-                              : `var(--color-${key}-primary, var(--primary))`
+                              ? `hsl(${customThemeValues.primary || '180 60% 45%'})` // Fallback for custom
+                              : `var(--color-${key}-primary, hsl(var(--primary)))` // Fallback for predefined
                           }} />
                           <div className="font-medium">{name}</div>
                         </Label>
@@ -432,6 +474,24 @@ export default function SettingsPage() {
                   <div className="space-y-4 pt-4 border-t">
                     <h4 className="font-medium">Custom Theme Properties</h4>
                     
+                    <div className="grid gap-2">
+                      <Label htmlFor="bg-color">Background Color (HSL)</Label>
+                      <Input
+                        id="bg-color"
+                        placeholder="220 15% 15%"
+                        value={customThemeValues.background || ''}
+                        onChange={(e) => setCustomThemeValues(prev => ({ ...prev, background: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="fg-color">Foreground Color (HSL)</Label>
+                      <Input
+                        id="fg-color"
+                        placeholder="220 10% 85%"
+                        value={customThemeValues.foreground || ''}
+                        onChange={(e) => setCustomThemeValues(prev => ({ ...prev, foreground: e.target.value }))}
+                      />
+                    </div>
                     <div className="grid gap-2">
                       <Label htmlFor="primary-color">Primary Color (HSL)</Label>
                       <Input
@@ -452,47 +512,8 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
             
-            {/* Add Font Settings Card */}
             <FontSettings />
           </div>
-        </TabsContent>
-
-        <TabsContent value="company" className="space-y-6">
-          <CompanySettingsForm 
-            defaultValues={companyInfo} 
-            onSuccess={() => {
-              getCompanyInfo().then(info => setCompanyInfo(info));
-            }} 
-          />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Application Name</CardTitle>
-              <CardDescription>Update the name displayed in the browser tab and application title</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Application Title</Label>
-                  <div className="flex w-full items-center gap-2">
-                    <Input
-                      id="companyName"
-                      placeholder="Enter your company name"
-                      value={companyNameInput}
-                      onChange={(e) => setCompanyNameInput(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleSaveCompanyName} size="sm">
-                      <Save className="mr-2 h-4 w-4" /> Save
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Current: <span className="font-medium">{currentCompanyName}</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-6">
@@ -574,13 +595,16 @@ export default function SettingsPage() {
                   and create a new API key.
                 </p>
                 <p className="font-semibold text-destructive">
-                  <strong>Important:</strong> For the AI features to use your saved key:
+                  <strong>Important:</strong> For the AI features to use your key:
                 </p>
                 <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
-                  <li>Save your API key using the button above (or clear it if you intend to remove it).</li>
-                  <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the root of this project.</li>
-                  <li>Add (or modify/remove): <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre>If clearing, you can remove this line or set it to empty: <code className="bg-secondary px-1 py-0.5 rounded text-foreground">GOOGLE_API_KEY=</code></li>
-                  <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code> if it's running).</li>
+                  <li>Save your API key using the button above.</li>
+                  <li>Create or open the <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the **root directory of this project**.</li>
+                  <li>Add (or modify/remove) the following line, replacing `YOUR_API_KEY_HERE` with your actual key:
+                     <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre>
+                     If clearing, you can remove this line or set it to empty: <code className="bg-secondary px-1 py-0.5 rounded text-foreground">GOOGLE_API_KEY=</code>
+                  </li>
+                  <li><strong>Restart your development server</strong> (both <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run dev</code> and <code className="bg-secondary px-1 py-0.5 rounded text-foreground">npm run genkit:dev</code> if it's running). This step is crucial.</li>
                 </ol>
               </div>
             </CardContent>

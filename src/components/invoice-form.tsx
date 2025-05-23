@@ -392,7 +392,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   };
 
   useEffect(() => {
-    if (showDueDate && !form.getValues("dueDate") && watchInvoiceDate) {
+    if (showDueDate && !form.getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
       form.setValue("dueDate", addDays(new Date(watchInvoiceDate), 30));
     } else if (!showDueDate) {
       form.setValue("dueDate", null);
@@ -434,18 +434,18 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                        </div>
                     ) : (
                       <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
+                        <FormControl>
+                          <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               role="combobox"
                               className={cn( "w-full justify-between", !field.value && "text-muted-foreground")}
                             >
-                              {field.value ? customers.find( (customer) => customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
+                              {field.value ? customers.find( (customer) => customer && customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
                               <UserPlus className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
-                          </FormControl>
-                        </PopoverTrigger>
+                          </PopoverTrigger>
+                        </FormControl>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                           <Command>
                             <CommandInput placeholder="Search customers..." />
@@ -458,7 +458,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 </div>
                               </CommandEmpty>
                               <CommandGroup>
-                                {customers.filter(c => c).map((customer) => (
+                                {customers.filter(customer => !!customer).map((customer) => (
                                   <CommandItem
                                     key={customer.id}
                                     value={customer.name} 
@@ -590,7 +590,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = isOpen; return newState; })}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-between mt-1">
-                          {form.getValues(`items.${index}.productId`) ? products.find(p => p.id === form.getValues(`items.${index}.productId`))?.name || "Select..." : "Select product..." }
+                          {form.getValues(`items.${index}.productId`) ? products.find(p => p && p.id === form.getValues(`items.${index}.productId`))?.name || "Select..." : "Select product..." }
                           <PlusCircle className="ml-2 h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
@@ -605,7 +605,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 </div>
                             </CommandEmpty>
                             <CommandGroup>
-                              {products.filter(p => p).map((product) => (
+                              {products.filter(product => !!product).map((product) => (
                                 <CommandItem 
                                   key={product.id} 
                                   value={product.name} 
@@ -805,3 +805,5 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
+
+    

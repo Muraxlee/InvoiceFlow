@@ -48,7 +48,7 @@ const invoiceItemSchema = z.object({
   description: z.string().optional(),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
-  gstCategory: z.string().optional(), // HSN/SAC code
+  gstCategory: z.string().optional(), 
   applyIgst: z.boolean().default(true),
   applyCgst: z.boolean().default(false),
   applySgst: z.boolean().default(false),
@@ -61,7 +61,7 @@ const invoiceSchema = z.object({
   customerId: z.string().min(1, "Customer selection is required."),
   customerName: z.string().min(1, "Customer name is required (auto-filled on selection)."),
   customerEmail: z.string().email("Invalid email address (auto-filled on selection).").optional().or(z.literal('')),
-  customerAddress: z.string().optional(), // auto-filled
+  customerAddress: z.string().optional(), 
   invoiceNumber: z.string().min(1, "Invoice number is required."),
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   dueDate: z.date({ required_error: "Due date is required." }),
@@ -74,20 +74,16 @@ const invoiceSchema = z.object({
     shipDate: z.date().optional().nullable(),
     trackingNumber: z.string().optional(),
     carrierName: z.string().optional(),
-    
-    // Consignee Details (likely replacing old shippingAddress)
     consigneeName: z.string().optional(),
-    consigneeAddress: z.string().optional(), // This was likely the old shippingAddress
+    consigneeAddress: z.string().optional(), 
     consigneeGstin: z.string().optional(),
     consigneeStateCode: z.string().optional(),
-
-    // Transport Information
     transportationMode: z.string().optional(),
     lrNo: z.string().optional(),
     vehicleNo: z.string().optional(),
     dateOfSupply: z.date().optional().nullable(),
     placeOfSupply: z.string().optional(),
-  }).optional().default({ // Provide default for the whole object
+  }).optional().default({ 
     shipDate: null,
     trackingNumber: "",
     carrierName: "",
@@ -197,39 +193,67 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedCustomers = loadFromLocalStorage<Customer[]>("app_customers", []);
-      const storedProducts = loadFromLocalStorage<Product[]>("app_products", []);
-      setCustomers(storedCustomers);
-      setProducts(storedProducts);
+    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
+    const initialInvoiceDate = defaultValuesProp?.invoiceDate || new Date();
+    const initialDueDate = defaultValuesProp?.dueDate || (() => {
+      const date = new Date(initialInvoiceDate);
+      date.setDate(date.getDate() + 30);
+      return date;
+    })();
 
-      const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
-      if (isCreatingNew) {
-        const currentInvoiceDate = form.getValues('invoiceDate');
-        const currentDueDate = form.getValues('dueDate');
-        
-        if (!currentInvoiceDate) {
-          form.setValue("invoiceDate", new Date(), { shouldValidate: true, shouldDirty: true });
-        }
-        if (!currentDueDate) {
-          const todayForDueDate = form.getValues('invoiceDate') || new Date();
-          const thirtyDaysFromNow = new Date(todayForDueDate);
-          thirtyDaysFromNow.setDate(todayForDueDate.getDate() + 30);
-          form.setValue("dueDate", thirtyDaysFromNow, { shouldValidate: true, shouldDirty: true });
-        }
-
-        const invoiceDateForNumber = form.getValues('invoiceDate') || new Date();
-        if (!form.getValues('invoiceNumber')) {
-           form.setValue("invoiceNumber", generateInvoiceNumber(invoiceDateForNumber, false), { shouldValidate: true, shouldDirty: true });
-        }
-      } else if (defaultValuesProp?.customerId) {
-        // If editing and customerId exists, mark as selected
-        setIsCustomerSelected(true);
+    form.reset({ // Reset form with potentially new defaultValuesProp or calculated ones
+      ...form.getValues(), // Keep existing values if any
+      ...defaultValuesProp,
+      invoiceDate: initialInvoiceDate,
+      dueDate: initialDueDate,
+      invoiceNumber: isCreatingNew 
+        ? generateInvoiceNumber(initialInvoiceDate, false) 
+        : defaultValuesProp?.invoiceNumber || '',
+      items: defaultValuesProp?.items?.length ? defaultValuesProp.items : [{
+        productId: "", quantity: 1, price: 0, gstCategory: "",
+        applyIgst: true, applyCgst: false, applySgst: false,
+        igstRate: 18, cgstRate: 9, sgstRate: 9
+      }],
+      shipmentDetails: defaultValuesProp?.shipmentDetails || {
+        shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
+        consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
+        dateOfSupply: null, placeOfSupply: ""
       }
+    });
+
+    if (defaultValuesProp?.customerId) {
+      setIsCustomerSelected(true);
+    } else {
+      setIsCustomerSelected(false);
     }
-  }, [defaultValuesProp, form]);
+
+    async function loadInitialData() {
+      setIsDataLoading(true);
+      if (window.electronAPI) {
+        try {
+          const [fetchedCustomers, fetchedProducts] = await Promise.all([
+            window.electronAPI.getAllCustomers(),
+            window.electronAPI.getAllProducts()
+          ]);
+          setCustomers(fetchedCustomers || []);
+          setProducts(fetchedProducts || []);
+        } catch (error) {
+          console.error("Error fetching initial data for invoice form:", error);
+          toast({ title: "Error", description: "Could not load customers/products.", variant: "destructive" });
+        }
+      } else {
+         console.warn("Electron API not available for invoice form data loading.");
+      }
+      setIsDataLoading(false);
+    }
+
+    loadInitialData();
+
+  }, [defaultValuesProp, form, toast]);
 
 
   useEffect(() => {
@@ -262,13 +286,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     const product = products.find(p => p.id === productId);
     if (product) {
       form.setValue(`items.${index}.productId`, product.id);
-      form.setValue(`items.${index}.description`, product.description);
+      form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.price`, product.price);
       form.setValue(`items.${index}.gstCategory`, product.gstCategory);
       form.setValue(`items.${index}.igstRate`, product.igstRate);
       form.setValue(`items.${index}.cgstRate`, product.cgstRate);
       form.setValue(`items.${index}.sgstRate`, product.sgstRate);
-      form.setValue(`items.${index}.applyIgst`, true);
+      form.setValue(`items.${index}.applyIgst`, true); 
       form.setValue(`items.${index}.applyCgst`, false);
       form.setValue(`items.${index}.applySgst`, false);
     }
@@ -281,13 +305,12 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         form.setValue(`items.${index}.applySgst`, false);
       }
       form.setValue(`items.${index}.applyIgst`, value);
-    } else { // CGST or SGST
-      if (value) { // If CGST or SGST is checked
+    } else { 
+      if (value) { 
         form.setValue(`items.${index}.applyIgst`, false);
-        form.setValue(`items.${index}.applyCgst`, true); // Ensure both are checked
+        form.setValue(`items.${index}.applyCgst`, true); 
         form.setValue(`items.${index}.applySgst`, true);
-      } else { // If CGST or SGST is unchecked
-        // If unchecking one, uncheck both CGST and SGST
+      } else { 
         form.setValue(`items.${index}.applyCgst`, false);
         form.setValue(`items.${index}.applySgst`, false);
       }
@@ -295,7 +318,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     
     const applyIgst = form.getValues(`items.${index}.applyIgst`);
     const applyCgst = form.getValues(`items.${index}.applyCgst`);
-    // If nothing is selected after changes, default to IGST
     if (!applyIgst && !applyCgst) {
       form.setValue(`items.${index}.applyIgst`, true);
     }
@@ -308,7 +330,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue("customerName", customer.name, { shouldValidate: true });
       form.setValue("customerEmail", customer.email || "", { shouldValidate: true });
       form.setValue("customerAddress", customer.address || "", { shouldValidate: true });
-      // Also set consignee details if they should default to customer details
       form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
       form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
       setIsCustomerSelected(true);
@@ -333,7 +354,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         const taxRate = (item.igstRate || 0) / 100;
         igst += itemAmount * taxRate;
       }
-      if (item.applyCgst) { // CGST and SGST are typically applied together for intra-state
+      if (item.applyCgst) { 
         const cgstTaxRate = (item.cgstRate || 0) / 100;
         cgst += itemAmount * cgstTaxRate;
       }
@@ -365,13 +386,22 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   };
 
   const handleFormSubmit = (data: InvoiceFormValues) => {
-    if (typeof window !== 'undefined' && !defaultValuesProp?.invoiceNumber) {
+    if (typeof window !== 'undefined' && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "")) {
         const invoiceDateForNumber = data.invoiceDate || new Date();
         const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, true);
         data.invoiceNumber = confirmedInvoiceNumber;
     }
     onSubmit(data);
   };
+
+  if (isDataLoading && (!defaultValuesProp || !defaultValuesProp.customerId)) { // Show loader if initial data is loading and not editing
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Loading form data...</p>
+      </div>
+    );
+  }
 
   return (
     <Form {...form}>
@@ -417,15 +447,19 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                           <Command>
                             <CommandInput placeholder="Search customers..." />
                             <CommandEmpty>
-                              No customer found. 
-                              <Link href="/customers" className="text-primary hover:underline text-xs"> Add New Customer</Link>
+                              <div className="py-2 text-center text-sm">
+                                No customer found. 
+                                <Button variant="link" size="sm" asChild className="px-1">
+                                  <Link href="/customers"> Add New Customer</Link>
+                                </Button>
+                              </div>
                             </CommandEmpty>
                             <CommandList>
                               <CommandGroup>
                                 {customers.map((customer) => (
                                   <CommandItem
                                     key={customer.id}
-                                    value={customer.name} // Search by name
+                                    value={customer.name} 
                                     onSelect={() => {
                                       handleSelectCustomer(customer.id);
                                     }}
@@ -454,21 +488,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               <FormField control={form.control} name="customerName" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Name</FormLabel>
-                  <FormControl><Input placeholder="Auto-filled" {...field} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="customerEmail" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Email</FormLabel>
-                  <FormControl><Input placeholder="Auto-filled" {...field} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="customerAddress" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Billing Address</FormLabel>
-                  <FormControl><Textarea placeholder="Auto-filled" {...field} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -481,7 +515,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Invoice Number *</FormLabel>
-                  <FormControl><Input placeholder="e.g. INVDDMMYYYY0001" {...field} /></FormControl>
+                  <FormControl><Input placeholder="e.g. INVDDMMYYYY0001" {...field} value={field.value || ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -503,7 +537,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         selected={field.value} 
                         onSelect={(date) => {
                           field.onChange(date);
-                          if (date && !defaultValuesProp?.invoiceNumber && typeof window !== 'undefined') {
+                          if (date && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "") && typeof window !== 'undefined') {
                             form.setValue(
                               "invoiceNumber", 
                               generateInvoiceNumber(date, false),
@@ -600,7 +634,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
             <div className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-md shadow-sm relative">
-                   {index > 0 && (
+                   {fields.length > 1 && ( // Show remove button only if there's more than one item
                      <Button 
                        type="button" 
                        variant="ghost" 
@@ -614,11 +648,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                    )}
                   <div className="col-span-12 md:col-span-3">
                     <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Product / Service *</FormLabel>
+                     {products.length === 0 ? (
+                       <div className="p-2 mt-1 text-xs border rounded-md bg-muted/50 text-muted-foreground">
+                         No products. 
+                         <Link href="/products" className="text-primary hover:underline mx-1">Add product</Link>
+                       </div>
+                    ) : (
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-between mt-1">
                           {form.getValues(`items.${index}.productId`) 
-                            ? products.find(p => p.id === form.getValues(`items.${index}.productId`))?.name
+                            ? products.find(p => p.id === form.getValues(`items.${index}.productId`))?.name || "Select..."
                             : "Select..."
                           }
                           <PlusCircle className="ml-2 h-4 w-4" />
@@ -628,15 +668,19 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         <Command>
                           <CommandInput placeholder="Search products..." />
                           <CommandEmpty>
-                            No products found.
-                            <Link href="/products" className="text-primary hover:underline text-xs"> Add New Product</Link>
+                             <div className="py-2 text-center text-sm">
+                                No product found. 
+                                <Button variant="link" size="sm" asChild className="px-1">
+                                  <Link href="/products"> Add New Product</Link>
+                                </Button>
+                              </div>
                           </CommandEmpty>
                           <CommandList>
                             <CommandGroup>
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
-                                  value={product.name} // Search by name
+                                  value={product.name} 
                                   onSelect={() => handleSelectProduct(index, product.id)}
                                 >
                                   <div className="flex items-center">
@@ -657,6 +701,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         </Command>
                       </PopoverContent>
                     </Popover>
+                    )}
                      <FormField control={form.control} name={`items.${index}.productId`} render={() => <FormMessage />} />
                   </div>
                   <FormField control={form.control} name={`items.${index}.quantity`} render={({ field: itemField }) => (
@@ -677,7 +722,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <FormItem className="col-span-6 md:col-span-3">
                       <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Tax Category</FormLabel>
                       <div className="flex items-center gap-2 mt-1">
-                        <FormControl><Input placeholder="e.g. HSN 1234" {...itemField} /></FormControl>
+                        <FormControl><Input placeholder="e.g. HSN 1234" {...itemField} value={itemField.value || ''} /></FormControl>
                         <Button type="button" size="icon" variant="outline" onClick={() => handleSuggestGst(index)} disabled={loadingGst[index]} aria-label="Suggest Tax Category">
                           {loadingGst[index] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                         </Button>
@@ -746,13 +791,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                       </div>
                     </div>
                   </div>
-                  {index === 0 && fields.length > 1 && ( // Show remove button for first item only if there are other items
-                     <div className="col-span-12 md:col-span-1 flex items-end justify-end">
-                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} aria-label="Remove item">
-                          <Trash2 className="h-5 w-5 text-destructive" />
-                        </Button>
-                     </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -882,8 +920,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
           <Button type="button" variant="outline" onClick={handleCancel} disabled={isLoading}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" disabled={isLoading || isDataLoading}>
+            {(isLoading || isDataLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {defaultValuesProp?.invoiceNumber ? "Save Changes" : "Create Invoice"}
           </Button>
         </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PackagePlus, MoreHorizontal, Edit, Trash2, Info } from "lucide-react";
+import { PackagePlus, MoreHorizontal, Edit, Trash2, Info, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Define Product type based on ProductFormValues and expected DB structure
 export interface Product extends ProductFormValues {
   // id is already in ProductFormValues
 }
@@ -35,22 +34,23 @@ export default function ProductsPage() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    async function fetchProducts() {
-      setIsDataLoading(true);
-      if (window.electronAPI) {
-        try {
-          const fetchedProducts = await window.electronAPI.getAllProducts();
-          setProducts(fetchedProducts);
-        } catch (error) {
-          console.error("Error fetching products:", error);
-          toast({ title: "Error", description: "Could not load products.", variant: "destructive" });
-        }
-      } else {
-        toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
+  const fetchProducts = async () => {
+    setIsDataLoading(true);
+    if (window.electronAPI) {
+      try {
+        const fetchedProducts = await window.electronAPI.getAllProducts();
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        toast({ title: "Error", description: "Could not load products.", variant: "destructive" });
       }
-      setIsDataLoading(false);
+    } else {
+      toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
     }
+    setIsDataLoading(false);
+  };
+
+  useEffect(() => {
     fetchProducts();
   }, [toast]);
 
@@ -78,7 +78,6 @@ export default function ProductsPage() {
     setIsLoading(true);
     if (window.electronAPI) {
       try {
-        // Check for duplicate ID client-side
         if (products.some(p => p.id === data.id)) {
           toast({
             title: "Error: Product ID Exists",
@@ -90,7 +89,7 @@ export default function ProductsPage() {
         }
         const success = await window.electronAPI.addProduct(data);
         if (success) {
-          setProducts(prev => [...prev, data]); // Optimistically update UI or re-fetch
+          await fetchProducts(); // Re-fetch to get the latest list
           setIsLoading(false);
           setIsAddProductDialogOpen(false);
           toast({
@@ -102,7 +101,8 @@ export default function ProductsPage() {
         }
       } catch (error) {
         console.error("Error adding product:", error);
-        toast({ title: "Error", description: "Could not add product.", variant: "destructive" });
+        const errorMessage = error instanceof Error ? error.message : "Could not add product.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
         setIsLoading(false);
       }
     } else {
@@ -110,32 +110,37 @@ export default function ProductsPage() {
     }
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProductClick = (product: Product) => {
     setCurrentProduct(product);
     setIsEditProductDialogOpen(true);
   };
 
   const handleSaveEditedProduct = async (data: ProductFormValues) => {
     setIsLoading(true);
-    // Placeholder for Electron API call to update product
-    // For now, just updates local state and shows a toast
-    // await window.electronAPI.updateProduct(data);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    
-    const updatedProducts = products.map(p => 
-      p.id === data.id ? { ...data } : p
-    );
-    setProducts(updatedProducts);
-    // await window.electronAPI.saveProducts(updatedProducts); // If saving all products at once
-    
-    setIsLoading(false);
-    setIsEditProductDialogOpen(false);
-    setCurrentProduct(null);
-    
-    toast({
-      title: "Product Updated (Placeholder)",
-      description: `Product ${data.name} has been updated in the UI. DB update via Electron API is a placeholder.`,
-    });
+     if (window.electronAPI && currentProduct) {
+      try {
+        const success = await window.electronAPI.updateProduct(currentProduct.id, data);
+        if (success) {
+          await fetchProducts(); // Re-fetch to get the updated list
+          setIsLoading(false);
+          setIsEditProductDialogOpen(false);
+          setCurrentProduct(null);
+          toast({
+            title: "Product Updated",
+            description: `Product ${data.name} has been successfully updated.`,
+          });
+        } else {
+          throw new Error("Failed to update product via Electron API");
+        }
+      } catch (error) {
+        console.error("Error updating product:", error);
+        const errorMessage = error instanceof Error ? error.message : "Could not update product.";
+        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -168,12 +173,15 @@ export default function ProductsPage() {
       />
 
       {/* Edit Product Dialog */}
-      <Dialog open={isEditProductDialogOpen} onOpenChange={setIsEditProductDialogOpen}>
+      <Dialog open={isEditProductDialogOpen} onOpenChange={(isOpen) => {
+        setIsEditProductDialogOpen(isOpen);
+        if (!isOpen) setCurrentProduct(null); // Reset current product when dialog closes
+      }}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
-              Update the product details below. (Edit functionality is a placeholder)
+              Update the product details below.
             </DialogDescription>
           </DialogHeader>
           {currentProduct && (
@@ -198,7 +206,7 @@ export default function ProductsPage() {
         <CardContent>
         {isDataLoading ? (
             <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
           ) : (
           <Table>
@@ -318,7 +326,7 @@ export default function ProductsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                        <DropdownMenuItem onClick={() => handleEditProductClick(product)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <ConfirmDialog
@@ -352,3 +360,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    

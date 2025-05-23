@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
@@ -13,7 +12,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 // let db; // db instance is now managed within database.ts
 
 // Import database functions from src/lib/database
-const dbActions = require('../src/lib/database'); // Adjust path if needed
+const dbActions = require('../src/lib/database-electron'); // Using database-electron.js instead
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.

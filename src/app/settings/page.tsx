@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData} from "@/lib/localStorage";
 
@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
-import { getCompanyInfo as getDbCompanyInfo, saveCompanyInfo as saveDbCompanyInfo } from "@/lib/database-wrapper"; // For DB interactions
+import { getCompanyInfo as getDbCompanyInfo, saveCompanyInfo as saveDbCompanyInfo } from "@/lib/database-wrapper";
 
 
 export default function SettingsPage() {
@@ -30,10 +30,10 @@ export default function SettingsPage() {
   const [googleApiKey, setGoogleApiKey] = useState("");
   const [originalGoogleApiKey, setOriginalGoogleApiKey] = useState("");
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
-  const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); // For app title in localStorage
-  const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); // For app title
+  const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); 
+  const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); 
   const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState(""); 
-  const [companyInfo, setCompanyInfo] = useState<any>(null); // For DB company info form
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
 
 
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
@@ -43,7 +43,6 @@ export default function SettingsPage() {
 
 
   useEffect(() => {
-    // Load settings from localStorage
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
       prefix: DEFAULT_INVOICE_PREFIX, 
       dailyCounters: {} 
@@ -74,7 +73,7 @@ export default function SettingsPage() {
     const loadCompanyInfoFromDb = async () => {
       if (window.electronAPI) {
         try {
-          const info = await getDbCompanyInfo(); // Uses database-wrapper
+          const info = await getDbCompanyInfo();
           setCompanyInfo(info || { name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
         } catch (error) {
           console.error('Failed to load company info from DB:', error);
@@ -86,24 +85,25 @@ export default function SettingsPage() {
     loadCompanyInfoFromDb();
   }, []);
 
-  const handleDataAction = async (actionName: string, dataType?: 'invoices' | 'customers' | 'products' | 'allData' | 'settings') => {
+  const handleDataAction = async (actionName: string, dataType?: 'customers' | 'products' | 'allData' | 'settings') => {
     console.log(`${actionName} for ${dataType} initiated`);
     let success = false;
+    let requiresReload = false;
 
     if (window.electronAPI) {
         try {
-            if (dataType === 'invoices' && window.electronAPI.clearAllData) { // Assuming clearAllData clears invoices too, or need specific clearInvoices
-                 await window.electronAPI.clearAllData(); // This is a placeholder; ideally, clearAllData handles selective clears or we need more specific IPCs
-                 success = true;
-            } else if (dataType === 'customers' && window.electronAPI.clearAllCustomers) {
+            if (dataType === 'customers' && window.electronAPI.clearAllCustomers) {
                 await window.electronAPI.clearAllCustomers();
                 success = true;
             } else if (dataType === 'products' && window.electronAPI.clearAllProducts) {
                 await window.electronAPI.clearAllProducts();
                 success = true;
-            } else if (dataType === 'allData' && window.electronAPI.clearAllData) { // Factory Reset - Clear DB
-                await window.electronAPI.clearAllData(); // This clears invoices, customers, products, company info
-                success = true; // DB part done
+            } else if (dataType === 'allData' && window.electronAPI.clearAllData) { 
+                await window.electronAPI.clearAllData(); 
+                success = true; 
+                 // Also clear company info form state if it was loaded from DB
+                setCompanyInfo({ name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
+
             }
         } catch (error) {
             console.error(`Error clearing DB for ${dataType}:`, error);
@@ -112,8 +112,6 @@ export default function SettingsPage() {
         }
     }
 
-
-    // Clear relevant localStorage settings for Factory Reset or specific setting resets
     if (dataType === 'allData' || dataType === 'settings') {
         const keysToClearFromLocalStorage = [
             COMPANY_NAME_STORAGE_KEY, 
@@ -122,18 +120,16 @@ export default function SettingsPage() {
             THEME_STORAGE_KEY, 
             CUSTOM_THEME_STORAGE_KEY, 
             LAST_BACKUP_TIMESTAMP_KEY
-            // Do NOT clear CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY here as they are now in DB
         ];
         keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
         
-        // Reset states for localStorage items
         setCompanyNameInput(DEFAULT_COMPANY_NAME);
         setCurrentCompanyName(DEFAULT_COMPANY_NAME);
         if (document) document.title = DEFAULT_COMPANY_NAME;
         setGoogleApiKey("");
         setOriginalGoogleApiKey("");
         const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
-        saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig); // Re-save default
+        saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
         setInvoicePrefix(defaultConfig.prefix);
         setOriginalInvoicePrefix(defaultConfig.prefix);
         handleThemeChange(DEFAULT_THEME_KEY); 
@@ -141,14 +137,18 @@ export default function SettingsPage() {
         setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
         saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
         setLastBackupTimestamp(null);
-        success = true; // localStorage part done
+        success = true; 
+        requiresReload = true;
     }
     
     if (success) {
         toast({
         title: `${actionName} Successful`,
-        description: `The ${actionName.toLowerCase()} operation has been completed.`,
+        description: `The ${actionName.toLowerCase()} operation has been completed. ${requiresReload ? 'Page will reload.' : ''}`,
         });
+        if (requiresReload) {
+            setTimeout(() => window.location.reload(), 1500);
+        }
     } else {
          toast({
         title: `Action Not Fully Supported`,
@@ -157,7 +157,6 @@ export default function SettingsPage() {
         });
     }
   };
-
 
   const handleSaveInvoiceSettings = () => {
     const currentConfig = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
@@ -223,7 +222,6 @@ export default function SettingsPage() {
     if (document) { 
         document.title = companyNameInput;
     }
-    // Dispatch a storage event to notify layout.tsx or other components
     window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(companyNameInput) }));
     toast({
       title: "Application Title Saved",
@@ -234,21 +232,19 @@ export default function SettingsPage() {
   const handleThemeChange = useCallback((themeKey: string) => {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
-      // Remove all other theme attributes before setting the new one
       Object.keys(AVAILABLE_THEMES).forEach(key => {
-        htmlElement.removeAttribute(`data-theme-${key}`); // This might be old, data-theme is enough
+        htmlElement.removeAttribute(`data-theme-${key}`);
       });
       htmlElement.setAttribute('data-theme', themeKey);
       localStorage.setItem(THEME_STORAGE_KEY, themeKey); 
       setSelectedThemeKey(themeKey);
-      // If switching to custom, ensure custom styles are applied
       if (themeKey === 'custom') {
           const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
           const root = document.documentElement;
           if (storedCustomTheme.background) root.style.setProperty('--background', storedCustomTheme.background);
           if (storedCustomTheme.foreground) root.style.setProperty('--foreground', storedCustomTheme.foreground);
           if (storedCustomTheme.primary) root.style.setProperty('--primary', storedCustomTheme.primary);
-      } else { // Clear inline styles if not custom theme
+      } else { 
           const root = document.documentElement;
           root.style.removeProperty('--background');
           root.style.removeProperty('--foreground');
@@ -274,11 +270,78 @@ export default function SettingsPage() {
   };
 
   const dataManagementActions = [
-    // { id: "clearSales", label: "Clear Sales Data (Invoices)", description: "Permanently delete all sales records (invoices).", dataType: 'invoices' as const }, // Invoices are cleared by clearAllData
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from the database.", dataType: 'customers' as const },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from the database.", dataType: 'products' as const },
     { id: "factoryReset", label: "Factory Reset", description: "Reset all application data in the database and clear settings from local storage.", dataType: 'allData' as const },
   ];
+
+  const handleExportSettings = () => {
+    const settingsData: Partial<AllApplicationData> = {
+      appThemeKey: loadFromLocalStorage(THEME_STORAGE_KEY, DEFAULT_THEME_KEY),
+      [COMPANY_NAME_STORAGE_KEY]: loadFromLocalStorage(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME),
+      [GOOGLE_AI_API_KEY_STORAGE_KEY]: loadFromLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""),
+      [INVOICE_CONFIG_KEY]: loadFromLocalStorage(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} }),
+      [CUSTOM_THEME_STORAGE_KEY]: loadFromLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES),
+      appVersion: "1.0.0" // Example version
+    };
+
+    const jsonString = JSON.stringify(settingsData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `invoiceflow_settings_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+
+    setLastBackupTimestamp(Date.now());
+    saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, Date.now());
+    toast({ title: "Settings Exported", description: "All application settings have been exported." });
+  };
+
+  const handleImportSettings = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = e.target?.result as string;
+        const importedData = JSON.parse(json) as Partial<AllApplicationData>;
+
+        if (importedData.appThemeKey && AVAILABLE_THEMES[importedData.appThemeKey as keyof typeof AVAILABLE_THEMES]) {
+          handleThemeChange(importedData.appThemeKey);
+        }
+        if (importedData[COMPANY_NAME_STORAGE_KEY]) {
+          saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, importedData[COMPANY_NAME_STORAGE_KEY]);
+          setCompanyNameInput(importedData[COMPANY_NAME_STORAGE_KEY]!);
+        }
+        if (importedData[GOOGLE_AI_API_KEY_STORAGE_KEY] !== undefined) {
+          saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]);
+          setGoogleApiKey(importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]!);
+        }
+        if (importedData[INVOICE_CONFIG_KEY]) {
+          saveToLocalStorage(INVOICE_CONFIG_KEY, importedData[INVOICE_CONFIG_KEY]);
+          setInvoicePrefix(importedData[INVOICE_CONFIG_KEY]!.prefix);
+        }
+        if (importedData[CUSTOM_THEME_STORAGE_KEY]) {
+          saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, importedData[CUSTOM_THEME_STORAGE_KEY]);
+          setCustomThemeValues(importedData[CUSTOM_THEME_STORAGE_KEY]!);
+        }
+        
+        toast({ title: "Settings Imported", description: "Application settings have been imported. Page will reload." });
+        setTimeout(() => window.location.reload(), 1000);
+
+      } catch (error) {
+        console.error("Error importing settings:", error);
+        toast({ title: "Import Error", description: "Failed to import settings. The file might be corrupted or in the wrong format.", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    if(importFileRef.current) importFileRef.current.value = ""; // Reset file input
+  };
 
 
   return (
@@ -289,7 +352,7 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="company" className="space-y-4">
-        <TabsList className="w-full grid md:w-auto md:grid-cols-5">
+        <TabsList className="w-full grid md:grid-cols-5">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building className="h-4 w-4" />
             <span className="hidden sm:inline">Company</span>
@@ -319,13 +382,21 @@ export default function SettingsPage() {
               if (window.electronAPI) {
                 const info = await getDbCompanyInfo();
                 setCompanyInfo(info);
+                 // Also update the app title if company name from DB is being used for it
+                if (info?.name) {
+                    saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, info.name);
+                    setCurrentCompanyName(info.name);
+                    setCompanyNameInput(info.name); // Sync input field
+                    if (document) document.title = info.name;
+                    window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(info.name) }));
+                }
               }
             }} 
           />
           <Card>
             <CardHeader>
               <CardTitle>Application Title</CardTitle>
-              <CardDescription>Update the name displayed in the browser tab and application title.</CardDescription>
+              <CardDescription>Update the name displayed in the browser tab and application title (stored locally).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -383,8 +454,8 @@ export default function SettingsPage() {
                           )}
                         >
                           <div className="mb-2 h-5 w-5 rounded-full border" style={{
-                            background: `var(--sidebar-primary, var(--primary))` // Use a representative color
-                          }} />
+                            background: key === 'custom' ? (customThemeValues.primary ? `hsl(${customThemeValues.primary})` : 'var(--sidebar-primary, var(--primary))') : `var(--sidebar-primary, var(--primary))`
+                          }} data-theme-preview={key} />
                           <div className="font-medium text-center text-xs">{name}</div>
                         </Label>
                       </div>
@@ -534,11 +605,82 @@ export default function SettingsPage() {
         </TabsContent>
         
         <TabsContent value="data" className="space-y-6">
-           {/* Removed JSON Import/Export and Backup card as requested, data is now in Electron DB */}
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Archive className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Application Settings Backup (Local Storage)</CardTitle>
+                  <CardDescription>Export or import your application settings (theme, API key, etc.). This does NOT include database data.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Button onClick={handleExportSettings} className="w-full sm:w-auto">
+                  <Download className="mr-2 h-4 w-4" /> Export All Settings
+                </Button>
+                 <p className="text-xs text-muted-foreground">Last settings export: {lastBackupTimestamp ? format(new Date(lastBackupTimestamp), "PPP p") : "Never"}</p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="importSettingsFile">Import Settings from JSON</Label>
+                <div className="flex items-center gap-2">
+                    <Input 
+                        id="importSettingsFile" 
+                        type="file" 
+                        accept=".json" 
+                        ref={importFileRef}
+                        onChange={handleImportSettings}
+                        className="flex-1"
+                    />
+                </div>
+                 <p className="text-xs text-muted-foreground">Importing settings will overwrite current settings and reload the page.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <DatabaseZap className="h-8 w-8 text-primary" />
+                <div>
+                  <CardTitle className="text-xl">Database Backup & Restore (Manual)</CardTitle>
+                  <CardDescription>Instructions for manually managing your Electron SQLite database file.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p className="flex items-center gap-2"><Info className="h-4 w-4 text-blue-500" /> Your main application data (invoices, customers, products, company details) is stored in an SQLite database file named <code className="font-mono bg-muted px-1 py-0.5 rounded">invoiceflow.db</code>.</p>
+              <div>
+                <h4 className="font-semibold">To Manually Back Up Your Database:</h4>
+                <ol className="list-decimal list-inside pl-4 text-muted-foreground">
+                  <li>Close the InvoiceFlow application.</li>
+                  <li>Navigate to the Electron user data directory for this application. This is typically:
+                    <ul className="list-disc list-inside pl-4">
+                        <li>Windows: <code className="font-mono bg-muted px-1 py-0.5 rounded">%APPDATA%\invoiceflow</code> (e.g., C:\Users\YourUser\AppData\Roaming\invoiceflow)</li>
+                        <li>macOS: <code className="font-mono bg-muted px-1 py-0.5 rounded">~/Library/Application Support/invoiceflow</code></li>
+                        <li>Linux: <code className="font-mono bg-muted px-1 py-0.5 rounded">~/.config/invoiceflow</code></li>
+                    </ul>
+                  </li>
+                  <li>Copy the <code className="font-mono bg-muted px-1 py-0.5 rounded">invoiceflow.db</code> file from this directory to a safe backup location.</li>
+                </ol>
+              </div>
+               <div>
+                <h4 className="font-semibold">To Manually Restore Your Database:</h4>
+                 <ol className="list-decimal list-inside pl-4 text-muted-foreground">
+                  <li>Close the InvoiceFlow application.</li>
+                  <li>Navigate to the Electron user data directory (see paths above).</li>
+                  <li>Replace the existing <code className="font-mono bg-muted px-1 py-0.5 rounded">invoiceflow.db</code> file with your backup copy.</li>
+                  <li>Restart the InvoiceFlow application.</li>
+                </ol>
+              </div>
+              <p className="text-xs text-destructive font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Ensure the application is closed before replacing the database file to avoid data corruption.</p>
+            </CardContent>
+          </Card>
+
           <Card className="shadow-lg border-destructive">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <DatabaseZap className="h-8 w-8 text-destructive" />
+                <Trash2 className="h-8 w-8 text-destructive" />
                 <div>
                   <CardTitle className="text-xl">Data Management (Electron Database)</CardTitle>
                   <CardDescription className="text-destructive flex items-center gap-1">
@@ -591,3 +733,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

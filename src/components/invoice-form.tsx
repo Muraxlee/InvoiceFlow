@@ -19,12 +19,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
-import { CalendarIcon, PlusCircle, Trash2, Wand2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus } from "lucide-react";
+import { Label } from "@/components/ui/label"; // Ensure Label is imported
+import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
-import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/flows/gst-suggestion";
+// Removed: import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/flows/gst-suggestion";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig } from "@/lib/localStorage";
@@ -118,7 +118,9 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
 
   let currentCounter = config.dailyCounters[dateKey] || 0;
-  const useCounter = increment ? currentCounter + 1 : (currentCounter === 0 ? 1 : currentCounter + 1);
+  // If incrementing, always use counter + 1. If not incrementing (just generating example),
+  // use counter + 1 if counter > 0, otherwise use 1 (for the first number of the day).
+  const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
 
 
   if (increment) {
@@ -139,8 +141,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [products, setProducts] = useState<Product[]>([]);
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
-  const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
+  // Removed AI GST Suggestion state:
+  // const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
+  // const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
 
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
@@ -268,31 +271,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [defaultValuesProp, form, toast]);
 
 
-  useEffect(() => {
-    setGstSuggestions(new Array(fields.length).fill(null));
-    setLoadingGst(new Array(fields.length).fill(false));
-  }, [fields.length]);
+  // Removed: useEffect for AI GST suggestions and loading state
 
-  const handleSuggestGst = async (index: number) => {
-    const itemDescription = form.getValues(`items.${index}.description`);
-    if (!itemDescription || itemDescription.trim() === "") {
-      toast({ title: "Missing Description", description: "Please enter an item description to get tax category suggestions.", variant: "destructive" });
-      return;
-    }
-
-    setLoadingGst(prev => { const newLoading = [...prev]; newLoading[index] = true; return newLoading; });
-    try {
-      const suggestion = await suggestGstCategory({ itemDescription });
-      setGstSuggestions(prev => { const newSuggestions = [...prev]; newSuggestions[index] = suggestion; return newSuggestions; });
-      form.setValue(`items.${index}.gstCategory`, suggestion.gstCategory);
-      toast({ title: "Tax Category Suggestion", description: `Suggested: ${suggestion.gstCategory} (Confidence: ${(suggestion.confidence * 100).toFixed(0)}%)` });
-    } catch (error) {
-      console.error("Error fetching tax category suggestion:", error);
-      toast({ title: "Error", description: "Could not fetch tax category suggestion.", variant: "destructive" });
-    } finally {
-      setLoadingGst(prev => { const newLoading = [...prev]; newLoading[index] = false; return newLoading; });
-    }
-  };
+  // Removed: handleSuggestGst function
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -454,7 +435,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               className={cn( "w-full justify-between", !field.value && "text-muted-foreground")}
                             >
                               <div className="flex w-full justify-between items-center">
+                                <span className="truncate">
                                 {field.value ? customers.find( (customer) => customer && customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
+                                </span>
                                 <UserPlus className="ml-auto h-4 w-4 opacity-50" />
                               </div>
                             </Button>
@@ -666,6 +649,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                                   alt={product.name} 
                                                   width={30} 
                                                   height={30}
+                                                  data-ai-hint="item product"
                                                   className="rounded-md mr-2 aspect-square object-cover"
                                                   onError={(e) => {
                                                     e.currentTarget.src = "https://placehold.co/30x30.png?text=Error";
@@ -694,16 +678,14 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <FormItem className="col-span-4 md:col-span-2"> <FormLabel>Price (₹) *</FormLabel> <FormControl><Input type="number" placeholder="0.00" {...itemField} className="mt-1"/></FormControl> <FormMessage /> </FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: itemField }) => (
-                    <FormItem className="col-span-6 md:col-span-3"> <FormLabel>Tax Category</FormLabel>
+                    <FormItem className="col-span-5 md:col-span-3"> <FormLabel>Tax Category</FormLabel>
                       <div className="flex items-center gap-2 mt-1">
                         <FormControl><Input placeholder="e.g. HSN 1234" {...itemField} value={itemField.value || ''} /></FormControl>
-                        <Button type="button" size="icon" variant="outline" onClick={() => handleSuggestGst(index)} disabled={loadingGst[index]} aria-label="Suggest Tax Category">
-                          {loadingGst[index] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                        </Button>
+                        {/* AI Suggestion Button Removed */}
                       </div> <FormMessage />
                     </FormItem>
                   )} />
-                  <div className="col-span-6 md:col-span-3"> <FormLabel>GST Types</FormLabel>
+                  <div className="col-span-7 md:col-span-3"> <FormLabel>GST Types</FormLabel>
                     <div className="flex flex-col gap-2 mt-2">
                        <Controller control={form.control} name={`items.${index}.applyIgst`}
                         render={({ field: igstField }) => (

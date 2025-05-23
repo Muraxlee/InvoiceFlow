@@ -14,13 +14,15 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'placehold.co',
-        pathname: '/**', // Ensure 'port' is empty string if not needed or remove it
+        pathname: '/**',
       },
     ],
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:9002'],
+      // Add your Electron app's origin if server actions are used from the renderer
+      // For development, if your Next.js app runs on 9002 and Electron serves it
+      allowedOrigins: ['localhost:9002'], 
     },
     // This is the Turbopack-friendly way to handle packages
     // that should not be bundled for server-side environments

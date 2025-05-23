@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Metadata } from 'next'; // Keep for potential static metadata
+import type { Metadata } from 'next';
 import './globals.css';
 import {
   SidebarProvider,
@@ -16,12 +16,12 @@ import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
 import { useEffect, useState, useCallback } from 'react'; 
 import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
-import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY } from '@/components/font-settings';
-// import { AuthProvider } from '@/contexts/auth-context'; // Will be uncommented when AuthProvider is ready
+import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings'; // Import AVAILABLE_FONTS
 
+// Static metadata as a base
 export const metadataBase: Metadata = {
-  title: 'Dynamic Company App', 
-  description: 'Advanced Analytics Dashboard.',
+  title: DEFAULT_COMPANY_NAME, // Default title
+  description: 'Advanced Invoice Management System.',
 };
 
 export const THEME_STORAGE_KEY = 'app-theme';
@@ -49,14 +49,15 @@ export default function RootLayout({
   const [currentThemeKey, setCurrentThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyName, setCompanyName] = useState<string>(DEFAULT_COMPANY_NAME);
   const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
-  const [isMounted, setIsMounted] = useState(false); // To prevent hydration issues with localStorage
+  const [isMounted, setIsMounted] = useState(false);
+  const [currentFontKey, setCurrentFontKey] = useState<string>(DEFAULT_FONT_KEY);
+
 
   const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
     const root = document.documentElement;
     if (customTheme.background) root.style.setProperty('--background', customTheme.background);
     if (customTheme.foreground) root.style.setProperty('--foreground', customTheme.foreground);
     if (customTheme.primary) root.style.setProperty('--primary', customTheme.primary);
-    // Add more variables here if custom theme expands
   }, []);
 
   const resetCustomThemeVariables = useCallback(() => {
@@ -64,15 +65,11 @@ export default function RootLayout({
     root.style.removeProperty('--background');
     root.style.removeProperty('--foreground');
     root.style.removeProperty('--primary');
-    // Add more variables here if custom theme expands
   }, []);
 
   const applyTheme = useCallback((themeKey: string) => {
     const htmlElement = document.documentElement;
-    Object.keys(AVAILABLE_THEMES).forEach(key => {
-      htmlElement.removeAttribute(`data-theme-${key}`); // Should be removeAttribute('data-theme') then set new one
-    });
-    htmlElement.setAttribute('data-theme', themeKey); // This applies the theme based on globals.css
+    htmlElement.setAttribute('data-theme', themeKey);
     localStorage.setItem(THEME_STORAGE_KEY, themeKey);
     setCurrentThemeKey(themeKey);
 
@@ -83,9 +80,27 @@ export default function RootLayout({
       resetCustomThemeVariables(); 
     }
   }, [applyCustomThemeVariables, resetCustomThemeVariables]);
+  
+  const applyFont = useCallback((fontKey: string) => {
+    const htmlElement = document.documentElement;
+    Object.keys(AVAILABLE_FONTS).forEach(key => {
+      htmlElement.classList.remove(`font-${key}`);
+    });
+    if (fontKey !== "system") {
+      htmlElement.classList.add(`font-${fontKey}`);
+    }
+    // Directly set body font family for broader application
+    document.body.style.fontFamily = fontKey === "system" 
+      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" 
+      : `var(--font-${fontKey}), sans-serif`;
+    
+    localStorage.setItem(FONT_STORAGE_KEY, fontKey);
+    setCurrentFontKey(fontKey);
+  }, []);
+
 
   useEffect(() => {
-    setIsMounted(true); // Component has mounted, safe to use localStorage
+    setIsMounted(true); 
 
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
     if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
@@ -95,22 +110,18 @@ export default function RootLayout({
     }
 
     const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY);
-    const htmlElement = document.documentElement;
-    const fontKeys = ['inter', 'roboto', 'open-sans', 'montserrat', 'poppins', 'lato', 'nunito', 'system'];
-    fontKeys.forEach(key => htmlElement.classList.remove(`font-${key}`));
-    
-    const activeFontKey = storedFontKey || DEFAULT_FONT_KEY;
-    htmlElement.classList.add(`font-${activeFontKey}`);
-    document.body.style.fontFamily = activeFontKey === "system"
-      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
-      : `'${activeFontKey.charAt(0).toUpperCase() + activeFontKey.slice(1)}', sans-serif`;
+    if (storedFontKey && AVAILABLE_FONTS[storedFontKey as keyof typeof AVAILABLE_FONTS]) {
+      applyFont(storedFontKey);
+    } else {
+      applyFont(DEFAULT_FONT_KEY);
+    }
+
 
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyName(storedCompanyName);
     setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || 'Q');
-    if (document) {
-        document.title = storedCompanyName;
-    }
+    document.title = storedCompanyName || String(metadataBase.title);
+
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY && event.newValue) {
@@ -122,55 +133,50 @@ export default function RootLayout({
         const newName = event.newValue ? JSON.parse(event.newValue) : DEFAULT_COMPANY_NAME;
         setCompanyName(newName);
         setCompanyInitial(newName.substring(0,1).toUpperCase() || 'Q');
-        if (document) {
-            document.title = newName;
-        }
+        document.title = newName || String(metadataBase.title);
       }
       if (event.key === CUSTOM_THEME_STORAGE_KEY && currentThemeKey === 'custom') {
         const newCustomTheme = event.newValue ? JSON.parse(event.newValue) : DEFAULT_CUSTOM_THEME_VALUES;
         applyCustomThemeVariables(newCustomTheme);
       }
-      if (event.key === FONT_STORAGE_KEY && event.newValue) {
-        const newFontKey = event.newValue || DEFAULT_FONT_KEY;
-        fontKeys.forEach(key => htmlElement.classList.remove(`font-${key}`));
-        htmlElement.classList.add(`font-${newFontKey}`);
-        document.body.style.fontFamily = newFontKey === "system"
-          ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
-          : `'${newFontKey.charAt(0).toUpperCase() + newFontKey.slice(1)}', sans-serif`;
+       if (event.key === FONT_STORAGE_KEY && event.newValue) {
+        if (AVAILABLE_FONTS[event.newValue as keyof typeof AVAILABLE_FONTS]) {
+          applyFont(event.newValue);
+        }
       }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [applyTheme, currentThemeKey, applyCustomThemeVariables]);
+  }, [applyTheme, currentThemeKey, applyCustomThemeVariables, applyFont]);
 
-  // Prevent rendering anything until isMounted is true to avoid hydration mismatches
-  // related to localStorage access.
   if (!isMounted) {
     return (
       <html lang="en" suppressHydrationWarning>
         <head>
-          <title>{DEFAULT_COMPANY_NAME}</title>
+          <title>{String(metadataBase.title)}</title>
           <meta name="description" content={String(metadataBase.description)} />
         </head>
-        <body className="antialiased">
-          {/* Minimal loader or skeleton can go here if desired */}
+        <body className="antialiased bg-background text-foreground">
+          {/* You can put a global loader here */}
         </body>
       </html>
     );
   }
 
   return (
-    // <AuthProvider> // Will be uncommented when AuthProvider is ready
-    <html lang="en" suppressHydrationWarning data-theme={currentThemeKey}>
+    <html lang="en" suppressHydrationWarning data-theme={currentThemeKey} className={currentFontKey !== "system" ? `font-${currentFontKey}` : ''}>
       <head>
         {/* Title is now set dynamically in useEffect */}
         <meta name="description" content={String(metadataBase.description)} />
       </head>
       <body
-        className="antialiased" 
-        // style={{ fontFamily: `var(--font-${currentFontKey})` }} // Managed by class on html
+        className="antialiased bg-background text-foreground"
+        style={{ fontFamily: currentFontKey === "system" 
+            ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" 
+            : `var(--font-${currentFontKey})` 
+        }}
       >
         <SidebarProvider defaultOpen> 
           <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
@@ -212,6 +218,5 @@ export default function RootLayout({
         <Toaster />
       </body>
     </html>
-    // </AuthProvider>
   );
 }

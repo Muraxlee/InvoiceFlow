@@ -1,3 +1,4 @@
+
 'use client';
 
 import { StoredInvoice } from './database';
@@ -25,7 +26,24 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
       // In browser but not Electron, fetch from API endpoint
       const response = await fetch('/api/invoices');
       if (!response.ok) throw new Error('Failed to fetch invoices');
-      return await response.json();
+      const invoices = await response.json();
+      // Ensure dates are converted from ISO strings if necessary
+      return invoices.map((inv: any) => ({
+        ...inv,
+        invoiceDate: new Date(inv.invoiceDate),
+        dueDate: new Date(inv.dueDate),
+        items: inv.items.map((item:any) => ({
+            ...item,
+            // Ensure rates are numbers, default if not present
+            igstRate: Number(item.igstRate ?? product?.igstRate ?? 18),
+            cgstRate: Number(item.cgstRate ?? product?.cgstRate ?? 9),
+            sgstRate: Number(item.sgstRate ?? product?.sgstRate ?? 9),
+        })),
+        shipmentDetails: inv.shipmentDetails ? {
+          ...inv.shipmentDetails,
+          shipDate: inv.shipmentDetails.shipDate ? new Date(inv.shipmentDetails.shipDate) : null,
+        } : { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" }
+      }));
     } catch (error) {
       console.error('Error fetching invoices:', error);
       return [];
@@ -44,7 +62,24 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
         if (response.status === 404) return null;
         throw new Error('Failed to fetch invoice');
       }
-      return await response.json();
+      const invoice = await response.json();
+      if (!invoice) return null;
+      // Ensure dates are converted
+      return {
+        ...invoice,
+        invoiceDate: new Date(invoice.invoiceDate),
+        dueDate: new Date(invoice.dueDate),
+        items: invoice.items.map((item:any) => ({
+            ...item,
+            igstRate: Number(item.igstRate ?? 18),
+            cgstRate: Number(item.cgstRate ?? 9),
+            sgstRate: Number(item.sgstRate ?? 9),
+        })),
+        shipmentDetails: invoice.shipmentDetails ? {
+          ...invoice.shipmentDetails,
+          shipDate: invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate) : null,
+        } : { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" }
+      };
     } catch (error) {
       console.error(`Error fetching invoice ${id}:`, error);
       return null;
@@ -97,10 +132,23 @@ export async function getCompanyInfo() {
   } else {
     try {
       const response = await fetch('/api/company');
-      if (!response.ok) throw new Error('Failed to fetch company info');
-      return await response.json();
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Company info not found, return null without logging an error
+          return null; 
+        }
+        // For other errors (500, network issues etc.), throw the error.
+        throw new Error(`Failed to fetch company info, API responded with status: ${response.status}`);
+      }
+      const companyData = await response.json();
+      // If API returns an empty object for a 200, treat as null
+      if (companyData && Object.keys(companyData).length === 0 && companyData.constructor === Object) {
+        return null;
+      }
+      return companyData;
     } catch (error) {
-      console.error('Error fetching company info:', error);
+      // This catch block will now only log errors not related to 404.
+      console.error('Error fetching company info in wrapper:', error); 
       return null;
     }
   }

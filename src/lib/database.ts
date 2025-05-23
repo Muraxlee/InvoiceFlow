@@ -295,9 +295,9 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
   const currentDb = await initDatabase();
   await currentDb.run('BEGIN TRANSACTION');
   try {
-    await currentDb.run(\`
+    await currentDb.run(`
       INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate.toISOString(), invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
     );
     await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
@@ -311,9 +311,9 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
 
     await currentDb.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
     if (invoice.shipmentDetails) {
-        await currentDb.run(\`
+        await currentDb.run(`
           INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, consigneeName, consigneeAddress, consigneeGstin, consigneeStateCode, transportationMode, lrNo, vehicleNo, dateOfSupply, placeOfSupply)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           invoice.id,
           invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null,
@@ -403,9 +403,9 @@ export async function deleteInvoice(id: string): Promise<boolean> {
 export async function saveCompanyInfo(company: CompanyData): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
-    await currentDb.run(\`
+    await currentDb.run(`
       INSERT OR REPLACE INTO company (id, name, address, phone, phone2, email, gstin, bank_account_name, bank_name, bank_account, bank_ifsc)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [company.name, company.address, company.phone, company.phone2 || null, company.email, company.gstin || null, company.bank_account_name || null, company.bank_name || null, company.bank_account || null, company.bank_ifsc || null]
     );
     return true;
@@ -439,7 +439,7 @@ export async function addCustomer(customer: Customer): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingCustomer = await currentDb.get('SELECT id FROM customers WHERE id = ?', [customer.id]);
-    if (existingCustomer) throw new Error(\`Customer with ID ${customer.id} already exists.\`);
+    if (existingCustomer) throw new Error(`Customer with ID ${customer.id} already exists.`);
     await currentDb.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)',
       [customer.id, customer.name, customer.email, customer.phone, customer.address]);
     return true;
@@ -480,7 +480,7 @@ export async function addProduct(product: Product): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingProduct = await currentDb.get('SELECT id FROM products WHERE id = ?', [product.id]);
-    if (existingProduct) throw new Error(\`Product with ID ${product.id} already exists.\`);
+    if (existingProduct) throw new Error(`Product with ID ${product.id} already exists.`);
     await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [product.id, product.name, product.description, product.price, product.imageUrl || null, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]);
     return true;

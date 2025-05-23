@@ -6,7 +6,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAllInvoices: () => ipcRenderer.invoke('get-all-invoices'),
   getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
   saveInvoice: (invoice) => {
-    // Ensure dates are serialized if they are Date objects
     const serializedInvoice = {
       ...invoice,
       invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : invoice.invoiceDate,
@@ -14,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       shipmentDetails: invoice.shipmentDetails ? {
         ...invoice.shipmentDetails,
         shipDate: invoice.shipmentDetails.shipDate instanceof Date ? invoice.shipmentDetails.shipDate.toISOString() : invoice.shipmentDetails.shipDate,
+        dateOfSupply: invoice.shipmentDetails.dateOfSupply instanceof Date ? invoice.shipmentDetails.dateOfSupply.toISOString() : invoice.shipmentDetails.dateOfSupply,
       } : undefined,
     };
     return ipcRenderer.invoke('save-invoice', serializedInvoice);
@@ -49,8 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database Backup/Restore operations
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
-  restoreDatabase: (sourceFilePath) => ipcRenderer.invoke('restore-database', sourceFilePath),
+  initiateDatabaseRestore: () => ipcRenderer.invoke('initiate-database-restore'), // Changed from restoreDatabase
+
   // For file dialogs that need to be initiated from renderer but executed in main
-  showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
-  showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),
+  // These are not strictly needed if main process handles dialogs internally for backup/restore
+  // showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
+  // showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),
 });

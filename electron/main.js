@@ -1,29 +1,16 @@
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
 const isDev = process.env.NODE_ENV !== 'production';
-// Note: sqlite3 and open are not directly used here anymore if all DB logic is in database.ts
-// const sqlite3 = require('sqlite3');
-// const { open } = require('sqlite');
-// const bcrypt = require('bcrypt'); // bcrypt is used within database.ts
 
-// Database connection - managed by database.ts
-// let db; // db instance is now managed within database.ts
+const dbActions = require('../src/lib/database-electron'); 
 
-// Import database functions from src/lib/database
-const dbActions = require('../src/lib/database-electron'); // Using database-electron.js instead
-
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
 let mainWindow;
-
 
 async function initDatabase() {
   try {
-    // Use the initDatabase function from database.ts which now handles path correctly
-    // This just ensures the DB is initialized on app start if needed by Electron directly,
-    // though most direct DB calls will come from IPC handlers calling dbActions.
     await dbActions.initDatabase();
     console.log('Electron Main: Database initialization check complete via database.ts logic');
   } catch (error) {
@@ -43,7 +30,7 @@ function createWindow() {
   });
   mainWindow.setTitle('InvoiceFlow - Invoice Management System');
   const startUrl = isDev
-    ? 'http://localhost:9002' // Port from package.json dev script
+    ? 'http://localhost:9002' 
     : url.format({
         pathname: path.join(__dirname, '../out/index.html'),
         protocol: 'file:',
@@ -59,7 +46,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await initDatabase(); // Ensure database is ready
+  await initDatabase(); 
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -69,7 +56,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', async () => {
-  await dbActions.closeDatabase(); // Close DB connection when app closes
+  await dbActions.closeDatabase(); 
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -92,7 +79,7 @@ ipcMain.handle('add-customer', async (event, customer) => {
     return await dbActions.addCustomer(customer);
   } catch (error) {
     console.error('Error in add-customer IPC handler:', error);
-    throw error; // Re-throw to be caught by renderer
+    throw error; 
   }
 });
 ipcMain.handle('delete-customer', async (event, id) => dbActions.deleteCustomer(id));
@@ -105,7 +92,7 @@ ipcMain.handle('add-product', async (event, product) => {
     return await dbActions.addProduct(product);
   } catch (error) {
     console.error('Error in add-product IPC handler:', error);
-    throw error; // Re-throw to be caught by renderer
+    throw error; 
   }
 });
 ipcMain.handle('delete-product', async (event, id) => dbActions.deleteProduct(id));
@@ -153,8 +140,6 @@ ipcMain.handle('delete-user', async (event, userId) => {
 
 ipcMain.handle('validate-user-credentials', async (event, { username, password_NOT_Hashed_Yet }) => {
   try {
-    // The password_NOT_Hashed_Yet naming implies it's plain text from form.
-    // The validateUserCredentials function in database.ts should handle comparison with hashed password.
     return await dbActions.validateUserCredentials(username, password_NOT_Hashed_Yet);
   } catch (error)
   {
@@ -166,7 +151,6 @@ ipcMain.handle('validate-user-credentials', async (event, { username, password_N
 // --- Database Backup/Restore IPC Handlers ---
 ipcMain.handle('get-database-path', async () => {
   try {
-    // dbActions.getDbPath() should be callable and return the Electron userData path for the DB
     return dbActions.getDbPath();
   } catch (error) {
     console.error('Error getting database path:', error);
@@ -181,34 +165,47 @@ ipcMain.handle('backup-database', async () => {
   const { filePath } = await dialog.showSaveDialog(mainWindow, {
     title: 'Backup Database',
     defaultPath: path.join(app.getPath('documents'), defaultFileName),
-    filters: [{ name: 'Database Files', extensions: ['db'] }]
+    filters: [{ name: 'Database Files', extensions: ['db', 'sqlite', 'sqlite3'] }]
   });
 
   if (filePath) {
     try {
-      await dbActions.closeDatabase(); // Ensure DB is closed before copying
+      await dbActions.closeDatabase(); 
       fs.copyFileSync(currentDbPath, filePath);
-      await dbActions.initDatabase(); // Re-initialize DB connection
+      await dbActions.initDatabase(); 
       return { success: true, path: filePath };
     } catch (error) {
       console.error('Database backup failed:', error);
-      await dbActions.initDatabase(); // Attempt to re-initialize if closing failed before copy
+      await dbActions.initDatabase(); 
       throw error;
     }
   }
   return { success: false, message: 'Backup cancelled by user.' };
 });
 
-ipcMain.handle('restore-database', async (event, sourceFilePath) => {
+ipcMain.handle('initiate-database-restore', async () => {
   const targetDbPath = dbActions.getDbPath();
+  
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Database Backup to Restore',
+    filters: [{ name: 'Database Files', extensions: ['db', 'sqlite', 'sqlite3'] }],
+    properties: ['openFile']
+  });
+
+  if (canceled || !filePaths || filePaths.length === 0) {
+    return { success: false, message: 'Restore cancelled by user.' };
+  }
+
+  const sourceFilePath = filePaths[0];
+
   try {
-    await dbActions.closeDatabase(); // Ensure DB is closed before replacing
+    await dbActions.closeDatabase(); 
     fs.copyFileSync(sourceFilePath, targetDbPath);
-    await dbActions.initDatabase(); // Re-initialize with the new DB file
+    await dbActions.initDatabase(); 
     return { success: true };
   } catch (error) {
     console.error('Database restore failed:', error);
-    await dbActions.initDatabase(); // Attempt to re-initialize if closing failed before copy
+    await dbActions.initDatabase(); 
     throw error;
   }
 });

@@ -1,5 +1,5 @@
 
-import type { User as AppUser } from '@/lib/database'; // Assuming User type is in database.ts
+import type { User as AppUser } from '@/lib/database'; 
 
 interface CustomerData {
   id: string;
@@ -21,8 +21,7 @@ interface ProductData {
   sgstRate: number;
 }
 
-// For user data being passed to/from IPC, omit password for creation/update where appropriate
-type UserCreationData = Omit<AppUser, 'id' | 'isSystemAdmin'> & { password_NOT_Hashed_Yet: string }; // Or a more specific type
+type UserCreationData = Omit<AppUser, 'id' | 'isSystemAdmin'> & { password_NOT_Hashed_Yet: string }; 
 type UserUpdateData = Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password_NOT_Hashed_Yet?: string };
 type UserListData = Omit<AppUser, 'password'>;
 
@@ -55,9 +54,7 @@ interface ElectronAPI {
 
   // User Management operations
   getAllUsers: () => Promise<UserListData[]>;
-  // For createUser, password is plain text from form, hashing happens in main/dbActions
-  createUser: (userData: Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'> & { password: string } ) => Promise<string | null>; // Returns new user ID or null
-  // For updateUser, password is plain text if being changed
+  createUser: (userData: Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'> & { password: string } ) => Promise<string | null>; 
   updateUser: (userId: string, userData: Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password?: string }) => Promise<boolean>;
   deleteUser: (userId: string) => Promise<boolean>;
   validateUserCredentials: (credentials: {username: string, password_NOT_Hashed_Yet: string}) => Promise<UserListData | null>;
@@ -65,11 +62,11 @@ interface ElectronAPI {
   // Database Backup/Restore operations
   getDatabasePath: () => Promise<string>;
   backupDatabase: () => Promise<{success: boolean; path?: string; message?: string}>;
-  restoreDatabase: (sourceFilePath: string) => Promise<{success: boolean; message?: string}>;
+  initiateDatabaseRestore: () => Promise<{success: boolean; message?: string}>; // Changed from restoreDatabase
   
-  // Generic dialogs (optional, if you want to trigger main process dialogs from renderer)
-  showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
-  showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
+  // Optional generic dialogs (if needed directly by renderer)
+  // showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
+  // showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
 }
 
 declare global {

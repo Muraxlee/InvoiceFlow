@@ -82,6 +82,14 @@ ipcMain.handle('add-customer', async (event, customer) => {
     throw error; 
   }
 });
+ipcMain.handle('update-customer', async (event, { customerId, customerData }) => {
+  try {
+    return await dbActions.updateCustomer(customerId, customerData);
+  } catch (error) {
+    console.error('Error in update-customer IPC handler:', error);
+    throw error;
+  }
+});
 ipcMain.handle('delete-customer', async (event, id) => dbActions.deleteCustomer(id));
 ipcMain.handle('clear-all-customers', async () => dbActions.clearAllCustomers());
 
@@ -93,6 +101,14 @@ ipcMain.handle('add-product', async (event, product) => {
   } catch (error) {
     console.error('Error in add-product IPC handler:', error);
     throw error; 
+  }
+});
+ipcMain.handle('update-product', async (event, { productId, productData }) => {
+  try {
+    return await dbActions.updateProduct(productId, productData);
+  } catch (error) {
+    console.error('Error in update-product IPC handler:', error);
+    throw error;
   }
 });
 ipcMain.handle('delete-product', async (event, id) => dbActions.deleteProduct(id));
@@ -108,6 +124,15 @@ ipcMain.handle('get-all-users', async () => {
   } catch (error) {
     console.error('Error in get-all-users IPC handler:', error);
     throw error; 
+  }
+});
+
+ipcMain.handle('get-user-by-username', async (event, username) => {
+  try {
+    return await dbActions.getUserByUsername(username);
+  } catch (error) {
+    console.error('Error in get-user-by-username IPC handler:', error);
+    throw error;
   }
 });
 

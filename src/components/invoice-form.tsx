@@ -21,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, PlusCircle, Trash2, Wand2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format as formatDateFns } from "date-fns";
+import { format as formatDateFns, isValid } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
 import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/flows/gst-suggestion";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,7 @@ const invoiceItemSchema = z.object({
   description: z.string().optional(),
   quantity: z.coerce.number().min(0.01, "Quantity must be positive"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
-  gstCategory: z.string().optional(), 
+  gstCategory: z.string().optional(),
   applyIgst: z.boolean().default(true),
   applyCgst: z.boolean().default(false),
   applySgst: z.boolean().default(false),
@@ -61,7 +61,7 @@ const invoiceSchema = z.object({
   customerId: z.string().min(1, "Customer selection is required."),
   customerName: z.string().min(1, "Customer name is required (auto-filled on selection)."),
   customerEmail: z.string().email("Invalid email address (auto-filled on selection).").optional().or(z.literal('')),
-  customerAddress: z.string().optional(), 
+  customerAddress: z.string().optional(),
   invoiceNumber: z.string().min(1, "Invoice number is required."),
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   dueDate: z.date({ required_error: "Due date is required." }),
@@ -75,7 +75,7 @@ const invoiceSchema = z.object({
     trackingNumber: z.string().optional(),
     carrierName: z.string().optional(),
     consigneeName: z.string().optional(),
-    consigneeAddress: z.string().optional(), 
+    consigneeAddress: z.string().optional(),
     consigneeGstin: z.string().optional(),
     consigneeStateCode: z.string().optional(),
     transportationMode: z.string().optional(),
@@ -83,7 +83,7 @@ const invoiceSchema = z.object({
     vehicleNo: z.string().optional(),
     dateOfSupply: z.date().optional().nullable(),
     placeOfSupply: z.string().optional(),
-  }).optional().default({ 
+  }).optional().default({
     shipDate: null,
     trackingNumber: "",
     carrierName: "",
@@ -126,60 +126,31 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
 
   let currentCounter = config.dailyCounters[dateKey] || 0;
   const nextCounter = currentCounter + 1;
-  
+
   if (increment) {
     config.dailyCounters[dateKey] = nextCounter;
     saveToLocalStorage(INVOICE_CONFIG_KEY, config);
   }
 
   const sequentialNumber = String(nextCounter).padStart(4, '0');
-  
+
   return `${prefix}${dateKey}${sequentialNumber}`;
 }
 
 export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoading, onCancel }: InvoiceFormProps) {
   const router = useRouter();
+  const { toast } = useToast();
+  
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isCustomerSelected, setIsCustomerSelected] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
+  const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: defaultValuesProp || {
-      invoiceDate: null as any, 
-      dueDate: null as any,
-      items: [{
-        productId: "",
-        quantity: 1,
-        price: 0,
-        gstCategory: "",
-        applyIgst: true,
-        applyCgst: false,
-        applySgst: false,
-        igstRate: 18,
-        cgstRate: 9,
-        sgstRate: 9
-      }],
-      customerId: "",
-      customerName: "",
-      customerEmail: "",
-      customerAddress: "",
-      invoiceNumber: "",
-      notes: "",
-      termsAndConditions: "",
-      paymentStatus: "Unpaid",
-      paymentMethod: "",
-      shipmentDetails: {
-        shipDate: null,
-        trackingNumber: "",
-        carrierName: "",
-        consigneeName: "",
-        consigneeAddress: "",
-        consigneeGstin: "",
-        consigneeStateCode: "",
-        transportationMode: "",
-        lrNo: "",
-        vehicleNo: "",
-        dateOfSupply: null,
-        placeOfSupply: ""
-      }
-    },
+    defaultValues: {}, // Default values will be set in useEffect
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -187,33 +158,36 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     name: "items",
   });
 
-  const { toast } = useToast();
-  const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
-  const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isCustomerSelected, setIsCustomerSelected] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(true);
-
-
   useEffect(() => {
     const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
-    const initialInvoiceDate = defaultValuesProp?.invoiceDate || new Date();
-    const initialDueDate = defaultValuesProp?.dueDate || (() => {
-      const date = new Date(initialInvoiceDate);
-      date.setDate(date.getDate() + 30);
-      return date;
-    })();
+    let initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : null;
+    let initialDueDate = defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : null;
 
-    form.reset({ // Reset form with potentially new defaultValuesProp or calculated ones
-      ...form.getValues(), // Keep existing values if any
+    if (isCreatingNew) {
+      if (typeof window !== 'undefined') {
+        initialInvoiceDate = new Date();
+        initialDueDate = new Date();
+        initialDueDate.setDate(initialInvoiceDate.getDate() + 30);
+      }
+    }
+    
+    const initialInvoiceNumber = isCreatingNew && initialInvoiceDate
+        ? generateInvoiceNumber(initialInvoiceDate, false)
+        : defaultValuesProp?.invoiceNumber || '';
+
+    form.reset({
       ...defaultValuesProp,
-      invoiceDate: initialInvoiceDate,
-      dueDate: initialDueDate,
-      invoiceNumber: isCreatingNew 
-        ? generateInvoiceNumber(initialInvoiceDate, false) 
-        : defaultValuesProp?.invoiceNumber || '',
-      items: defaultValuesProp?.items?.length ? defaultValuesProp.items : [{
+      invoiceDate: initialInvoiceDate || new Date(), // Fallback for SSR
+      dueDate: initialDueDate || new Date(new Date().setDate(new Date().getDate() + 30)), // Fallback for SSR
+      invoiceNumber: initialInvoiceNumber,
+      items: defaultValuesProp?.items?.length ? defaultValuesProp.items.map(item => ({
+        ...item,
+        quantity: Number(item.quantity || 1),
+        price: Number(item.price || 0),
+        igstRate: Number(item.igstRate || 18),
+        cgstRate: Number(item.cgstRate || 9),
+        sgstRate: Number(item.sgstRate || 9),
+      })) : [{
         productId: "", quantity: 1, price: 0, gstCategory: "",
         applyIgst: true, applyCgst: false, applySgst: false,
         igstRate: 18, cgstRate: 9, sgstRate: 9
@@ -222,7 +196,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
         consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
         dateOfSupply: null, placeOfSupply: ""
-      }
+      },
+      customerName: defaultValuesProp?.customerName || "",
+      customerEmail: defaultValuesProp?.customerEmail || "",
+      customerAddress: defaultValuesProp?.customerAddress || "",
+      paymentStatus: defaultValuesProp?.paymentStatus || "Unpaid",
     });
 
     if (defaultValuesProp?.customerId) {
@@ -251,7 +229,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       setIsDataLoading(false);
     }
 
-    loadInitialData();
+    if (typeof window !== 'undefined') {
+        loadInitialData();
+    }
 
   }, [defaultValuesProp, form, toast]);
 
@@ -281,48 +261,50 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       setLoadingGst(prev => { const newLoading = [...prev]; newLoading[index] = false; return newLoading; });
     }
   };
-  
+
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
       form.setValue(`items.${index}.productId`, product.id);
       form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.price`, product.price);
-      form.setValue(`items.${index}.gstCategory`, product.gstCategory);
-      form.setValue(`items.${index}.igstRate`, product.igstRate);
-      form.setValue(`items.${index}.cgstRate`, product.cgstRate);
-      form.setValue(`items.${index}.sgstRate`, product.sgstRate);
-      form.setValue(`items.${index}.applyIgst`, true); 
+      form.setValue(`items.${index}.gstCategory`, product.gstCategory || "");
+      form.setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+      form.setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+      form.setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+      form.setValue(`items.${index}.applyIgst`, true);
       form.setValue(`items.${index}.applyCgst`, false);
       form.setValue(`items.${index}.applySgst`, false);
+      // Trigger validation for the item if needed
+      form.trigger(`items.${index}`);
     }
   };
-  
+
   const handleToggleGstType = (index: number, type: 'igst' | 'cgst' | 'sgst', value: boolean) => {
     if (type === 'igst') {
+      form.setValue(`items.${index}.applyIgst`, value);
       if (value) {
         form.setValue(`items.${index}.applyCgst`, false);
         form.setValue(`items.${index}.applySgst`, false);
       }
-      form.setValue(`items.${index}.applyIgst`, value);
-    } else { 
-      if (value) { 
+    } else { // CGST or SGST
+      // If checking CGST, SGST should also be checked, and IGST unchecked
+      // If unchecking CGST, SGST should also be unchecked
+      const isChecking = value;
+      form.setValue(`items.${index}.applyCgst`, isChecking);
+      form.setValue(`items.${index}.applySgst`, isChecking);
+      if (isChecking) {
         form.setValue(`items.${index}.applyIgst`, false);
-        form.setValue(`items.${index}.applyCgst`, true); 
-        form.setValue(`items.${index}.applySgst`, true);
-      } else { 
-        form.setValue(`items.${index}.applyCgst`, false);
-        form.setValue(`items.${index}.applySgst`, false);
       }
     }
-    
-    const applyIgst = form.getValues(`items.${index}.applyIgst`);
-    const applyCgst = form.getValues(`items.${index}.applyCgst`);
-    if (!applyIgst && !applyCgst) {
+
+    // Ensure at least one GST type is selected, default to IGST if none
+    const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
+    if (!applyIgst && !applyCgst && !applySgst) {
       form.setValue(`items.${index}.applyIgst`, true);
     }
   };
-  
+
   const handleSelectCustomer = (customerId: string) => {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
@@ -330,49 +312,47 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue("customerName", customer.name, { shouldValidate: true });
       form.setValue("customerEmail", customer.email || "", { shouldValidate: true });
       form.setValue("customerAddress", customer.address || "", { shouldValidate: true });
-      form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
-      form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
+      form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true }); // Auto-fill consignee name
+      form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true }); // Auto-fill consignee address
       setIsCustomerSelected(true);
     } else {
       setIsCustomerSelected(false);
     }
   };
-  
+
   const watchItems = form.watch("items");
-  
-  const { subtotal, cgstAmount, sgstAmount, igstAmount, totalTax, total } = useMemo(() => {
+
+  const { subtotal, cgstAmount, sgstAmount, igstAmount, total } = useMemo(() => {
     const currentItems = form.getValues("items") || [];
-    const sub = currentItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
-    
+    const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
+
     let cgst = 0;
     let sgst = 0;
     let igst = 0;
-    
+
     currentItems.forEach(item => {
-      const itemAmount = (item.quantity || 0) * (item.price || 0);
+      const itemAmount = (Number(item.quantity) || 0) * (Number(item.price) || 0);
       if (item.applyIgst) {
-        const taxRate = (item.igstRate || 0) / 100;
+        const taxRate = (Number(item.igstRate) || 0) / 100;
         igst += itemAmount * taxRate;
       }
-      if (item.applyCgst) { 
-        const cgstTaxRate = (item.cgstRate || 0) / 100;
+      if (item.applyCgst) {
+        const cgstTaxRate = (Number(item.cgstRate) || 0) / 100;
         cgst += itemAmount * cgstTaxRate;
       }
       if (item.applySgst) {
-        const sgstTaxRate = (item.sgstRate || 0) / 100;
+        const sgstTaxRate = (Number(item.sgstRate) || 0) / 100;
         sgst += itemAmount * sgstTaxRate;
       }
     });
-    
-    const tax = cgst + sgst + igst;
-    const grandTotal = sub + tax;
-    
+
+    const grandTotal = sub + cgst + sgst + igst;
+
     return {
       subtotal: sub,
       cgstAmount: cgst,
       sgstAmount: sgst,
       igstAmount: igst,
-      totalTax: tax,
       total: grandTotal
     };
   }, [watchItems, form]);
@@ -387,14 +367,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
   const handleFormSubmit = (data: InvoiceFormValues) => {
     if (typeof window !== 'undefined' && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "")) {
-        const invoiceDateForNumber = data.invoiceDate || new Date();
-        const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, true);
-        data.invoiceNumber = confirmedInvoiceNumber;
+        const invoiceDateForNumber = data.invoiceDate instanceof Date ? data.invoiceDate : new Date(data.invoiceDate);
+        if (isValid(invoiceDateForNumber)) {
+            const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, true);
+            data.invoiceNumber = confirmedInvoiceNumber;
+        } else {
+            // Handle invalid date case, perhaps by setting a default or showing an error
+            console.error("Invalid invoice date for number generation");
+            toast({ title: "Error", description: "Invalid invoice date provided.", variant: "destructive" });
+            return;
+        }
     }
     onSubmit(data);
   };
 
-  if (isDataLoading && (!defaultValuesProp || !defaultValuesProp.customerId)) { // Show loader if initial data is loading and not editing
+  if (isDataLoading && (!defaultValuesProp || !defaultValuesProp.customerId)) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -416,10 +403,14 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Select Customer *</FormLabel>
-                    {customers.length === 0 ? (
+                    {isDataLoading ? (
+                      <div className="flex items-center justify-center p-4 border rounded-md h-[40px]">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : customers.length === 0 ? (
                        <div className="p-4 text-sm border rounded-md bg-muted/50 text-muted-foreground">
-                         No customers found. Please 
-                         <Link href="/customers" className="text-primary hover:underline mx-1">add a customer</Link> 
+                         No customers found. Please
+                         <Button variant="link" asChild className="px-1 py-0 h-auto"><Link href="/customers">add a customer</Link></Button>
                          first.
                        </div>
                     ) : (
@@ -448,7 +439,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             <CommandInput placeholder="Search customers..." />
                             <CommandEmpty>
                               <div className="py-2 text-center text-sm">
-                                No customer found. 
+                                No customer found.
                                 <Button variant="link" size="sm" asChild className="px-1">
                                   <Link href="/customers"> Add New Customer</Link>
                                 </Button>
@@ -459,9 +450,12 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 {customers.map((customer) => (
                                   <CommandItem
                                     key={customer.id}
-                                    value={customer.name} 
+                                    value={customer.name}
                                     onSelect={() => {
                                       handleSelectCustomer(customer.id);
+                                      // Manually close Popover, Command doesn't always do this
+                                      // when inside a form like this.
+                                      // This can be done by managing open state of Popover.
                                     }}
                                   >
                                     <Check
@@ -488,21 +482,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               <FormField control={form.control} name="customerName" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Name</FormLabel>
-                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50" : ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="customerEmail" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Email</FormLabel>
-                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50" : ""}/></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="customerAddress" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Billing Address</FormLabel>
-                  <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} /></FormControl>
+                  <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50" : ""}/></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -526,26 +520,26 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value ? formatDateFns(field.value, "PPP") : <span>Pick a date</span>}
+                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar 
-                        mode="single" 
-                        selected={field.value} 
+                      <Calendar
+                        mode="single"
+                        selected={field.value ? new Date(field.value) : undefined}
                         onSelect={(date) => {
                           field.onChange(date);
-                          if (date && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "") && typeof window !== 'undefined') {
+                           if (date && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "") && typeof window !== 'undefined') {
                             form.setValue(
-                              "invoiceNumber", 
+                              "invoiceNumber",
                               generateInvoiceNumber(date, false),
                               { shouldValidate: true }
                             );
                           }
                         }}
-                        initialFocus 
+                        initialFocus
                         disabled={(date) => date < new Date("1900-01-01")}
                       />
                     </PopoverContent>
@@ -560,13 +554,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value ? formatDateFns(field.value, "PPP") : <span>Pick a date</span>}
+                           {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={(date) => date < new Date("1900-01-01")}/>
+                      <Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={field.onChange} initialFocus disabled={(date) => date < new Date("1900-01-01")}/>
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
@@ -634,32 +628,36 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
             <div className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-md shadow-sm relative">
-                   {fields.length > 1 && ( // Show remove button only if there's more than one item
-                     <Button 
-                       type="button" 
-                       variant="ghost" 
-                       size="icon" 
-                       onClick={() => remove(index)} 
-                       className="absolute top-1 right-1 h-7 w-7"
+                   {fields.length > 1 && (
+                     <Button
+                       type="button"
+                       variant="ghost"
+                       size="icon"
+                       onClick={() => remove(index)}
+                       className="absolute top-1 right-1 h-7 w-7 text-destructive hover:bg-destructive/10"
                        aria-label="Remove item"
                      >
-                       <X className="h-4 w-4 text-destructive" />
+                       <X className="h-4 w-4" />
                      </Button>
                    )}
                   <div className="col-span-12 md:col-span-3">
-                    <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Product / Service *</FormLabel>
-                     {products.length === 0 ? (
+                    <FormLabel>Product / Service *</FormLabel>
+                     {isDataLoading ? (
+                        <div className="flex items-center justify-center p-4 border rounded-md h-[40px] mt-1">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                     ) : products.length === 0 ? (
                        <div className="p-2 mt-1 text-xs border rounded-md bg-muted/50 text-muted-foreground">
-                         No products. 
-                         <Link href="/products" className="text-primary hover:underline mx-1">Add product</Link>
+                         No products.
+                         <Button variant="link" asChild className="px-1 py-0 h-auto"><Link href="/products">Add product</Link></Button>
                        </div>
                     ) : (
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-between mt-1">
-                          {form.getValues(`items.${index}.productId`) 
+                          {form.getValues(`items.${index}.productId`)
                             ? products.find(p => p.id === form.getValues(`items.${index}.productId`))?.name || "Select..."
-                            : "Select..."
+                            : "Select product..."
                           }
                           <PlusCircle className="ml-2 h-4 w-4" />
                         </Button>
@@ -669,7 +667,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                           <CommandInput placeholder="Search products..." />
                           <CommandEmpty>
                              <div className="py-2 text-center text-sm">
-                                No product found. 
+                                No product found.
                                 <Button variant="link" size="sm" asChild className="px-1">
                                   <Link href="/products"> Add New Product</Link>
                                 </Button>
@@ -680,15 +678,15 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
-                                  value={product.name} 
+                                  value={product.name}
                                   onSelect={() => handleSelectProduct(index, product.id)}
                                 >
                                   <div className="flex items-center">
-                                    <Image 
-                                      src={product.imageUrl || "https://placehold.co/30x30.png"} 
-                                      alt={product.name} 
-                                      width={30} 
-                                      height={30} 
+                                    <Image
+                                      src={product.imageUrl || "https://placehold.co/30x30.png"}
+                                      alt={product.name}
+                                      width={30}
+                                      height={30}
                                       className="rounded-md mr-2 aspect-square object-cover"
                                       data-ai-hint="product item"
                                     />
@@ -706,21 +704,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   </div>
                   <FormField control={form.control} name={`items.${index}.quantity`} render={({ field: itemField }) => (
                     <FormItem className="col-span-3 md:col-span-1">
-                      <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Qty *</FormLabel>
+                      <FormLabel>Qty *</FormLabel>
                       <FormControl><Input type="number" placeholder="1" {...itemField} className="mt-1"/></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.price`} render={({ field: itemField }) => (
                     <FormItem className="col-span-4 md:col-span-2">
-                      <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Price (₹) *</FormLabel>
+                      <FormLabel>Price (₹) *</FormLabel>
                       <FormControl><Input type="number" placeholder="0.00" {...itemField} className="mt-1"/></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: itemField }) => (
                     <FormItem className="col-span-6 md:col-span-3">
-                      <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>Tax Category</FormLabel>
+                      <FormLabel>Tax Category</FormLabel>
                       <div className="flex items-center gap-2 mt-1">
                         <FormControl><Input placeholder="e.g. HSN 1234" {...itemField} value={itemField.value || ''} /></FormControl>
                         <Button type="button" size="icon" variant="outline" onClick={() => handleSuggestGst(index)} disabled={loadingGst[index]} aria-label="Suggest Tax Category">
@@ -731,7 +729,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     </FormItem>
                   )} />
                   <div className="col-span-6 md:col-span-3">
-                    <FormLabel className={cn(index !== 0 && "sr-only md:not-sr-only")}>GST Types</FormLabel>
+                    <FormLabel>GST Types</FormLabel>
                     <div className="flex flex-col gap-2 mt-2">
                        <Controller
                         control={form.control}
@@ -777,6 +775,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                              <FormItem className="flex flex-row items-center space-x-2">
                               <Checkbox
                                 checked={sgstField.value}
+                                // SGST is linked to CGST
                                 onCheckedChange={(checked) => handleToggleGstType(index, 'sgst', checked === true)}
                                 id={`items.${index}.applySgst`}
                               />
@@ -794,12 +793,12 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 </div>
               ))}
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ 
+            <Button type="button" variant="outline" size="sm" onClick={() => append({
               productId: "",
-              description: "", 
-              quantity: 1, 
-              price: 0, 
-              gstCategory: "", 
+              description: "",
+              quantity: 1,
+              price: 0,
+              gstCategory: "",
               applyIgst: true,
               applyCgst: false,
               applySgst: false,
@@ -822,11 +821,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               {sgstAmount > 0 && (
                 <div className="flex justify-between"><span>SGST:</span><span>₹{sgstAmount.toFixed(2)}</span></div>
               )}
-              <div className="flex justify-between font-bold text-lg"><span>Total:</span><span>₹{total.toFixed(2)}</span></div>
+              <div className="flex justify-between font-bold text-lg border-t pt-1 mt-1"><span>Total:</span><span>₹{total.toFixed(2)}</span></div>
             </div>
           </CardFooter>
         </Card>
-        
+
         <Card>
           <CardHeader><CardTitle>Shipment & Transport Details (Optional)</CardTitle></CardHeader>
           <CardContent className="space-y-6">
@@ -858,7 +857,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   <FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl>
                         <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
+                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
@@ -877,25 +876,25 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 <FormField control={form.control} name="shipmentDetails.trackingNumber" render={({ field }) => (
                   <FormItem><FormLabel>Tracking Number</FormLabel><FormControl><Input placeholder="AWB or Tracking ID" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                 )} />
-              </div>
-              <FormField control={form.control} name="shipmentDetails.placeOfSupply" render={({ field }) => (
-                <FormItem className="mt-4"><FormLabel>Place of Supply</FormLabel><FormControl><Input placeholder="e.g., Chennai, Bangalore" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                 <FormField control={form.control} name="shipmentDetails.placeOfSupply" render={({ field }) => (
+                <FormItem ><FormLabel>Place of Supply</FormLabel><FormControl><Input placeholder="e.g., Chennai, Bangalore" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
               )} />
                <FormField control={form.control} name="shipmentDetails.shipDate" render={({ field }) => (
-                  <FormItem className="flex flex-col mt-4"><FormLabel>Ship Date (Actual)</FormLabel>
+                  <FormItem className="flex flex-col"><FormLabel>Ship Date (Actual)</FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl>
                         <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
+                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
                     </Popover><FormMessage />
                   </FormItem>
                 )} />
+              </div>
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
             <CardHeader><CardTitle>Additional Information</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -929,5 +928,3 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
-
-    

@@ -40,12 +40,14 @@ interface ElectronAPI {
   // Customer operations
   getAllCustomers: () => Promise<CustomerData[]>;
   addCustomer: (customer: CustomerData) => Promise<boolean>;
+  updateCustomer: (customerId: string, customerData: Partial<CustomerData>) => Promise<boolean>;
   deleteCustomer: (id: string) => Promise<boolean>;
   clearAllCustomers: () => Promise<boolean>;
 
   // Product operations
   getAllProducts: () => Promise<ProductData[]>;
   addProduct: (product: ProductData) => Promise<boolean>;
+  updateProduct: (productId: string, productData: Partial<ProductData>) => Promise<boolean>;
   deleteProduct: (id: string) => Promise<boolean>;
   clearAllProducts: () => Promise<boolean>;
 
@@ -54,6 +56,7 @@ interface ElectronAPI {
 
   // User Management operations
   getAllUsers: () => Promise<UserListData[]>;
+  getUserByUsername: (username: string) => Promise<UserListData | null>;
   createUser: (userData: Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'> & { password: string } ) => Promise<string | null>; 
   updateUser: (userId: string, userData: Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password?: string }) => Promise<boolean>;
   deleteUser: (userId: string) => Promise<boolean>;
@@ -62,11 +65,8 @@ interface ElectronAPI {
   // Database Backup/Restore operations
   getDatabasePath: () => Promise<string>;
   backupDatabase: () => Promise<{success: boolean; path?: string; message?: string}>;
-  initiateDatabaseRestore: () => Promise<{success: boolean; message?: string}>; // Changed from restoreDatabase
+  initiateDatabaseRestore: () => Promise<{success: boolean; message?: string}>; 
   
-  // Optional generic dialogs (if needed directly by renderer)
-  // showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
-  // showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
 }
 
 declare global {

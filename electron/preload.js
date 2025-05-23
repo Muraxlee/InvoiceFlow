@@ -27,12 +27,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Customer operations
   getAllCustomers: () => ipcRenderer.invoke('get-all-customers'),
   addCustomer: (customer) => ipcRenderer.invoke('add-customer', customer),
+  updateCustomer: (customerId, customerData) => ipcRenderer.invoke('update-customer', { customerId, customerData }),
   deleteCustomer: (id) => ipcRenderer.invoke('delete-customer', id),
   clearAllCustomers: () => ipcRenderer.invoke('clear-all-customers'),
 
   // Product operations
   getAllProducts: () => ipcRenderer.invoke('get-all-products'),
   addProduct: (product) => ipcRenderer.invoke('add-product', product),
+  updateProduct: (productId, productData) => ipcRenderer.invoke('update-product', { productId, productData }),
   deleteProduct: (id) => ipcRenderer.invoke('delete-product', id),
   clearAllProducts: () => ipcRenderer.invoke('clear-all-products'),
 
@@ -41,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // User Management operations
   getAllUsers: () => ipcRenderer.invoke('get-all-users'),
+  getUserByUsername: (username) => ipcRenderer.invoke('get-user-by-username', username),
   createUser: (userData) => ipcRenderer.invoke('create-user', userData),
   updateUser: (userId, userData) => ipcRenderer.invoke('update-user', { userId, userData }),
   deleteUser: (userId) => ipcRenderer.invoke('delete-user', userId),
@@ -49,10 +52,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database Backup/Restore operations
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   backupDatabase: () => ipcRenderer.invoke('backup-database'),
-  initiateDatabaseRestore: () => ipcRenderer.invoke('initiate-database-restore'), // Changed from restoreDatabase
+  initiateDatabaseRestore: () => ipcRenderer.invoke('initiate-database-restore'),
 
-  // For file dialogs that need to be initiated from renderer but executed in main
-  // These are not strictly needed if main process handles dialogs internally for backup/restore
-  // showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
-  // showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),
 });

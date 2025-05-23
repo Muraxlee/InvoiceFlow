@@ -1,3 +1,4 @@
+
 // CommonJS version of database.ts for use in Electron main process
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
@@ -9,7 +10,16 @@ let db = null;
 
 // Get the database path based on electron's userData folder
 function getDbPath() {
-  return path.join(app.getPath('userData'), 'invoiceflow.db');
+  // If running in a packaged app, app might not be available immediately at module load.
+  // It's better to get it when the function is called or ensure it's initialized.
+  const currentApp = app || require('electron').remote?.app; // A common pattern for safety
+  if (!currentApp) {
+    console.error("Electron app object is not available for getDbPath. Falling back to CWD.");
+    // Fallback to project root if app is not available (e.g., during some test/script scenarios)
+    // This fallback is less ideal for production packaged apps.
+    return path.join(process.cwd(), 'invoiceflow.db');
+  }
+  return path.join(currentApp.getPath('userData'), 'invoiceflow.db');
 }
 
 // Initialize the database
@@ -188,7 +198,7 @@ async function deleteUser(id) {
 }
 
 async function validateUserCredentials(username, passwordAttempt) {
-  const user = await getUserByUsername(username);
+  const user = await getUserByUsername(username); // This already calls initDatabase
   if (!user || !user.isActive || !user.password) return null;
   const isMatch = await compare(passwordAttempt, user.password);
   if (!isMatch) return null;
@@ -199,7 +209,12 @@ async function validateUserCredentials(username, passwordAttempt) {
 // Invoice Functions
 async function getAllInvoices() {
   const currentDb = await initDatabase();
-  return await currentDb.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
+  const invoicesRaw = await currentDb.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
+  return invoicesRaw.map(inv => ({
+    ...inv,
+    invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(),
+    dueDate: inv.dueDate ? new Date(inv.dueDate) : new Date(),
+  }));
 }
 
 async function getInvoiceById(id) {
@@ -207,14 +222,13 @@ async function getInvoiceById(id) {
   const invoice = await currentDb.get('SELECT * FROM invoices WHERE id = ?', [id]);
   if (!invoice) return null;
 
-  // Get invoice items
   const items = await currentDb.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
-  
-  // Get shipment details
   const shipmentDetails = await currentDb.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
   
   return {
     ...invoice,
+    invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date(),
+    dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
     items: items || [],
     shipmentDetails: shipmentDetails || {}
   };
@@ -227,28 +241,27 @@ async function saveInvoice(invoice) {
   try {
     await currentDb.run('BEGIN TRANSACTION');
     
-    // Check if invoice exists
     const exists = await currentDb.get('SELECT id FROM invoices WHERE id = ?', [id]);
     
+    const invoiceDateISO = invoiceData.invoiceDate instanceof Date ? invoiceData.invoiceDate.toISOString() : invoiceData.invoiceDate;
+    const dueDateISO = invoiceData.dueDate instanceof Date ? invoiceData.dueDate.toISOString() : invoiceData.dueDate;
+    
+    const dbInvoiceData = {...invoiceData, invoiceDate: invoiceDateISO, dueDate: dueDateISO};
+
     if (exists) {
-      // Update existing invoice
-      const cols = Object.keys(invoiceData).map(key => `${key} = ?`).join(', ');
-      const values = Object.values(invoiceData);
+      const cols = Object.keys(dbInvoiceData).map(key => `${key} = ?`).join(', ');
+      const values = Object.values(dbInvoiceData);
       await currentDb.run(`UPDATE invoices SET ${cols} WHERE id = ?`, [...values, id]);
-      
-      // Delete existing items
       await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
     } else {
-      // Create new invoice
-      const cols = Object.keys(invoiceData).join(', ');
-      const placeholders = Object.values(invoiceData).map(() => '?').join(', ');
+      const cols = Object.keys(dbInvoiceData).join(', ');
+      const placeholders = Object.values(dbInvoiceData).map(() => '?').join(', ');
       await currentDb.run(
         `INSERT INTO invoices (id, ${cols}) VALUES (?, ${placeholders})`,
-        [id, ...Object.values(invoiceData)]
+        [id, ...Object.values(dbInvoiceData)]
       );
     }
     
-    // Insert items
     if (items && items.length > 0) {
       for (const item of items) {
         const { id: itemId, ...itemData } = item;
@@ -263,17 +276,21 @@ async function saveInvoice(invoice) {
       }
     }
     
-    // Update shipment details
     if (shipmentDetails) {
       const shipExists = await currentDb.get('SELECT invoiceId FROM shipment_details WHERE invoiceId = ?', [id]);
+      const dbShipmentDetails = {
+          ...shipmentDetails,
+          shipDate: shipmentDetails.shipDate instanceof Date ? shipmentDetails.shipDate.toISOString() : shipmentDetails.shipDate,
+          dateOfSupply: shipmentDetails.dateOfSupply instanceof Date ? shipmentDetails.dateOfSupply.toISOString() : shipmentDetails.dateOfSupply
+      };
       
       if (shipExists) {
-        const shipCols = Object.keys(shipmentDetails).map(key => `${key} = ?`).join(', ');
-        const shipValues = Object.values(shipmentDetails);
+        const shipCols = Object.keys(dbShipmentDetails).map(key => `${key} = ?`).join(', ');
+        const shipValues = Object.values(dbShipmentDetails);
         await currentDb.run(`UPDATE shipment_details SET ${shipCols} WHERE invoiceId = ?`, [...shipValues, id]);
-      } else {
-        const shipCols = Object.keys({...shipmentDetails, invoiceId: id}).join(', ');
-        const shipValues = Object.values({...shipmentDetails, invoiceId: id});
+      } else if (Object.values(dbShipmentDetails).some(v => v !== null && v !== "" && v !== undefined)) { // Insert only if there's actual data
+        const shipCols = Object.keys({...dbShipmentDetails, invoiceId: id}).join(', ');
+        const shipValues = Object.values({...dbShipmentDetails, invoiceId: id});
         const shipPlaceholders = shipValues.map(() => '?').join(', ');
         
         await currentDb.run(
@@ -304,12 +321,10 @@ async function saveCompanyInfo(company) {
   const exists = await currentDb.get('SELECT id FROM company WHERE id = 1');
   
   if (exists) {
-    // Update existing company info
     const cols = Object.keys(company).map(key => `${key} = ?`).join(', ');
     const values = Object.values(company);
     await currentDb.run(`UPDATE company SET ${cols} WHERE id = 1`, values);
   } else {
-    // Create new company info
     const cols = Object.keys(company).join(', ');
     const placeholders = Object.values(company).map(() => '?').join(', ');
     await currentDb.run(
@@ -337,6 +352,15 @@ async function addCustomer(customer) {
     Object.values(customer)
   );
   
+  return true;
+}
+
+async function updateCustomer(customerId, customerData) {
+  const currentDb = await initDatabase();
+  const updates = Object.keys(customerData).map(key => `${key} = ?`);
+  const params = [...Object.values(customerData), customerId];
+  const query = `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`;
+  await currentDb.run(query, params);
   return true;
 }
 
@@ -371,6 +395,15 @@ async function addProduct(product) {
   return true;
 }
 
+async function updateProduct(productId, productData) {
+  const currentDb = await initDatabase();
+  const updates = Object.keys(productData).map(key => `${key} = ?`);
+  const params = [...Object.values(productData), productId];
+  const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
+  await currentDb.run(query, params);
+  return true;
+}
+
 async function getAllProducts() {
   const currentDb = await initDatabase();
   return await currentDb.all('SELECT * FROM products ORDER BY name');
@@ -391,12 +424,23 @@ async function clearAllProducts() {
 // Utility Functions
 async function clearAllData() {
   const currentDb = await initDatabase();
-  await currentDb.run('DELETE FROM invoices');
-  await currentDb.run('DELETE FROM invoice_items');
-  await currentDb.run('DELETE FROM shipment_details');
-  await currentDb.run('DELETE FROM customers');
-  await currentDb.run('DELETE FROM products');
-  return true;
+  await currentDb.run('BEGIN TRANSACTION');
+  try {
+    await currentDb.run('DELETE FROM invoice_items');
+    await currentDb.run('DELETE FROM shipment_details');
+    await currentDb.run('DELETE FROM invoices');
+    await currentDb.run('DELETE FROM customers');
+    await currentDb.run('DELETE FROM products');
+    // Company data is not typically cleared in a "business data" clear,
+    // but if needed, add: await currentDb.run('DELETE FROM company WHERE id = 1');
+    // Users are also not cleared by this.
+    await currentDb.run('COMMIT');
+    return true;
+  } catch (error) {
+    console.error('Error clearing all data:', error);
+    await currentDb.run('ROLLBACK');
+    return false;
+  }
 }
 
 // Export all functions
@@ -404,24 +448,36 @@ module.exports = {
   getDbPath,
   initDatabase,
   closeDatabase,
+  // User Management
+  getAllUsers,
+  getUserById, // Added for completeness, though not directly used by current IPC
+  getUserByUsername, // Ensure this is exported
+  createUser,
+  updateUser,
+  deleteUser,
+  validateUserCredentials,
+  // Invoice
   getAllInvoices,
   getInvoiceById,
   saveInvoice,
   deleteInvoice,
+  // Company
   saveCompanyInfo,
   getCompanyInfo,
+  // Customer
   addCustomer,
+  updateCustomer, // Added export
   getAllCustomers,
   deleteCustomer,
   clearAllCustomers,
+  // Product
   addProduct,
+  updateProduct, // Added export
   getAllProducts,
   deleteProduct,
   clearAllProducts,
-  clearAllData,
-  getAllUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-  validateUserCredentials
+  // Utility
+  clearAllData
 }; 
+
+    

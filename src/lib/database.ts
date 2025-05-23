@@ -11,13 +11,14 @@ import { hash, compare } from 'bcrypt';
 export interface StoredInvoice extends InvoiceFormValues {
   id: string;
   status: "Paid" | "Pending" | "Overdue" | "Draft" | "Unpaid" | "Partially Paid";
-  amount: number;
+  amount: number; // This will store the final (potentially rounded) amount
+  dueDate: Date | null; // Ensure dueDate can be null
 }
 
 export interface User {
   id: string;
   username: string;
-  password?: string; // Optional for fetching, required for creation
+  password?: string; 
   role: 'admin' | 'user';
   name: string;
   email: string;
@@ -26,7 +27,7 @@ export interface User {
 }
 
 export interface CompanyData {
-  id?: number; // Usually 1 for a single company setup
+  id?: number; 
   name: string;
   address: string;
   phone: string;
@@ -41,10 +42,7 @@ export interface CompanyData {
 
 let db: Database | null = null;
 
-// This function is intended for use in the Next.js server environment or direct Node scripts
 function getDbPath() {
-  // In a server context (like Next.js API routes or server components if not using Electron),
-  // or for scripts like seeding, the database would typically be in the project root.
   return path.join(process.cwd(), 'invoiceflow.db');
 }
 
@@ -68,52 +66,42 @@ export async function initDatabase(): Promise<Database> {
         id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS shipment_details (
-        invoiceId TEXT PRIMARY KEY,
-        shipDate TEXT,
-        trackingNumber TEXT,
-        carrierName TEXT,
-        consigneeName TEXT,
-        consigneeAddress TEXT,
-        consigneeGstin TEXT,
-        consigneeStateCode TEXT,
-        transportationMode TEXT,
-        lrNo TEXT,
-        vehicleNo TEXT,
-        dateOfSupply TEXT,
-        placeOfSupply TEXT,
-        FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+        invoiceId TEXT PRIMARY KEY, shipDate TEXT, trackingNumber TEXT, carrierName TEXT, consigneeName TEXT, consigneeAddress TEXT, consigneeGstin TEXT, consigneeStateCode TEXT, transportationMode TEXT, lrNo TEXT, vehicleNo TEXT, dateOfSupply TEXT, placeOfSupply TEXT, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS company (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL,
-        address TEXT,
-        phone TEXT,
-        phone2 TEXT,
-        email TEXT,
-        gstin TEXT,
-        bank_account_name TEXT,
-        bank_name TEXT,
-        bank_account TEXT,
-        bank_ifsc TEXT
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL, address TEXT, phone TEXT, phone2 TEXT, email TEXT, gstin TEXT, bank_account_name TEXT, bank_name TEXT, bank_account TEXT, bank_ifsc TEXT
       );
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
       CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, igstRate REAL, cgstRate REAL, sgstRate REAL
       );
       CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL,
-        name TEXT,
-        email TEXT,
-        isActive INTEGER DEFAULT 1,
-        isSystemAdmin INTEGER DEFAULT 0
+        id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL, name TEXT, email TEXT, isActive INTEGER DEFAULT 1, isSystemAdmin INTEGER DEFAULT 0
       );
     `);
+    // Removed gstType and gstRate from products table, rates are now igstRate, cgstRate, sgstRate
+    // If products table exists and needs updating:
+    // BEGIN TRANSACTION;
+    // CREATE TEMPORARY TABLE products_backup(...); // old schema
+    // INSERT INTO products_backup SELECT * FROM products;
+    // DROP TABLE products;
+    // CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, igstRate REAL, cgstRate REAL, sgstRate REAL);
+    // INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) 
+    //   SELECT id, name, description, price, imageUrl, gstCategory, 
+    //          CASE WHEN gstType = 'IGST' THEN gstRate ELSE igstRate END, -- or some default
+    //          CASE WHEN gstType = 'CGST_SGST' THEN gstRate / 2 ELSE cgstRate END, -- or some default
+    //          CASE WHEN gstType = 'CGST_SGST' THEN gstRate / 2 ELSE sgstRate END -- or some default
+    //   FROM products_backup;
+    // DROP TABLE products_backup;
+    // COMMIT;
 
+
+    // If company table exists and needs updating:
+    // ALTER TABLE company ADD COLUMN phone2 TEXT;
+    // ALTER TABLE company ADD COLUMN bank_account_name TEXT;
+    
     const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
     if (!adminExists) {
       const hashedPassword = await hash('admin123', 10);
@@ -203,7 +191,7 @@ export async function updateUser(id: string, userData: Partial<Omit<User, 'id' |
       throw new Error("System admin cannot be deactivated.");
   }
 
-  if (updates.length === 0) return true; // No changes to apply
+  if (updates.length === 0) return true; 
 
   const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
   params.push(id);
@@ -242,7 +230,7 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
     result.push({
       ...invoice,
       invoiceDate: new Date(invoice.invoiceDate),
-      dueDate: new Date(invoice.dueDate),
+      dueDate: invoice.dueDate ? new Date(invoice.dueDate) : null, // Handle null dueDate
       items: items.map(item => {
         const product = allProds.find(p=>p.id === item.productId);
         return {
@@ -256,16 +244,11 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
       }),
       shipmentDetails: shipment ? {
         shipDate: shipment.shipDate ? new Date(shipment.shipDate) : null,
-        trackingNumber: shipment.trackingNumber || "",
-        carrierName: shipment.carrierName || "",
-        consigneeName: shipment.consigneeName || "",
-        consigneeAddress: shipment.consigneeAddress || "",
-        consigneeGstin: shipment.consigneeGstin || "",
-        consigneeStateCode: shipment.consigneeStateCode || "",
-        transportationMode: shipment.transportationMode || "",
-        lrNo: shipment.lrNo || "",
-        vehicleNo: shipment.vehicleNo || "",
-        dateOfSupply: shipment.dateOfSupply ? new Date(shipment.dateOfSupply) : null,
+        trackingNumber: shipment.trackingNumber || "", carrierName: shipment.carrierName || "",
+        consigneeName: shipment.consigneeName || "", consigneeAddress: shipment.consigneeAddress || "",
+        consigneeGstin: shipment.consigneeGstin || "", consigneeStateCode: shipment.consigneeStateCode || "",
+        transportationMode: shipment.transportationMode || "", lrNo: shipment.lrNo || "",
+        vehicleNo: shipment.vehicleNo || "", dateOfSupply: shipment.dateOfSupply ? new Date(shipment.dateOfSupply) : null,
         placeOfSupply: shipment.placeOfSupply || ""
       } : {
         shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
@@ -284,7 +267,8 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
     await currentDb.run(`
       INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate.toISOString(), invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
+      [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate ? invoice.dueDate.toISOString() : null, // Handle null dueDate
+       invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
     );
     await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
     for (const item of invoice.items) {
@@ -301,18 +285,12 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
           INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, consigneeName, consigneeAddress, consigneeGstin, consigneeStateCode, transportationMode, lrNo, vehicleNo, dateOfSupply, placeOfSupply)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          invoice.id,
-          invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null,
-          invoice.shipmentDetails.trackingNumber,
-          invoice.shipmentDetails.carrierName,
-          invoice.shipmentDetails.consigneeName,
-          invoice.shipmentDetails.consigneeAddress,
-          invoice.shipmentDetails.consigneeGstin,
-          invoice.shipmentDetails.consigneeStateCode,
-          invoice.shipmentDetails.transportationMode,
-          invoice.shipmentDetails.lrNo,
-          invoice.shipmentDetails.vehicleNo,
-          invoice.shipmentDetails.dateOfSupply ? new Date(invoice.shipmentDetails.dateOfSupply).toISOString() : null,
+          invoice.id, invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null,
+          invoice.shipmentDetails.trackingNumber, invoice.shipmentDetails.carrierName,
+          invoice.shipmentDetails.consigneeName, invoice.shipmentDetails.consigneeAddress,
+          invoice.shipmentDetails.consigneeGstin, invoice.shipmentDetails.consigneeStateCode,
+          invoice.shipmentDetails.transportationMode, invoice.shipmentDetails.lrNo,
+          invoice.shipmentDetails.vehicleNo, invoice.shipmentDetails.dateOfSupply ? new Date(invoice.shipmentDetails.dateOfSupply).toISOString() : null,
           invoice.shipmentDetails.placeOfSupply
         ]);
     }
@@ -336,7 +314,7 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
   return {
     ...invoiceData,
     invoiceDate: new Date(invoiceData.invoiceDate),
-    dueDate: new Date(invoiceData.dueDate),
+    dueDate: invoiceData.dueDate ? new Date(invoiceData.dueDate) : null, // Handle null dueDate
     items: itemsData.map(item => {
       const product = allProducts.find(p=>p.id === item.productId);
       return {
@@ -350,16 +328,11 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
     }),
     shipmentDetails: shipmentData ? {
       shipDate: shipmentData.shipDate ? new Date(shipmentData.shipDate) : null,
-      trackingNumber: shipmentData.trackingNumber || "",
-      carrierName: shipmentData.carrierName || "",
-      consigneeName: shipmentData.consigneeName || "",
-      consigneeAddress: shipmentData.consigneeAddress || "",
-      consigneeGstin: shipmentData.consigneeGstin || "",
-      consigneeStateCode: shipmentData.consigneeStateCode || "",
-      transportationMode: shipmentData.transportationMode || "",
-      lrNo: shipmentData.lrNo || "",
-      vehicleNo: shipmentData.vehicleNo || "",
-      dateOfSupply: shipmentData.dateOfSupply ? new Date(shipmentData.dateOfSupply) : null,
+      trackingNumber: shipmentData.trackingNumber || "", carrierName: shipmentData.carrierName || "",
+      consigneeName: shipmentData.consigneeName || "", consigneeAddress: shipmentData.consigneeAddress || "",
+      consigneeGstin: shipmentData.consigneeGstin || "", consigneeStateCode: shipmentData.consigneeStateCode || "",
+      transportationMode: shipmentData.transportationMode || "", lrNo: shipmentData.lrNo || "",
+      vehicleNo: shipmentData.vehicleNo || "", dateOfSupply: shipmentData.dateOfSupply ? new Date(shipmentData.dateOfSupply) : null,
       placeOfSupply: shipmentData.placeOfSupply || ""
     } : {
       shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
@@ -415,11 +388,7 @@ export async function getCompanyInfo(): Promise<CompanyData | null> {
 
 // Customer Functions
 export interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
+  id: string; name: string; email: string; phone: string; address: string;
 }
 export async function addCustomer(customer: Customer): Promise<boolean> {
   const currentDb = await initDatabase();
@@ -437,13 +406,8 @@ export async function updateCustomer(customerId: string, customerData: Partial<C
   const updates = Object.keys(customerData).map(key => `${key} = ?`);
   const params = [...Object.values(customerData), customerId];
   const query = `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`;
-  try {
-    await currentDb.run(query, params);
-    return true;
-  } catch (error) {
-    console.error('Error updating customer:', error);
-    throw error;
-  }
+  try { await currentDb.run(query, params); return true; } 
+  catch (error) { console.error('Error updating customer:', error); throw error; }
 }
 
 export async function getAllCustomers(): Promise<Customer[]> {
@@ -466,15 +430,8 @@ export async function clearAllCustomers(): Promise<boolean> {
 
 // Product Functions
 export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl?: string;
-  gstCategory: string;
-  igstRate: number;
-  cgstRate: number;
-  sgstRate: number;
+  id: string; name: string; description: string; price: number; imageUrl?: string;
+  gstCategory: string; igstRate: number; cgstRate: number; sgstRate: number;
 }
 export async function addProduct(product: Product): Promise<boolean> {
   const currentDb = await initDatabase();
@@ -492,15 +449,9 @@ export async function updateProduct(productId: string, productData: Partial<Prod
   const updates = Object.keys(productData).map(key => `${key} = ?`);
   const params = [...Object.values(productData), productId];
   const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
-  try {
-    await currentDb.run(query, params);
-    return true;
-  } catch (error) {
-    console.error('Error updating product:', error);
-    throw error;
-  }
+  try { await currentDb.run(query, params); return true; }
+  catch (error) { console.error('Error updating product:', error); throw error; }
 }
-
 
 export async function getAllProducts(): Promise<Product[]> {
   const currentDb = await initDatabase();
@@ -531,8 +482,6 @@ export async function clearAllData(): Promise<boolean> {
     await currentDb.run('DELETE FROM customers');
     await currentDb.run('DELETE FROM products');
     await currentDb.run('DELETE FROM company WHERE id = 1');
-    // Note: Users are not cleared by this "business data" clear function.
-    // If you want to clear users (EXCEPT system admin), add specific logic here.
     await currentDb.run('COMMIT'); return true;
   } catch (error) {
     console.error('Error clearing all data:', error);

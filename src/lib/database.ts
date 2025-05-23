@@ -4,7 +4,7 @@
 import sqlite3 from 'sqlite3';
 import { open, type Database } from 'sqlite';
 // Changed from '@/components/invoice-form'
-import type { InvoiceFormValues from '../../components/invoice-form'; 
+import type { InvoiceFormValues } from '../../components/invoice-form'; 
 import path from 'path';
 import { hash, compare } from 'bcrypt';
 
@@ -44,13 +44,15 @@ let db: Database | null = null;
 
 function getDbPath() {
   try {
+    // Check if running in Electron's main process by trying to require 'electron'
     const electronApp = require('electron').app;
     if (electronApp) {
       return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
     }
   } catch (e) {
-    // Fallback for Next.js server or seed script
+    // If 'electron' module is not found, assume not in Electron's main process
   }
+  // Fallback path for Next.js server environment or direct script execution
   return path.join(process.cwd(), 'invoiceflow.db');
 }
 
@@ -102,6 +104,9 @@ export async function initDatabase(): Promise<Database> {
         bank_account TEXT, 
         bank_ifsc TEXT
       );
+      -- If company table exists and needs updating:
+      -- ALTER TABLE company ADD COLUMN phone2 TEXT;
+      -- ALTER TABLE company ADD COLUMN bank_account_name TEXT;
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
@@ -273,7 +278,11 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
         vehicleNo: shipment.vehicleNo || "",
         dateOfSupply: shipment.dateOfSupply ? new Date(shipment.dateOfSupply) : null,
         placeOfSupply: shipment.placeOfSupply || ""
-      } : undefined 
+      } : { 
+        shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "", 
+        consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "", 
+        dateOfSupply: null, placeOfSupply: ""
+      }
     });
   }
   return result;
@@ -363,7 +372,11 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
       vehicleNo: shipmentData.vehicleNo || "",
       dateOfSupply: shipmentData.dateOfSupply ? new Date(shipmentData.dateOfSupply) : null,
       placeOfSupply: shipmentData.placeOfSupply || ""
-    } : undefined 
+    } : { 
+      shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "", 
+      consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "", 
+      dateOfSupply: null, placeOfSupply: ""
+    }
   };
 }
 

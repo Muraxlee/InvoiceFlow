@@ -1,4 +1,6 @@
+
 import type { ReactNode } from 'react';
+import React from 'react'; // Import React for React.memo
 
 interface PageHeaderProps {
   title: string;
@@ -6,16 +8,16 @@ interface PageHeaderProps {
   actions?: ReactNode;
 }
 
-export default function PageHeader({ title, description, actions }: PageHeaderProps) {
+function PageHeaderComponent({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="mb-6 rounded-lg border border-border bg-card p-6 shadow-sm">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground"> {/* Adjusted size from text-3xl */}
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {title}
           </h1>
           {description && (
-            <p className="mt-1 text-xs text-muted-foreground"> {/* Adjusted size from text-sm */}
+            <p className="mt-1 text-xs text-muted-foreground">
               {description}
             </p>
           )}
@@ -25,3 +27,6 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
     </div>
   );
 }
+
+const PageHeader = React.memo(PageHeaderComponent);
+export default PageHeader;

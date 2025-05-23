@@ -3,8 +3,7 @@
 
 import sqlite3 from 'sqlite3';
 import { open, type Database } from 'sqlite';
-// Changed from '@/components/invoice-form'
-import type { InvoiceFormValues } from '../../components/invoice-form';
+import type { InvoiceFormValues } from '../../components/invoice-form'; 
 import path from 'path';
 import { hash, compare } from 'bcrypt';
 
@@ -18,7 +17,7 @@ export interface StoredInvoice extends InvoiceFormValues {
 export interface User {
   id: string;
   username: string;
-  password?: string;
+  password?: string; // Optional for fetching, required for creation
   role: 'admin' | 'user';
   name: string;
   email: string;
@@ -42,17 +41,10 @@ export interface CompanyData {
 
 let db: Database | null = null;
 
+// This function is intended for use in the Next.js server environment or direct Node scripts
 function getDbPath() {
-  try {
-    // Check if running in Electron's main process by trying to require 'electron'
-    const electronApp = require('electron').app;
-    if (electronApp) {
-      return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
-    }
-  } catch (e) {
-    // If 'electron' module is not found, assume not in Electron's main process
-  }
-  // Fallback path for Next.js server environment or direct script execution
+  // In a server context (like Next.js API routes or server components if not using Electron),
+  // or for scripts like seeding, the database would typically be in the project root.
   return path.join(process.cwd(), 'invoiceflow.db');
 }
 
@@ -61,7 +53,7 @@ export async function initDatabase(): Promise<Database> {
 
   try {
     const dbPath = getDbPath();
-    console.log('Database path:', dbPath);
+    console.log('Database path (database.ts):', dbPath);
 
     db = await open({
       filename: dbPath,
@@ -104,9 +96,6 @@ export async function initDatabase(): Promise<Database> {
         bank_account TEXT,
         bank_ifsc TEXT
       );
-      -- If company table exists and needs updating:
-      -- ALTER TABLE company ADD COLUMN phone2 TEXT;
-      -- ALTER TABLE company ADD COLUMN bank_account_name TEXT;
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
@@ -134,7 +123,7 @@ export async function initDatabase(): Promise<Database> {
       );
       console.log('Default admin user created in database.ts');
     }
-    console.log('Database initialized successfully');
+    console.log('Database initialized successfully from database.ts');
     return db;
   } catch (error) {
     console.error('Database initialization error in database.ts:', error);
@@ -147,7 +136,7 @@ export async function closeDatabase() {
   if (db) {
     await db.close();
     db = null;
-    console.log('Database connection closed.');
+    console.log('Database connection closed (database.ts).');
   }
 }
 
@@ -232,7 +221,7 @@ export async function deleteUser(id: string): Promise<boolean> {
 
 export async function validateUserCredentials(username: string, passwordAttempt: string): Promise<Omit<User, 'password'> | null> {
   const currentDb = await initDatabase();
-  const user = await getUserByUsername(username); // This already returns the full User object including hashed password
+  const user = await getUserByUsername(username); 
   if (!user || !user.isActive || !user.password) return null;
   const isMatch = await compare(passwordAttempt, user.password);
   if (!isMatch) return null;
@@ -443,6 +432,20 @@ export async function addCustomer(customer: Customer): Promise<boolean> {
   } catch (error) { console.error('Error adding customer:', error); throw error; }
 }
 
+export async function updateCustomer(customerId: string, customerData: Partial<Customer>): Promise<boolean> {
+  const currentDb = await initDatabase();
+  const updates = Object.keys(customerData).map(key => `${key} = ?`);
+  const params = [...Object.values(customerData), customerId];
+  const query = `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`;
+  try {
+    await currentDb.run(query, params);
+    return true;
+  } catch (error) {
+    console.error('Error updating customer:', error);
+    throw error;
+  }
+}
+
 export async function getAllCustomers(): Promise<Customer[]> {
   const currentDb = await initDatabase();
   try { return await currentDb.all('SELECT * FROM customers ORDER BY name'); }
@@ -484,6 +487,21 @@ export async function addProduct(product: Product): Promise<boolean> {
   } catch (error) { console.error('Error adding product:', error); throw error; }
 }
 
+export async function updateProduct(productId: string, productData: Partial<Product>): Promise<boolean> {
+  const currentDb = await initDatabase();
+  const updates = Object.keys(productData).map(key => `${key} = ?`);
+  const params = [...Object.values(productData), productId];
+  const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
+  try {
+    await currentDb.run(query, params);
+    return true;
+  } catch (error) {
+    console.error('Error updating product:', error);
+    throw error;
+  }
+}
+
+
 export async function getAllProducts(): Promise<Product[]> {
   const currentDb = await initDatabase();
   try { return await currentDb.all('SELECT * FROM products ORDER BY name'); }
@@ -514,6 +532,7 @@ export async function clearAllData(): Promise<boolean> {
     await currentDb.run('DELETE FROM products');
     await currentDb.run('DELETE FROM company WHERE id = 1');
     // Note: Users are not cleared by this "business data" clear function.
+    // If you want to clear users (EXCEPT system admin), add specific logic here.
     await currentDb.run('COMMIT'); return true;
   } catch (error) {
     console.error('Error clearing all data:', error);
@@ -521,7 +540,3 @@ export async function clearAllData(): Promise<boolean> {
     return false;
   }
 }
-
-export { getDbPath };
-    
-    

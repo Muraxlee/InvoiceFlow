@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -454,8 +453,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               role="combobox"
                               className={cn( "w-full justify-between", !field.value && "text-muted-foreground")}
                             >
-                              {field.value ? customers.find( (customer) => customer && customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
-                              <UserPlus className="ml-auto h-4 w-4 opacity-50" />
+                              <div className="flex w-full justify-between items-center">
+                                {field.value ? customers.find( (customer) => customer && customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
+                                <UserPlus className="ml-auto h-4 w-4 opacity-50" />
+                              </div>
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
@@ -513,8 +514,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 <FormItem className="flex flex-col"> <FormLabel>Invoice Date *</FormLabel>
                   <Popover> <PopoverTrigger asChild> <FormControl>
                         <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          <div className="flex w-full justify-between items-center">
+                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </div>
                         </Button>
                       </FormControl> </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -539,8 +542,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   <FormItem className="flex flex-col"> <FormLabel>Due Date</FormLabel>
                     <Popover> <PopoverTrigger asChild> <FormControl>
                           <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            <div className="flex w-full justify-between items-center">
+                              {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </div>
                           </Button>
                         </FormControl> </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -606,22 +611,35 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         render={({ field: itemField }) => (
                           <FormItem className="flex flex-col mt-1">
                             <FormControl>
-                              <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = isOpen; return newState; })}>
+                              <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => {
+                                const newState = [...productPopoversOpen];
+                                newState[index] = isOpen;
+                                setProductPopoversOpen(newState);
+                              }}>
                                 <PopoverTrigger asChild>
                                   <Button variant="outline" className="w-full justify-between">
-                                    {itemField.value ? products.find(p => p && p.id === itemField.value)?.name || "Select..." : "Select product..." }
-                                    <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <div className="flex w-full justify-between items-center">
+                                      <span className="truncate">
+                                        {itemField.value 
+                                          ? products.find(p => p && p.id === itemField.value)?.name || "Select..." 
+                                          : "Select product..."
+                                        }
+                                      </span>
+                                      <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </div>
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                                  <Command> <CommandInput placeholder="Search products..." />
+                                  <Command>
+                                    <CommandInput placeholder="Search products..." />
                                     <CommandList>
                                       <CommandEmpty>
-                                          <div className="py-2 text-center text-sm"> No product found.
-                                            <Button variant="link" size="sm" asChild className="px-1">
-                                              <Link href="/products"> Add New Product</Link>
-                                            </Button>
-                                          </div>
+                                        <div className="py-2 text-center text-sm">
+                                          No product found.
+                                          <Button variant="link" size="sm" asChild className="px-1">
+                                            <Link href="/products">Add New Product</Link>
+                                          </Button>
+                                        </div>
                                       </CommandEmpty>
                                       <CommandGroup>
                                         {products.filter(product => !!product).map((product) => (
@@ -630,11 +648,24 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                             value={product.name} 
                                             onSelect={() => handleSelectProduct(index, product.id)} 
                                           >
-                                            <Check className={cn( "mr-2 h-4 w-4", product.id === itemField.value ? "opacity-100" : "opacity-0")} />
-                                            <div className="flex items-center">
-                                              <Image src={product.imageUrl || "https://placehold.co/30x30.png"} alt={product.name} width={30} height={30}
-                                                className="rounded-md mr-2 aspect-square object-cover" data-ai-hint="product item" onError={(e) => (e.currentTarget.src = "https://placehold.co/30x30.png?text=Error")}/>
-                                              <span className="truncate">{product.name}</span>
+                                            <div className="flex items-center w-full">
+                                              <Check className={cn( 
+                                                "mr-2 h-4 w-4", 
+                                                product.id === itemField.value ? "opacity-100" : "opacity-0"
+                                              )} />
+                                              <div className="flex items-center">
+                                                <Image 
+                                                  src={product.imageUrl || "https://placehold.co/30x30.png"} 
+                                                  alt={product.name} 
+                                                  width={30} 
+                                                  height={30}
+                                                  className="rounded-md mr-2 aspect-square object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.src = "https://placehold.co/30x30.png?text=Error";
+                                                  }}
+                                                />
+                                                <span className="truncate">{product.name}</span>
+                                              </div>
                                             </div>
                                           </CommandItem>
                                         ))}
@@ -757,8 +788,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   <FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl>
                         <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          <div className="flex w-full justify-between items-center">
+                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </div>
                         </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
                     </Popover><FormMessage />
@@ -783,8 +816,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   <FormItem className="flex flex-col"><FormLabel>Ship Date (Actual)</FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl>
                         <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          <div className="flex w-full justify-between items-center">
+                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </div>
                         </Button></FormControl></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
                     </Popover><FormMessage />

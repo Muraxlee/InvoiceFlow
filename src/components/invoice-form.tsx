@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -104,7 +105,7 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   if (typeof window === 'undefined') {
     const prefix = DEFAULT_INVOICE_PREFIX.substring(0,3).toUpperCase();
     const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
-    const sequentialNumber = "0001"; // Default for server-side if needed
+    const sequentialNumber = "0001"; 
     return `${prefix}${dateKey}${sequentialNumber}`;
   }
 
@@ -151,7 +152,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
-      // Initialize with a structure that matches InvoiceFormValues to prevent controlled/uncontrolled issues
       customerId: "", customerName: "", customerEmail: "", customerAddress: "",
       invoiceNumber: "", invoiceDate: new Date(), dueDate: null,
       items: [{
@@ -445,8 +445,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                          first.
                        </div>
                     ) : (
-                      <FormControl>
-                        <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                      <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                        <FormControl>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -459,6 +459,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               </div>
                             </Button>
                           </PopoverTrigger>
+                        </FormControl>
                           <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                             <Command>
                               <CommandInput placeholder="Search customers..." />
@@ -486,7 +487,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             </Command>
                           </PopoverContent>
                         </Popover>
-                      </FormControl>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -512,14 +512,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               )} />
               <FormField control={form.control} name="invoiceDate" render={({ field }) => (
                 <FormItem className="flex flex-col"> <FormLabel>Invoice Date *</FormLabel>
-                  <Popover> <PopoverTrigger asChild> <FormControl>
+                  <Popover> 
+                  <FormControl>
+                    <PopoverTrigger asChild> 
                         <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                           <div className="flex w-full justify-between items-center">
                             {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </div>
                         </Button>
-                      </FormControl> </PopoverTrigger>
+                      </PopoverTrigger> 
+                    </FormControl>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar mode="single" selected={field.value ? new Date(field.value) : undefined}
                         onSelect={(date) => {
@@ -540,14 +543,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               {showDueDate && (
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
                   <FormItem className="flex flex-col"> <FormLabel>Due Date</FormLabel>
-                    <Popover> <PopoverTrigger asChild> <FormControl>
-                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            <div className="flex w-full justify-between items-center">
-                              {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </div>
-                          </Button>
-                        </FormControl> </PopoverTrigger>
+                    <Popover> 
+                      <FormControl>
+                        <PopoverTrigger asChild> 
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                              <div className="flex w-full justify-between items-center">
+                                {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </div>
+                            </Button>
+                          </PopoverTrigger> 
+                        </FormControl>
                       <PopoverContent className="w-auto p-0" align="start">
                         <Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={field.onChange} initialFocus disabled={(date) => date < new Date("1900-01-01")}/>
                       </PopoverContent>
@@ -595,40 +601,41 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                      </Button>
                    )}
                   <div className="col-span-12 md:col-span-3">
-                    <FormLabel>Product / Service *</FormLabel>
-                     {isDataLoading && products.length === 0 ? (
-                        <div className="flex items-center justify-center p-4 border rounded-md h-[40px] mt-1">
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        </div>
-                     ) : !isDataLoading && products.length === 0 ? (
-                       <div className="p-2 mt-1 text-xs border rounded-md bg-muted/50 text-muted-foreground"> No products.
-                         <Button variant="link" asChild className="px-1 py-0 h-auto text-xs"><Link href="/products">Add product</Link></Button>
-                       </div>
-                    ) : (
-                      <FormField
+                     <FormField
                         control={form.control}
                         name={`items.${index}.productId`}
                         render={({ field: itemField }) => (
-                          <FormItem className="flex flex-col mt-1">
-                            <FormControl>
+                          <FormItem>
+                            <FormLabel>Product / Service *</FormLabel>
+                            {isDataLoading && products.length === 0 ? (
+                                <div className="flex items-center justify-center p-4 border rounded-md h-[40px] mt-1">
+                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                </div>
+                             ) : !isDataLoading && products.length === 0 ? (
+                               <div className="p-2 mt-1 text-xs border rounded-md bg-muted/50 text-muted-foreground"> No products.
+                                 <Button variant="link" asChild className="px-1 py-0 h-auto text-xs"><Link href="/products">Add product</Link></Button>
+                               </div>
+                            ) : (
                               <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => {
                                 const newState = [...productPopoversOpen];
                                 newState[index] = isOpen;
                                 setProductPopoversOpen(newState);
                               }}>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" className="w-full justify-between">
-                                    <div className="flex w-full justify-between items-center">
-                                      <span className="truncate">
-                                        {itemField.value 
-                                          ? products.find(p => p && p.id === itemField.value)?.name || "Select..." 
-                                          : "Select product..."
-                                        }
-                                      </span>
-                                      <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </div>
-                                  </Button>
-                                </PopoverTrigger>
+                                <FormControl>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-between mt-1">
+                                      <div className="flex w-full justify-between items-center">
+                                        <span className="truncate">
+                                          {itemField.value 
+                                            ? products.find(p => p && p.id === itemField.value)?.name || "Select..." 
+                                            : "Select product..."
+                                          }
+                                        </span>
+                                        <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </div>
+                                    </Button>
+                                  </PopoverTrigger>
+                                </FormControl>
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                                   <Command>
                                     <CommandInput placeholder="Search products..." />
@@ -674,12 +681,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                   </Command>
                                 </PopoverContent>
                               </Popover>
-                            </FormControl>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    )}
                   </div>
                   <FormField control={form.control} name={`items.${index}.quantity`} render={({ field: itemField }) => (
                     <FormItem className="col-span-3 md:col-span-1"> <FormLabel>Qty *</FormLabel> <FormControl><Input type="number" placeholder="1" {...itemField} className="mt-1"/></FormControl> <FormMessage /> </FormItem>
@@ -786,13 +792,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 )} />
                  <FormField control={form.control} name="shipmentDetails.dateOfSupply" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel>
-                    <Popover><PopoverTrigger asChild><FormControl>
-                        <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          <div className="flex w-full justify-between items-center">
-                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </div>
-                        </Button></FormControl></PopoverTrigger>
+                    <Popover>
+                      <FormControl>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                            <div className="flex w-full justify-between items-center">
+                              {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </div>
+                          </Button>
+                        </PopoverTrigger>
+                      </FormControl>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
                     </Popover><FormMessage />
                   </FormItem>
@@ -814,13 +824,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               )} />
                <FormField control={form.control} name="shipmentDetails.shipDate" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Ship Date (Actual)</FormLabel>
-                    <Popover><PopoverTrigger asChild><FormControl>
-                        <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                          <div className="flex w-full justify-between items-center">
-                            {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </div>
-                        </Button></FormControl></PopoverTrigger>
+                    <Popover>
+                      <FormControl>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                            <div className="flex w-full justify-between items-center">
+                              {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Select shipping date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </div>
+                          </Button>
+                        </PopoverTrigger>
+                      </FormControl>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={(date) => field.onChange(date)} initialFocus /></PopoverContent>
                     </Popover><FormMessage />
                   </FormItem>
@@ -863,3 +877,5 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
+
+    

@@ -105,7 +105,7 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   if (typeof window === 'undefined') {
     const prefix = DEFAULT_INVOICE_PREFIX.substring(0,3).toUpperCase();
     const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
-    const sequentialNumber = "0001";
+    const sequentialNumber = "0001"; // Default for server-side if needed
     return `${prefix}${dateKey}${sequentialNumber}`;
   }
 
@@ -118,16 +118,14 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
 
   let currentCounter = config.dailyCounters[dateKey] || 0;
-  const nextCounter = increment ? currentCounter + 1 : currentCounter; 
+  const useCounter = increment ? currentCounter + 1 : (currentCounter === 0 ? 1 : currentCounter + 1);
+
 
   if (increment) {
-    config.dailyCounters[dateKey] = nextCounter;
+    config.dailyCounters[dateKey] = useCounter;
     saveToLocalStorage(INVOICE_CONFIG_KEY, config);
   }
   
-  const useCounter = increment ? nextCounter : (currentCounter === 0 ? 1 : currentCounter + 1);
-
-
   const sequentialNumber = String(useCounter).padStart(4, '0');
 
   return `${prefix}${dateKey}${sequentialNumber}`;
@@ -147,13 +145,27 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
-  const [showDueDate, setShowDueDate] = useState(!!defaultValuesProp?.dueDate);
+  const [showDueDate, setShowDueDate] = useState(false);
   const [applyRoundOff, setApplyRoundOff] = useState(false);
 
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: {}, 
+    defaultValues: {
+      // Initialize with a structure that matches InvoiceFormValues to prevent controlled/uncontrolled issues
+      customerId: "", customerName: "", customerEmail: "", customerAddress: "",
+      invoiceNumber: "", invoiceDate: new Date(), dueDate: null,
+      items: [{
+        productId: "", description: "", quantity: 1, price: 0, gstCategory: "",
+        applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9
+      }],
+      notes: "", termsAndConditions: "", paymentStatus: "Unpaid", paymentMethod: "",
+      shipmentDetails: {
+        shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
+        consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
+        dateOfSupply: null, placeOfSupply: ""
+      }
+    }, 
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -178,7 +190,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         initialDueDate = new Date(defaultValuesProp.dueDate);
         setShowDueDate(true);
       } else {
-        setShowDueDate(isCreatingNew ? false : !!defaultValuesProp?.dueDate); // Show if editing with existing due date
+        setShowDueDate(isCreatingNew ? false : !!defaultValuesProp?.dueDate);
         initialDueDate = null;
       }
     }
@@ -188,10 +200,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         : defaultValuesProp?.invoiceNumber || '';
 
     form.reset({
-      ...defaultValuesProp,
+      customerId: defaultValuesProp?.customerId || "",
+      customerName: defaultValuesProp?.customerName || "",
+      customerEmail: defaultValuesProp?.customerEmail || "",
+      customerAddress: defaultValuesProp?.customerAddress || "",
+      invoiceNumber: initialInvoiceNumber,
       invoiceDate: initialInvoiceDate || new Date(),
       dueDate: initialDueDate, 
-      invoiceNumber: initialInvoiceNumber,
       items: defaultValuesProp?.items?.length ? defaultValuesProp.items.map(item => ({
         ...item,
         quantity: Number(item.quantity || 1),
@@ -204,17 +219,15 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         applyIgst: true, applyCgst: false, applySgst: false,
         igstRate: 18, cgstRate: 9, sgstRate: 9
       }],
+      notes: defaultValuesProp?.notes || "",
+      termsAndConditions: defaultValuesProp?.termsAndConditions || "Payment due within 30 days. All goods remain property of the seller until paid in full.",
+      paymentStatus: defaultValuesProp?.paymentStatus || "Unpaid",
+      paymentMethod: defaultValuesProp?.paymentMethod || "",
       shipmentDetails: defaultValuesProp?.shipmentDetails || {
         shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
         consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
         dateOfSupply: null, placeOfSupply: ""
       },
-      customerId: defaultValuesProp?.customerId || "",
-      customerName: defaultValuesProp?.customerName || "",
-      customerEmail: defaultValuesProp?.customerEmail || "",
-      customerAddress: defaultValuesProp?.customerAddress || "",
-      paymentStatus: defaultValuesProp?.paymentStatus || "Unpaid",
-      paymentMethod: defaultValuesProp?.paymentMethod || "",
     });
 
     if (defaultValuesProp?.customerId) {
@@ -433,8 +446,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                          first.
                        </div>
                     ) : (
-                      <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                        <FormControl>
+                      <FormControl>
+                        <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -445,34 +458,34 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               <UserPlus className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                        </FormControl>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder="Search customers..." />
-                            <CommandList>
-                              <CommandEmpty>
-                                <div className="py-2 text-center text-sm"> No customer found.
-                                  <Button variant="link" size="sm" asChild className="px-1">
-                                    <Link href="/customers">Add New Customer</Link>
-                                  </Button>
-                                </div>
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {customers.filter(customer => !!customer).map((customer) => (
-                                  <CommandItem
-                                    key={customer.id}
-                                    value={customer.name} 
-                                    onSelect={() => handleSelectCustomer(customer.id)}
-                                  >
-                                    <Check className={cn( "mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
-                                    {customer.name} ({customer.id})
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search customers..." />
+                              <CommandList>
+                                <CommandEmpty>
+                                  <div className="py-2 text-center text-sm"> No customer found.
+                                    <Button variant="link" size="sm" asChild className="px-1">
+                                      <Link href="/customers">Add New Customer</Link>
+                                    </Button>
+                                  </div>
+                                </CommandEmpty>
+                                <CommandGroup>
+                                  {customers.filter(customer => !!customer).map((customer) => (
+                                    <CommandItem
+                                      key={customer.id}
+                                      value={customer.name} 
+                                      onSelect={() => handleSelectCustomer(customer.id)}
+                                    >
+                                      <Check className={cn( "mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
+                                      {customer.name} ({customer.id})
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </FormControl>
                     )}
                     <FormMessage />
                   </FormItem>
@@ -584,48 +597,58 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         </div>
                      ) : !isDataLoading && products.length === 0 ? (
                        <div className="p-2 mt-1 text-xs border rounded-md bg-muted/50 text-muted-foreground"> No products.
-                         <Button variant="link" asChild className="px-1 py-0 h-auto"><Link href="/products">Add product</Link></Button>
+                         <Button variant="link" asChild className="px-1 py-0 h-auto text-xs"><Link href="/products">Add product</Link></Button>
                        </div>
                     ) : (
-                    <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = isOpen; return newState; })}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between mt-1">
-                          {form.getValues(`items.${index}.productId`) ? products.find(p => p && p.id === form.getValues(`items.${index}.productId`))?.name || "Select..." : "Select product..." }
-                          <PlusCircle className="ml-2 h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command> <CommandInput placeholder="Search products..." />
-                           <CommandList>
-                            <CommandEmpty>
-                                <div className="py-2 text-center text-sm"> No product found.
-                                  <Button variant="link" size="sm" asChild className="px-1">
-                                    <Link href="/products"> Add New Product</Link>
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.productId`}
+                        render={({ field: itemField }) => (
+                          <FormItem className="flex flex-col mt-1">
+                            <FormControl>
+                              <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = isOpen; return newState; })}>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" className="w-full justify-between">
+                                    {itemField.value ? products.find(p => p && p.id === itemField.value)?.name || "Select..." : "Select product..." }
+                                    <PlusCircle className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
-                                </div>
-                            </CommandEmpty>
-                            <CommandGroup>
-                              {products.filter(product => !!product).map((product) => (
-                                <CommandItem 
-                                  key={product.id} 
-                                  value={product.name} 
-                                  onSelect={() => handleSelectProduct(index, product.id)} 
-                                >
-                                  <Check className={cn( "mr-2 h-4 w-4", product.id === form.getValues(`items.${index}.productId`) ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex items-center">
-                                    <Image src={product.imageUrl || "https://placehold.co/30x30.png"} alt={product.name} width={30} height={30}
-                                      className="rounded-md mr-2 aspect-square object-cover" data-ai-hint="product item" onError={(e) => (e.currentTarget.src = "https://placehold.co/30x30.png?text=Error")}/>
-                                    <span className="truncate">{product.name}</span>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                  <Command> <CommandInput placeholder="Search products..." />
+                                    <CommandList>
+                                      <CommandEmpty>
+                                          <div className="py-2 text-center text-sm"> No product found.
+                                            <Button variant="link" size="sm" asChild className="px-1">
+                                              <Link href="/products"> Add New Product</Link>
+                                            </Button>
+                                          </div>
+                                      </CommandEmpty>
+                                      <CommandGroup>
+                                        {products.filter(product => !!product).map((product) => (
+                                          <CommandItem 
+                                            key={product.id} 
+                                            value={product.name} 
+                                            onSelect={() => handleSelectProduct(index, product.id)} 
+                                          >
+                                            <Check className={cn( "mr-2 h-4 w-4", product.id === itemField.value ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex items-center">
+                                              <Image src={product.imageUrl || "https://placehold.co/30x30.png"} alt={product.name} width={30} height={30}
+                                                className="rounded-md mr-2 aspect-square object-cover" data-ai-hint="product item" onError={(e) => (e.currentTarget.src = "https://placehold.co/30x30.png?text=Error")}/>
+                                              <span className="truncate">{product.name}</span>
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                     <FormField control={form.control} name={`items.${index}.productId`} render={() => <FormMessage />} /> 
                   </div>
                   <FormField control={form.control} name={`items.${index}.quantity`} render={({ field: itemField }) => (
                     <FormItem className="col-span-3 md:col-span-1"> <FormLabel>Qty *</FormLabel> <FormControl><Input type="number" placeholder="1" {...itemField} className="mt-1"/></FormControl> <FormMessage /> </FormItem>
@@ -805,5 +828,3 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
-
-    

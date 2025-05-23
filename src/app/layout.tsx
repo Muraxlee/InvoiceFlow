@@ -14,9 +14,10 @@ import {
 import { Toaster } from '@/components/ui/toaster';
 import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
-import { useEffect, useState, useCallback } from 'react'; 
+import { useEffect, useState, useCallback } from 'react';
 import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
-import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings'; // Import AVAILABLE_FONTS
+import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings';
+import { usePathname } from 'next/navigation'; // Import usePathname
 
 // Static metadata as a base
 export const metadataBase: Metadata = {
@@ -51,13 +52,13 @@ export default function RootLayout({
   const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
   const [isMounted, setIsMounted] = useState(false);
   const [currentFontKey, setCurrentFontKey] = useState<string>(DEFAULT_FONT_KEY);
-
+  const pathname = usePathname(); // Get the current path
 
   const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
     const root = document.documentElement;
-    if (customTheme.background) root.style.setProperty('--background', customTheme.background);
-    if (customTheme.foreground) root.style.setProperty('--foreground', customTheme.foreground);
-    if (customTheme.primary) root.style.setProperty('--primary', customTheme.primary);
+    if (customTheme.background) root.style.setProperty('--background', customTheme.background); else root.style.removeProperty('--background');
+    if (customTheme.foreground) root.style.setProperty('--foreground', customTheme.foreground); else root.style.removeProperty('--foreground');
+    if (customTheme.primary) root.style.setProperty('--primary', customTheme.primary); else root.style.removeProperty('--primary');
   }, []);
 
   const resetCustomThemeVariables = useCallback(() => {
@@ -77,10 +78,10 @@ export default function RootLayout({
       const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
       applyCustomThemeVariables(storedCustomTheme);
     } else {
-      resetCustomThemeVariables(); 
+      resetCustomThemeVariables();
     }
   }, [applyCustomThemeVariables, resetCustomThemeVariables]);
-  
+
   const applyFont = useCallback((fontKey: string) => {
     const htmlElement = document.documentElement;
     Object.keys(AVAILABLE_FONTS).forEach(key => {
@@ -89,18 +90,17 @@ export default function RootLayout({
     if (fontKey !== "system") {
       htmlElement.classList.add(`font-${fontKey}`);
     }
-    // Directly set body font family for broader application
-    document.body.style.fontFamily = fontKey === "system" 
-      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" 
+    document.body.style.fontFamily = fontKey === "system"
+      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
       : `var(--font-${fontKey}), sans-serif`;
-    
+
     localStorage.setItem(FONT_STORAGE_KEY, fontKey);
     setCurrentFontKey(fontKey);
   }, []);
 
 
   useEffect(() => {
-    setIsMounted(true); 
+    setIsMounted(true);
 
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
     if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
@@ -119,7 +119,7 @@ export default function RootLayout({
 
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyName(storedCompanyName);
-    setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || 'Q');
+    setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
     document.title = storedCompanyName || String(metadataBase.title);
 
 
@@ -132,7 +132,7 @@ export default function RootLayout({
       if (event.key === COMPANY_NAME_STORAGE_KEY) {
         const newName = event.newValue ? JSON.parse(event.newValue) : DEFAULT_COMPANY_NAME;
         setCompanyName(newName);
-        setCompanyInitial(newName.substring(0,1).toUpperCase() || 'Q');
+        setCompanyInitial(newName.substring(0,1).toUpperCase() || DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
         document.title = newName || String(metadataBase.title);
       }
       if (event.key === CUSTOM_THEME_STORAGE_KEY && currentThemeKey === 'custom') {
@@ -165,6 +165,8 @@ export default function RootLayout({
     );
   }
 
+  const isLoginPage = pathname === '/login';
+
   return (
     <html lang="en" suppressHydrationWarning data-theme={currentThemeKey} className={currentFontKey !== "system" ? `font-${currentFontKey}` : ''}>
       <head>
@@ -173,48 +175,50 @@ export default function RootLayout({
       </head>
       <body
         className="antialiased bg-background text-foreground"
-        style={{ fontFamily: currentFontKey === "system" 
-            ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" 
-            : `var(--font-${currentFontKey})` 
+        style={{ fontFamily: currentFontKey === "system"
+            ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
+            : `var(--font-${currentFontKey})`
         }}
       >
-        <SidebarProvider defaultOpen> 
-          <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
-            <SidebarHeader className="p-3 border-b border-sidebar-border">
-              <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
-                <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
-              </div>
-              <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
-                 <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
-                   {companyInitial}
-                 </span>
-              </div>
-            </SidebarHeader>
-            <SidebarContent className="flex-1 mt-2">
-              <AppNav />
-            </SidebarContent>
-          </Sidebar>
+        {isLoginPage ? (
+          <main>{children}</main> // Render only children for login page
+        ) : (
+          <SidebarProvider defaultOpen>
+            <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
+              <SidebarHeader className="p-3 border-b border-sidebar-border">
+                <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
+                  <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
+                </div>
+                <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
+                   <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
+                     {companyInitial}
+                   </span>
+                </div>
+              </SidebarHeader>
+              <SidebarContent className="flex-1 mt-2">
+                <AppNav />
+              </SidebarContent>
+            </Sidebar>
 
-          <div className="flex flex-col flex-1">
-            <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
-              <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
-              
-              <div className="flex-1 flex justify-center px-4">
-                {/* Search input removed */}
-              </div>
+            <div className="flex flex-col flex-1">
+              <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
+                <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
+                <div className="flex-1 flex justify-center px-4">
+                  {/* Main header search input removed */}
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <UserNav />
+                </div>
+              </header>
 
-              <div className="flex items-center gap-2 ml-auto">
-                <UserNav />
-              </div>
-            </header>
-
-            <SidebarInset className="bg-background"> 
-              <main className="flex-1 p-4 sm:p-6 md:p-8">
-                {children}
-              </main>
-            </SidebarInset>
-          </div>
-        </SidebarProvider>
+              <SidebarInset className="bg-background">
+                <main className="flex-1 p-4 sm:p-6 md:p-8">
+                  {children}
+                </main>
+              </SidebarInset>
+            </div>
+          </SidebarProvider>
+        )}
         <Toaster />
       </body>
     </html>

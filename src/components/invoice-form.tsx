@@ -148,6 +148,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
   const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
 
+  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
+  const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
+
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {}, // Default values will be set in useEffect
@@ -159,16 +163,22 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   });
 
   useEffect(() => {
-    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
-    let initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : null;
-    let initialDueDate = defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : null;
+    setProductPopoversOpen(fields.map(() => false));
+  }, [fields.length]);
 
-    if (isCreatingNew) {
-      if (typeof window !== 'undefined') {
-        initialInvoiceDate = new Date();
-        initialDueDate = new Date();
-        initialDueDate.setDate(initialInvoiceDate.getDate() + 30);
-      }
+
+  useEffect(() => {
+    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
+    let initialInvoiceDate: Date | null = null;
+    let initialDueDate: Date | null = null;
+
+    if (typeof window !== 'undefined') {
+        initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : (isCreatingNew ? new Date() : null);
+        initialDueDate = defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : (isCreatingNew && initialInvoiceDate ? new Date(new Date(initialInvoiceDate).setDate(initialInvoiceDate.getDate() + 30)) : null);
+    } else {
+        // Fallback for SSR or if window is not defined (should ideally not rely on this path for critical logic)
+        initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : new Date();
+        initialDueDate = defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : new Date(new Date().setDate(new Date().getDate() + 30));
     }
     
     const initialInvoiceNumber = isCreatingNew && initialInvoiceDate
@@ -177,8 +187,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
     form.reset({
       ...defaultValuesProp,
-      invoiceDate: initialInvoiceDate || new Date(), // Fallback for SSR
-      dueDate: initialDueDate || new Date(new Date().setDate(new Date().getDate() + 30)), // Fallback for SSR
+      invoiceDate: initialInvoiceDate || new Date(),
+      dueDate: initialDueDate || new Date(new Date().setDate(new Date().getDate() + 30)), 
       invoiceNumber: initialInvoiceNumber,
       items: defaultValuesProp?.items?.length ? defaultValuesProp.items.map(item => ({
         ...item,
@@ -275,8 +285,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue(`items.${index}.applyIgst`, true);
       form.setValue(`items.${index}.applyCgst`, false);
       form.setValue(`items.${index}.applySgst`, false);
-      // Trigger validation for the item if needed
       form.trigger(`items.${index}`);
+      setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
     }
   };
 
@@ -287,9 +297,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         form.setValue(`items.${index}.applyCgst`, false);
         form.setValue(`items.${index}.applySgst`, false);
       }
-    } else { // CGST or SGST
-      // If checking CGST, SGST should also be checked, and IGST unchecked
-      // If unchecking CGST, SGST should also be unchecked
+    } else { 
       const isChecking = value;
       form.setValue(`items.${index}.applyCgst`, isChecking);
       form.setValue(`items.${index}.applySgst`, isChecking);
@@ -298,7 +306,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       }
     }
 
-    // Ensure at least one GST type is selected, default to IGST if none
     const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
     if (!applyIgst && !applyCgst && !applySgst) {
       form.setValue(`items.${index}.applyIgst`, true);
@@ -312,9 +319,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue("customerName", customer.name, { shouldValidate: true });
       form.setValue("customerEmail", customer.email || "", { shouldValidate: true });
       form.setValue("customerAddress", customer.address || "", { shouldValidate: true });
-      form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true }); // Auto-fill consignee name
-      form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true }); // Auto-fill consignee address
+      form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
+      form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true }); 
       setIsCustomerSelected(true);
+      setIsCustomerPopoverOpen(false); 
     } else {
       setIsCustomerSelected(false);
     }
@@ -372,7 +380,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
             const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, true);
             data.invoiceNumber = confirmedInvoiceNumber;
         } else {
-            // Handle invalid date case, perhaps by setting a default or showing an error
             console.error("Invalid invoice date for number generation");
             toast({ title: "Error", description: "Invalid invoice date provided.", variant: "destructive" });
             return;
@@ -414,7 +421,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                          first.
                        </div>
                     ) : (
-                      <Popover>
+                      <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
@@ -450,12 +457,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 {customers.map((customer) => (
                                   <CommandItem
                                     key={customer.id}
-                                    value={customer.name}
+                                    value={customer.name} // Use customer name for searching/value
                                     onSelect={() => {
                                       handleSelectCustomer(customer.id);
-                                      // Manually close Popover, Command doesn't always do this
-                                      // when inside a form like this.
-                                      // This can be done by managing open state of Popover.
                                     }}
                                   >
                                     <Check
@@ -652,7 +656,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                          <Button variant="link" asChild className="px-1 py-0 h-auto"><Link href="/products">Add product</Link></Button>
                        </div>
                     ) : (
-                    <Popover>
+                    <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = isOpen; return newState; })}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-between mt-1">
                           {form.getValues(`items.${index}.productId`)
@@ -678,9 +682,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
-                                  value={product.name}
+                                  value={product.name} // Use product name for searching/value
                                   onSelect={() => handleSelectProduct(index, product.id)}
                                 >
+                                  <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        product.id === form.getValues(`items.${index}.productId`)
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
                                   <div className="flex items-center">
                                     <Image
                                       src={product.imageUrl || "https://placehold.co/30x30.png"}
@@ -775,7 +787,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                              <FormItem className="flex flex-row items-center space-x-2">
                               <Checkbox
                                 checked={sgstField.value}
-                                // SGST is linked to CGST
                                 onCheckedChange={(checked) => handleToggleGstType(index, 'sgst', checked === true)}
                                 id={`items.${index}.applySgst`}
                               />
@@ -928,3 +939,4 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
+

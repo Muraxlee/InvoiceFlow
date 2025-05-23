@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 import { CalendarIcon, PlusCircle, Trash2, Wand2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
@@ -117,7 +118,7 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
 
   let currentCounter = config.dailyCounters[dateKey] || 0;
-  const nextCounter = increment ? currentCounter + 1 : currentCounter; // Only increment if asked
+  const nextCounter = increment ? currentCounter + 1 : currentCounter; 
 
   if (increment) {
     config.dailyCounters[dateKey] = nextCounter;
@@ -166,22 +167,20 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
 
   useEffect(() => {
-    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
     let initialInvoiceDate: Date | null = null;
     let initialDueDate: Date | null = null;
-  
+    let isCreatingNew = true;
+
     if (typeof window !== 'undefined') {
-        initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : (isCreatingNew ? new Date() : new Date());
-        if (defaultValuesProp?.dueDate) {
-            initialDueDate = new Date(defaultValuesProp.dueDate);
-            setShowDueDate(true);
-        } else if (isCreatingNew) {
-            setShowDueDate(false); // Default no due date for new invoices
-            initialDueDate = null;
-        } else {
-            setShowDueDate(false);
-            initialDueDate = null;
-        }
+      isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
+      initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : (isCreatingNew ? new Date() : new Date());
+      if (defaultValuesProp?.dueDate) {
+        initialDueDate = new Date(defaultValuesProp.dueDate);
+        setShowDueDate(true);
+      } else {
+        setShowDueDate(isCreatingNew ? false : !!defaultValuesProp?.dueDate); // Show if editing with existing due date
+        initialDueDate = null;
+      }
     }
     
     const initialInvoiceNumber = isCreatingNew && initialInvoiceDate && typeof window !== 'undefined'
@@ -237,12 +236,16 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         } catch (error) {
           console.error("Error fetching initial data for invoice form:", error);
           toast({ title: "Error", description: "Could not load customers/products.", variant: "destructive" });
+          setCustomers([]); 
+          setProducts([]);  
         } finally {
             setIsDataLoading(false);
         }
       } else {
          console.warn("Electron API not available for invoice form data loading.");
          setIsDataLoading(false);
+         setCustomers([]); 
+         setProducts([]);  
       }
     }
 
@@ -455,7 +458,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 </div>
                               </CommandEmpty>
                               <CommandGroup>
-                                {customers.map((customer) => (
+                                {customers.filter(c => c).map((customer) => (
                                   <CommandItem
                                     key={customer.id}
                                     value={customer.name} 
@@ -476,13 +479,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 )}
               />
               <FormField control={form.control} name="customerName" render={({ field }) => (
-                <FormItem> <FormLabel>Customer Name</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : ""} /></FormControl> <FormMessage /> </FormItem>
+                <FormItem> <FormLabel>Customer Name</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")} /></FormControl> <FormMessage /> </FormItem>
               )} />
               <FormField control={form.control} name="customerEmail" render={({ field }) => (
-                <FormItem> <FormLabel>Customer Email</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : ""}/></FormControl> <FormMessage /> </FormItem>
+                <FormItem> <FormLabel>Customer Email</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")}/></FormControl> <FormMessage /> </FormItem>
               )} />
               <FormField control={form.control} name="customerAddress" render={({ field }) => (
-                <FormItem> <FormLabel>Billing Address</FormLabel> <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : ""}/></FormControl> <FormMessage /> </FormItem>
+                <FormItem> <FormLabel>Billing Address</FormLabel> <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")}/></FormControl> <FormMessage /> </FormItem>
               )} />
             </CardContent>
           </Card>
@@ -520,7 +523,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
               </FormItem>
               {showDueDate && (
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem className="flex flex-col"> <FormLabel>Due Date *</FormLabel>
+                  <FormItem className="flex flex-col"> <FormLabel>Due Date</FormLabel>
                     <Popover> <PopoverTrigger asChild> <FormControl>
                           <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                             {field.value && isValid(new Date(field.value)) ? formatDateFns(new Date(field.value), "PPP") : <span>Pick a date</span>}
@@ -538,9 +541,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 <FormItem> <FormLabel>Payment Status</FormLabel>
                   <FormControl>
                     <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-row space-x-2 pt-2" >
-                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Paid" /></FormControl> <FormLabel className="font-normal">Paid</FormLabel> </FormItem>
-                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Unpaid" /></FormControl> <FormLabel className="font-normal">Unpaid</FormLabel> </FormItem>
-                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Partially Paid" /></FormControl> <FormLabel className="font-normal">Partially Paid</FormLabel> </FormItem>
+                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Paid" /></FormControl> <Label className="font-normal">Paid</Label> </FormItem>
+                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Unpaid" /></FormControl> <Label className="font-normal">Unpaid</Label> </FormItem>
+                      <FormItem className="flex items-center space-x-1 space-y-0"> <FormControl><RadioGroupItem value="Partially Paid" /></FormControl> <Label className="font-normal">Partially Paid</Label> </FormItem>
                     </RadioGroup>
                   </FormControl> <FormMessage />
                 </FormItem>
@@ -569,7 +572,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 <div key={field.id} className="grid grid-cols-12 gap-4 items-start border p-4 rounded-md shadow-sm relative">
                    {fields.length > 1 && (
                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}
-                       className="absolute top-1 right-1 h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive-foreground" aria-label="Remove item" >
+                       className="absolute top-1 right-1 h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive" aria-label="Remove item" >
                        <X className="h-4 w-4" />
                      </Button>
                    )}
@@ -602,8 +605,12 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                 </div>
                             </CommandEmpty>
                             <CommandGroup>
-                              {products.map((product) => (
-                                <CommandItem key={product.id} value={product.name} onSelect={() => handleSelectProduct(index, product.id)} >
+                              {products.filter(p => p).map((product) => (
+                                <CommandItem 
+                                  key={product.id} 
+                                  value={product.name} 
+                                  onSelect={() => handleSelectProduct(index, product.id)} 
+                                >
                                   <Check className={cn( "mr-2 h-4 w-4", product.id === form.getValues(`items.${index}.productId`) ? "opacity-100" : "opacity-0")} />
                                   <div className="flex items-center">
                                     <Image src={product.imageUrl || "https://placehold.co/30x30.png"} alt={product.name} width={30} height={30}

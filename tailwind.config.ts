@@ -10,8 +10,8 @@ const config: Config = {
   theme: {
   	extend: {
       fontFamily: {
-        sans: ['var(--font-geist-sans)', ...defaultTheme.fontFamily.sans],
-        mono: ['var(--font-geist-mono)', ...defaultTheme.fontFamily.mono],
+        sans: ['var(--font-sans)', ...defaultTheme.fontFamily.sans],
+        mono: ['var(--font-mono)', ...defaultTheme.fontFamily.mono],
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -70,10 +70,15 @@ const config: Config = {
         }
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			lg: 'calc(var(--radius) + 2px)',
+  			md: 'var(--radius)',
+  			sm: 'calc(var(--radius) - 2px)',
+        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'calc(var(--radius) + 8px)',
   		},
+      transitionDuration: {
+        DEFAULT: '200ms',
+      },
   		keyframes: {
   			'accordion-down': {
   				from: {
@@ -90,11 +95,29 @@ const config: Config = {
   				to: {
   					height: '0'
   				}
-  			}
+  			},
+        'fade-in': {
+          '0%': {
+            opacity: '0'
+          },
+          '100%': {
+            opacity: '1'
+          },
+        },
+        'fade-out': {
+          '0%': {
+            opacity: '1'
+          },
+          '100%': {
+            opacity: '0'
+          },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-in': 'fade-in 0.2s ease-out',
+        'fade-out': 'fade-out 0.2s ease-out'
   		}
   	}
   },

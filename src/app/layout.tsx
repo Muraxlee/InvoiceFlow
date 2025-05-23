@@ -1,8 +1,6 @@
-
 "use client";
 
 import type { Metadata } from 'next'; // Keep for potential static metadata
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import {
   SidebarProvider,
@@ -17,16 +15,7 @@ import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
 import { useEffect, useState, useCallback } from 'react'; 
 import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY } from '@/components/font-settings';
 
 export const metadataBase: Metadata = {
   title: 'Dynamic Company App', 
@@ -49,7 +38,6 @@ export const AVAILABLE_THEMES = {
   'custom': 'Custom User Theme',
 };
 export const DEFAULT_THEME_KEY = 'quanti-dark';
-
 
 export default function RootLayout({
   children,
@@ -101,6 +89,24 @@ export default function RootLayout({
       applyTheme(DEFAULT_THEME_KEY);
     }
 
+    // Load and apply font preference
+    const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY);
+    if (storedFontKey) {
+      const htmlElement = document.documentElement;
+      htmlElement.classList.add(`font-${storedFontKey}`);
+      
+      if (storedFontKey !== "system") {
+        document.body.style.fontFamily = `'${storedFontKey.charAt(0).toUpperCase() + storedFontKey.slice(1)}', sans-serif`;
+      } else {
+        document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif";
+      }
+    } else {
+      // Apply default font
+      const htmlElement = document.documentElement;
+      htmlElement.classList.add(`font-${DEFAULT_FONT_KEY}`);
+      document.body.style.fontFamily = `'${DEFAULT_FONT_KEY.charAt(0).toUpperCase() + DEFAULT_FONT_KEY.slice(1)}', sans-serif`;
+    }
+
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyName(storedCompanyName);
     setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || 'Q');
@@ -126,6 +132,25 @@ export default function RootLayout({
         const newCustomTheme = event.newValue ? JSON.parse(event.newValue) : DEFAULT_CUSTOM_THEME_VALUES;
         applyCustomThemeVariables(newCustomTheme);
       }
+      if (event.key === FONT_STORAGE_KEY && event.newValue) {
+        const htmlElement = document.documentElement;
+        
+        // Remove all existing font classes
+        const fontKeys = ['inter', 'roboto', 'open-sans', 'montserrat', 'poppins', 'lato', 'nunito', 'system'];
+        fontKeys.forEach(key => {
+          htmlElement.classList.remove(`font-${key}`);
+        });
+        
+        // Add new font class
+        htmlElement.classList.add(`font-${event.newValue}`);
+        
+        // Apply to body
+        if (event.newValue !== "system") {
+          document.body.style.fontFamily = `'${event.newValue.charAt(0).toUpperCase() + event.newValue.slice(1)}', sans-serif`;
+        } else {
+          document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif";
+        }
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => {
@@ -141,7 +166,7 @@ export default function RootLayout({
         <meta name="description" content={String(metadataBase.description)} />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className="antialiased"
       >
         <SidebarProvider defaultOpen> {/* `defaultOpen` controls initial state on desktop */}
           <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">

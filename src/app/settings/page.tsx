@@ -1,4 +1,3 @@
-
 "use client";
 
 import PageHeader from "@/components/page-header";
@@ -8,32 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { 
-  loadFromLocalStorage, 
-  saveToLocalStorage, 
-  INVOICE_CONFIG_KEY, 
-  DEFAULT_INVOICE_PREFIX, 
-  type InvoiceConfig, 
-  GOOGLE_AI_API_KEY_STORAGE_KEY,
-  COMPANY_NAME_STORAGE_KEY,
-  DEFAULT_COMPANY_NAME,
-  CUSTOM_THEME_STORAGE_KEY,
-  type CustomThemeValues,
-  DEFAULT_CUSTOM_THEME_VALUES,
-  CUSTOMERS_STORAGE_KEY,
-  PRODUCTS_STORAGE_KEY,
-  INVOICES_STORAGE_KEY,
-  LAST_BACKUP_TIMESTAMP_KEY,
-  type AllApplicationData
-} from "@/lib/localStorage";
+import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData} from "@/lib/localStorage";
+import { getCompanyInfo } from "@/lib/database-wrapper";
+import { CompanySettingsForm } from "@/components/company-settings-form";
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
 import { format } from "date-fns"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import FontSettings from "@/components/font-settings";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -45,6 +30,7 @@ export default function SettingsPage() {
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME);
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME);
   const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState("DDMMYYYY");
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
 
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
@@ -79,6 +65,43 @@ export default function SettingsPage() {
     setLastBackupTimestamp(storedBackupTimestamp);
 
     setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
+    
+    // Load company info from database
+    const loadCompanyInfo = async () => {
+      try {
+        const info = await getCompanyInfo();
+        if (info) {
+          setCompanyInfo(info);
+        } else {
+          console.log('No company info found, using empty object as fallback');
+          setCompanyInfo({
+            name: '',
+            address: '',
+            phone: '',
+            email: '',
+            gstin: '',
+            bank_name: '',
+            bank_account: '',
+            bank_ifsc: '',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load company info:', error);
+        // Set empty default values as fallback
+        setCompanyInfo({
+          name: '',
+          address: '',
+          phone: '',
+          email: '',
+          gstin: '',
+          bank_name: '',
+          bank_account: '',
+          bank_ifsc: '',
+        });
+      }
+    };
+    
+    loadCompanyInfo();
 
   }, []);
 
@@ -332,138 +355,147 @@ export default function SettingsPage() {
 
 
   return (
-    <div className="space-y-8">
-      <PageHeader title="Application Settings" description="Manage your application configurations and preferences." />
+    <div className="space-y-6">
+      <PageHeader 
+        title="Settings" 
+        description="Manage your application settings and preferences." 
+        icon={<SettingsIcon className="h-6 w-6" />}
+      />
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <TabsTrigger value="general"><Building className="mr-2 h-4 w-4" /> Company</TabsTrigger>
-          <TabsTrigger value="theme"><Palette className="mr-2 h-4 w-4" /> Theme</TabsTrigger>
-          <TabsTrigger value="invoice-ai"><FileCog className="mr-2 h-4 w-4" /> Invoice & AI</TabsTrigger>
-          <TabsTrigger value="data-security"><ShieldCheck className="mr-2 h-4 w-4" /> Data & Security</TabsTrigger>
+      <Tabs defaultValue="appearance" className="space-y-4">
+        <TabsList className="w-full md:w-auto">
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            <span className="hidden sm:inline">Appearance</span>
+          </TabsTrigger>
+          <TabsTrigger value="company" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            <span className="hidden sm:inline">Company</span>
+          </TabsTrigger>
+          <TabsTrigger value="invoices" className="flex items-center gap-2">
+            <FileCog className="h-4 w-4" />
+            <span className="hidden sm:inline">Invoices</span>
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            <span className="hidden sm:inline">AI Settings</span>
+          </TabsTrigger>
+          <TabsTrigger value="data" className="flex items-center gap-2">
+            <DatabaseZap className="h-4 w-4" />
+            <span className="hidden sm:inline">Data</span>
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Building className="h-8 w-8 text-primary" />
-                <div>
-                  <CardTitle className="text-xl">Company Settings</CardTitle>
-                  <CardDescription>Set your company name that appears in the application.</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyNameInput">Company Name</Label>
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Input 
-                        id="companyNameInput" 
-                        value={companyNameInput} 
-                        onChange={(e) => setCompanyNameInput(e.target.value)}
-                        className="max-w-xs flex-grow"
-                        placeholder="Your Company Name"
-                    />
-                    <Button onClick={handleSaveCompanyName} disabled={companyNameInput === currentCompanyName || companyNameInput.trim() === ""}>
-                        <Save className="mr-2 h-4 w-4" /> Save Name
-                    </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="theme" className="space-y-6">
-           <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Palette className="h-8 w-8 text-primary" />
-                <div>
-                  <CardTitle className="text-xl">Theme Selection</CardTitle>
-                  <CardDescription>Choose your preferred application theme.</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup value={selectedThemeKey} onValueChange={handleThemeChange} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
-                  <Label 
-                    key={key} 
-                    htmlFor={`theme-${key}`} 
-                    className={cn(
-                      "flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer min-h-[100px]",
-                      selectedThemeKey === key && "border-primary ring-2 ring-primary"
-                    )}
-                  >
-                    <RadioGroupItem value={key} id={`theme-${key}`} className="sr-only" />
-                    <div className="w-full h-10 rounded mb-2 relative overflow-hidden" 
-                         style={{ 
-                            backgroundColor: `hsl(var(--${key}-background, var(--background)))`, 
-                            border: `2px solid hsl(var(--${key}-primary, var(--primary)))` 
-                         }}
-                         data-theme-preview={key} // Custom attribute for theme preview styling via CSS
-                    >
-                         {/* Simple visual cue for sidebar and header areas */}
-                        <div className="absolute left-0 top-0 h-full w-1/3" style={{backgroundColor: `hsl(var(--${key}-sidebar-background, var(--sidebar-background)))`}}></div>
-                        <div className="absolute right-0 top-0 h-1/4 w-2/3" style={{backgroundColor: `hsl(var(--${key}-header-background, var(--header-background)))`}}></div>
-                     </div>
-                    <span className="text-sm font-medium text-center">{name}</span>
-                  </Label>
-                ))}
-              </RadioGroup>
-            </CardContent>
-          </Card>
-
-          {selectedThemeKey === 'custom' && (
-            <Card className="shadow-lg border-primary/50">
+        <TabsContent value="appearance" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="w-full">
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <Edit3 className="h-8 w-8 text-primary" />
-                  <div>
-                    <CardTitle className="text-xl">Custom Theme Configuration</CardTitle>
-                    <CardDescription>Define your custom theme colors (use HSL format: e.g., "220 15% 15%"). Changes apply after saving and if "Custom User Theme" is active.</CardDescription>
-                  </div>
-                </div>
+                <CardTitle>Theme Settings</CardTitle>
+                <CardDescription>
+                  Customize the look and feel of the application
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="customBg">Background HSL (e.g., 220 15% 15%)</Label>
-                  <Input 
-                    id="customBg" 
-                    value={customThemeValues.background || ""} 
-                    onChange={(e) => setCustomThemeValues(prev => ({...prev, background: e.target.value}))}
-                    placeholder="e.g., 220 15% 15%" 
-                  />
+                <div className="space-y-4">
+                  <RadioGroup
+                    value={selectedThemeKey}
+                    onValueChange={handleThemeChange}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
+                    {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
+                      <div key={key}>
+                        <RadioGroupItem
+                          value={key}
+                          id={`theme-${key}`}
+                          className="peer sr-only"
+                        />
+                        <Label
+                          htmlFor={`theme-${key}`}
+                          className={cn(
+                            "flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer",
+                            selectedThemeKey === key ? "border-primary" : "border-muted"
+                          )}
+                        >
+                          <div className="mb-2 h-5 w-5 rounded-full border" style={{
+                            background: key === 'custom' 
+                              ? `hsl(${customThemeValues.primary || '180 60% 45%'})`
+                              : `var(--color-${key}-primary, var(--primary))`
+                          }} />
+                          <div className="font-medium">{name}</div>
+                        </Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
                 </div>
-                <div>
-                  <Label htmlFor="customFg">Foreground HSL (e.g., 220 10% 85%)</Label>
-                  <Input 
-                    id="customFg" 
-                    value={customThemeValues.foreground || ""} 
-                    onChange={(e) => setCustomThemeValues(prev => ({...prev, foreground: e.target.value}))}
-                    placeholder="e.g., 220 10% 85%" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customPrimary">Primary Accent HSL (e.g., 180 60% 45%)</Label>
-                  <Input 
-                    id="customPrimary" 
-                    value={customThemeValues.primary || ""} 
-                    onChange={(e) => setCustomThemeValues(prev => ({...prev, primary: e.target.value}))}
-                    placeholder="e.g., 180 60% 45%" 
-                  />
-                </div>
-                <Button onClick={handleSaveCustomTheme} 
-                        disabled={JSON.stringify(customThemeValues) === JSON.stringify(originalCustomThemeValues)}>
-                  <Save className="mr-2 h-4 w-4" /> Save Custom Theme
-                </Button>
+
+                {selectedThemeKey === 'custom' && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="font-medium">Custom Theme Properties</h4>
+                    
+                    <div className="grid gap-2">
+                      <Label htmlFor="primary-color">Primary Color (HSL)</Label>
+                      <Input
+                        id="primary-color"
+                        placeholder="180 60% 45%"
+                        value={customThemeValues.primary || ''}
+                        onChange={(e) => setCustomThemeValues(prev => ({ ...prev, primary: e.target.value }))}
+                      />
+                      <p className="text-sm text-muted-foreground">Format: hue saturation% lightness%</p>
+                    </div>
+                    
+                    <Button onClick={handleSaveCustomTheme} className="w-full mt-2">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Custom Theme
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
+            
+            {/* Add Font Settings Card */}
+            <FontSettings />
+          </div>
         </TabsContent>
 
-        <TabsContent value="invoice-ai" className="space-y-6">
+        <TabsContent value="company" className="space-y-6">
+          <CompanySettingsForm 
+            defaultValues={companyInfo} 
+            onSuccess={() => {
+              getCompanyInfo().then(info => setCompanyInfo(info));
+            }} 
+          />
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Application Name</CardTitle>
+              <CardDescription>Update the name displayed in the browser tab and application title</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Application Title</Label>
+                  <div className="flex w-full items-center gap-2">
+                    <Input
+                      id="companyName"
+                      placeholder="Enter your company name"
+                      value={companyNameInput}
+                      onChange={(e) => setCompanyNameInput(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleSaveCompanyName} size="sm">
+                      <Save className="mr-2 h-4 w-4" /> Save
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Current: <span className="font-medium">{currentCompanyName}</span>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="invoices" className="space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -496,7 +528,9 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="ai" className="space-y-6">
           <Card className="shadow-lg">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -553,7 +587,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="data-security" className="space-y-6">
+        <TabsContent value="data" className="space-y-6">
            <Card className="shadow-lg">
             <CardHeader>
               <div className="flex items-center gap-3">

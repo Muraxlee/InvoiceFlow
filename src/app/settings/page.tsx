@@ -49,8 +49,7 @@ export default function SettingsPage() {
 
   const [currentDbPath, setCurrentDbPath] = useState<string | null>(null);
   const [isDbOperationLoading, setIsDbOperationLoading] = useState(false);
-  // Removed restoreFileRef as restore file selection will be handled by main process dialog
-
+  
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
       prefix: DEFAULT_INVOICE_PREFIX, 
@@ -134,7 +133,7 @@ export default function SettingsPage() {
         const keysToClearFromLocalStorage = [
             COMPANY_NAME_STORAGE_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, INVOICE_CONFIG_KEY, 
             THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
-            CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY // Clear these as well if factory resetting
+            CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY 
         ];
         keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
         
@@ -239,6 +238,7 @@ export default function SettingsPage() {
       [GOOGLE_AI_API_KEY_STORAGE_KEY]: loadFromLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""),
       [INVOICE_CONFIG_KEY]: loadFromLocalStorage(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} }),
       [CUSTOM_THEME_STORAGE_KEY]: loadFromLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES),
+      [LAST_BACKUP_TIMESTAMP_KEY]: loadFromLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null),
       appVersion: "1.0.0" 
     };
     const jsonString = JSON.stringify(settingsData, null, 2);
@@ -264,6 +264,7 @@ export default function SettingsPage() {
         if (importedData[GOOGLE_AI_API_KEY_STORAGE_KEY] !== undefined) { saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]); setGoogleApiKey(importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]!);}
         if (importedData[INVOICE_CONFIG_KEY]) { saveToLocalStorage(INVOICE_CONFIG_KEY, importedData[INVOICE_CONFIG_KEY]); setInvoicePrefix(importedData[INVOICE_CONFIG_KEY]!.prefix);}
         if (importedData[CUSTOM_THEME_STORAGE_KEY]) { saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, importedData[CUSTOM_THEME_STORAGE_KEY]); setCustomThemeValues(importedData[CUSTOM_THEME_STORAGE_KEY]!);}
+        if (importedData[LAST_BACKUP_TIMESTAMP_KEY]) { setLastSettingsBackupTimestamp(importedData[LAST_BACKUP_TIMESTAMP_KEY]!); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, importedData[LAST_BACKUP_TIMESTAMP_KEY]!);}
         toast({ title: "Settings Imported", description: "Application settings imported. Page will reload." });
         setTimeout(() => window.location.reload(), 1000);
       } catch (error) {
@@ -327,7 +328,7 @@ export default function SettingsPage() {
       const backupResult = await window.electronAPI.backupDatabase();
       if (backupResult.success) {
         toast({ title: "Pre-Restore Backup Successful", description: `Current database backed up to ${backupResult.path}. Proceeding with restore.`});
-        await triggerAndExecuteRestore(); // This will open the dialog to select file to restore
+        await triggerAndExecuteRestore(); 
       } else {
         toast({ title: "Pre-Restore Backup Failed", description: "Could not back up current database. Restore cancelled.", variant: "destructive" });
       }
@@ -470,7 +471,7 @@ export default function SettingsPage() {
         
         <TabsContent value="data" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Database Management (SQLite)</CardTitle><CardDescription>Backup or restore your main application database (invoices, customers, products, users, company info).</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Database Management (Electron Database)</CardTitle><CardDescription>Backup or restore your main application database (invoices, customers, products, users, company info).</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
                 <Label>Active Database Path</Label>
@@ -491,10 +492,16 @@ export default function SettingsPage() {
                   }
                   title="Confirm Database Restore"
                   description={
-                    <div className="space-y-3">
-                      <div className="text-destructive font-semibold flex items-center gap-1"><AlertTriangle className="h-4 w-4"/>Restoring will overwrite your current database. This action cannot be undone.</div>
-                      <div>It is <strong className="text-primary">STRONGLY RECOMMENDED</strong> to back up your current database before proceeding.</div>
-                    </div>
+                    <>
+                      <span className="block mb-2 text-destructive font-semibold flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 inline-block mr-1"/>
+                        Restoring will overwrite your current database. This action cannot be undone.
+                      </span>
+                      <br />
+                      <span className="block">
+                        It is <strong className="text-primary">STRONGLY RECOMMENDED</strong> to back up your current database before proceeding.
+                      </span>
+                    </>
                   }
                   confirmText="Backup Now & Select Restore File"
                   onConfirm={handleRestoreWithMandatoryBackup}
@@ -541,3 +548,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

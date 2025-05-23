@@ -3,7 +3,7 @@
 
 import sqlite3 from 'sqlite3';
 import { open, type Database } from 'sqlite';
-import { type InvoiceFormValues } from '@/components/invoice-form'; // Will infer new fields
+import { type InvoiceFormValues } from '@/components/invoice-form';
 import path from 'path';
 import { hash, compare } from 'bcrypt';
 
@@ -12,7 +12,6 @@ export interface StoredInvoice extends InvoiceFormValues {
   id: string;
   status: "Paid" | "Pending" | "Overdue" | "Draft" | "Unpaid" | "Partially Paid";
   amount: number;
-  // shipmentDetails will automatically have the new fields from InvoiceFormValues
 }
 
 export interface User {
@@ -26,17 +25,34 @@ export interface User {
   isSystemAdmin: boolean;
 }
 
+export interface CompanyData {
+  id?: number; // Usually 1 for a single company setup
+  name: string;
+  address: string;
+  phone: string;
+  phone2?: string; // New optional field
+  email: string;
+  gstin?: string;
+  bank_account_name?: string; // New optional field
+  bank_name?: string;
+  bank_account?: string;
+  bank_ifsc?: string;
+}
+
 let db: Database | null = null;
 
 function getDbPath() {
   try {
+    // Attempt to require electron and get its app path
+    // This will only work in an Electron environment
     const electronApp = require('electron').app;
     if (electronApp) {
       return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
     }
   } catch (e) {
-    // In Next.js server context or seed script
+    // If electron.app is not available, we're likely in Next.js server context or seed script
   }
+  // Fallback for Next.js server or seed script: use project root
   return path.join(process.cwd(), 'invoiceflow.db');
 }
 
@@ -52,75 +68,22 @@ export async function initDatabase(): Promise<Database> {
       driver: sqlite3.Database
     });
     
-    // Invoice related tables
     await db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
-        id TEXT PRIMARY KEY,
-        invoiceNumber TEXT UNIQUE,
-        customerId TEXT,
-        customerName TEXT,
-        customerEmail TEXT,
-        customerAddress TEXT,
-        invoiceDate TEXT,
-        dueDate TEXT,
-        notes TEXT,
-        termsAndConditions TEXT,
-        -- invoiceImage TEXT, -- Removed
-        status TEXT,
-        amount REAL,
-        paymentStatus TEXT,
-        paymentMethod TEXT
+        id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
       );
-      
       CREATE TABLE IF NOT EXISTS invoice_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        invoiceId TEXT,
-        productId TEXT,
-        description TEXT,
-        quantity REAL,
-        price REAL,
-        gstCategory TEXT,
-        gstType TEXT,
-        gstRate REAL,
-        FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
-      
       CREATE TABLE IF NOT EXISTS shipment_details (
-        invoiceId TEXT PRIMARY KEY,
-        shipDate TEXT,
-        trackingNumber TEXT,
-        carrierName TEXT,
-        -- OLD: shippingAddress TEXT, -- This will be consigneeAddress
-        consigneeName TEXT,
-        consigneeAddress TEXT,
-        consigneeGstin TEXT,
-        consigneeStateCode TEXT,
-        transportationMode TEXT,
-        lrNo TEXT,
-        vehicleNo TEXT,
-        dateOfSupply TEXT,
-        placeOfSupply TEXT,
-        FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+        invoiceId TEXT PRIMARY KEY, shipDate TEXT, trackingNumber TEXT, carrierName TEXT, consigneeName TEXT, consigneeAddress TEXT, consigneeGstin TEXT, consigneeStateCode TEXT, transportationMode TEXT, lrNo TEXT, vehicleNo TEXT, dateOfSupply TEXT, placeOfSupply TEXT, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
-      -- TODO: If shipment_details table exists, you might need to ALTER it:
-      -- ALTER TABLE shipment_details ADD COLUMN consigneeName TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN consigneeAddress TEXT; (rename shippingAddress or add new)
-      -- ALTER TABLE shipment_details ADD COLUMN consigneeGstin TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN consigneeStateCode TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN transportationMode TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN lrNo TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN vehicleNo TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN dateOfSupply TEXT;
-      -- ALTER TABLE shipment_details ADD COLUMN placeOfSupply TEXT;
-      -- Also consider renaming existing shippingAddress to consigneeAddress if that's the intent.
-    `);
-    
-    // Company, Customers, Products, Users tables (schemas assumed to be fine for now, 
-    // except product schema needs to match form for GST rates if they differ)
-    await db.exec(`
       CREATE TABLE IF NOT EXISTS company (
-        id INTEGER PRIMARY KEY, name TEXT NOT NULL, address TEXT, phone TEXT, email TEXT, gstin TEXT, bank_name TEXT, bank_account TEXT, bank_ifsc TEXT
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL, address TEXT, phone TEXT, phone2 TEXT, email TEXT, gstin TEXT, bank_account_name TEXT, bank_name TEXT, bank_account TEXT, bank_ifsc TEXT
       );
+      -- If company table exists and needs updating:
+      -- ALTER TABLE company ADD COLUMN phone2 TEXT;
+      -- ALTER TABLE company ADD COLUMN bank_account_name TEXT;
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
@@ -158,7 +121,6 @@ export async function closeDatabase() {
   }
 }
 
-// User management functions (no changes needed for this request)
 export async function getAllUsers(): Promise<Omit<User, 'password'>[]> {
   const currentDb = await initDatabase();
   const usersData = await currentDb.all('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users ORDER BY username');
@@ -232,7 +194,6 @@ export async function validateUserCredentials(username: string, passwordAttempt:
   return userWithoutPassword;
 }
 
-// Invoice functions - updated
 export async function getAllInvoices(): Promise<StoredInvoice[]> {
   const currentDb = await initDatabase();
   const invoices = await currentDb.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
@@ -270,7 +231,7 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
         vehicleNo: shipment.vehicleNo || "",
         dateOfSupply: shipment.dateOfSupply ? new Date(shipment.dateOfSupply) : null,
         placeOfSupply: shipment.placeOfSupply || ""
-      } : undefined // Keep it undefined if no record, form has defaults
+      } : undefined 
     });
   }
   return result;
@@ -360,7 +321,7 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
       vehicleNo: shipmentData.vehicleNo || "",
       dateOfSupply: shipmentData.dateOfSupply ? new Date(shipmentData.dateOfSupply) : null,
       placeOfSupply: shipmentData.placeOfSupply || ""
-    } : undefined // Keep undefined if no record, form defaults
+    } : undefined 
   };
 }
 
@@ -380,19 +341,30 @@ export async function deleteInvoice(id: string): Promise<boolean> {
   }
 }
 
-// Company, Customer, Product functions (no changes needed for this request beyond DB schema update for product GST if necessary)
-export async function saveCompanyInfo(company: any): Promise<boolean> {
+export async function saveCompanyInfo(company: CompanyData): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
-    await currentDb.run('INSERT OR REPLACE INTO company (id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [company.name, company.address, company.phone, company.email, company.gstin, company.bank_name, company.bank_account, company.bank_ifsc]
-    ); return true;
-  } catch (error) { console.error('Error saving company info:', error); return false; }
+    await currentDb.run(`
+      INSERT OR REPLACE INTO company (id, name, address, phone, phone2, email, gstin, bank_account_name, bank_name, bank_account, bank_ifsc) 
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [company.name, company.address, company.phone, company.phone2 || null, company.email, company.gstin || null, company.bank_account_name || null, company.bank_name || null, company.bank_account || null, company.bank_ifsc || null]
+    ); 
+    return true;
+  } catch (error) { 
+    console.error('Error saving company info:', error); 
+    return false; 
+  }
 }
-export async function getCompanyInfo() {
+export async function getCompanyInfo(): Promise<CompanyData | null> {
   const currentDb = await initDatabase();
-  try { return await currentDb.get('SELECT * FROM company WHERE id = 1'); }
-  catch (error) { console.error('Error getting company info:', error); return null; }
+  try { 
+    const company = await currentDb.get('SELECT * FROM company WHERE id = 1');
+    return company || null;
+  }
+  catch (error) { 
+    console.error('Error getting company info:', error); 
+    return null; 
+  }
 }
 export async function addCustomer(customer: any): Promise<boolean> {
   const currentDb = await initDatabase();
@@ -459,5 +431,3 @@ export async function clearAllData(): Promise<boolean> {
 }
 
 export { getDbPath };
-
-    

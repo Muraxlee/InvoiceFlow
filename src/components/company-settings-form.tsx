@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -24,9 +25,11 @@ import { saveCompanyInfo } from '@/lib/database-wrapper';
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
   address: z.string().min(1, 'Company address is required'),
-  phone: z.string().min(1, 'Phone number is required'),
+  phone: z.string().min(1, 'Primary phone number is required'),
+  phone2: z.string().optional(),
   email: z.string().email('Invalid email address'),
   gstin: z.string().optional(),
+  bank_account_name: z.string().optional(),
   bank_name: z.string().optional(),
   bank_account: z.string().optional(),
   bank_ifsc: z.string().optional(),
@@ -34,8 +37,12 @@ const companySchema = z.object({
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
+export interface CompanyInfo extends CompanyFormValues {
+  // Potentially add id if it's ever used, though for company it's usually a single record
+}
+
 interface CompanySettingsFormProps {
-  defaultValues?: Partial<CompanyFormValues>;
+  defaultValues?: Partial<CompanyInfo>;
   onSuccess?: () => void;
 }
 
@@ -49,8 +56,10 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
       name: defaultValues?.name || '',
       address: defaultValues?.address || '',
       phone: defaultValues?.phone || '',
+      phone2: defaultValues?.phone2 || '',
       email: defaultValues?.email || '',
       gstin: defaultValues?.gstin || '',
+      bank_account_name: defaultValues?.bank_account_name || '',
       bank_name: defaultValues?.bank_name || '',
       bank_account: defaultValues?.bank_account || '',
       bank_ifsc: defaultValues?.bank_ifsc || '',
@@ -61,7 +70,7 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
     setIsLoading(true);
     
     try {
-      const success = await saveCompanyInfo(data);
+      const success = await saveCompanyInfo(data); // Pass the whole data object
       
       if (success) {
         toast({
@@ -132,7 +141,7 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
+                    <FormLabel>Primary Phone Number</FormLabel>
                     <FormControl>
                       <Input placeholder="+91 1234567890" {...field} />
                     </FormControl>
@@ -140,12 +149,24 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
                   </FormItem>
                 )}
               />
-
               <FormField
+                control={form.control}
+                name="phone2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Secondary Phone Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+91 0987654321" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
                 control={form.control}
                 name="gstin"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-2">
                     <FormLabel>GST Number (GSTIN)</FormLabel>
                     <FormControl>
                       <Input placeholder="22AAAAA0000A1Z5" {...field} />
@@ -177,26 +198,25 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
             <div className="border-t pt-6">
               <h3 className="text-lg font-medium mb-4">Banking Details</h3>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <FormField
+                 <FormField
                   control={form.control}
-                  name="bank_name"
+                  name="bank_account_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bank Name</FormLabel>
+                      <FormLabel>Account Holder Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="HDFC Bank" {...field} />
+                        <Input placeholder="e.g., Your Company Name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="bank_account"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Account Number</FormLabel>
+                      <FormLabel>Bank A/C No</FormLabel>
                       <FormControl>
                         <Input placeholder="1234567890" {...field} />
                       </FormControl>
@@ -204,20 +224,29 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
                     </FormItem>
                   )}
                 />
-
+                <FormField
+                  control={form.control}
+                  name="bank_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., HDFC Bank" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="bank_ifsc"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>IFSC Code</FormLabel>
+                      <FormLabel>Bank IFSC</FormLabel>
                       <FormControl>
-                        <Input placeholder="HDFC0001234" {...field} />
+                        <Input placeholder="e.g., HDFC0001234" {...field} />
                       </FormControl>
                       <FormMessage />
-                      <FormDescription>
-                        The bank's IFSC code for transfers
-                      </FormDescription>
                     </FormItem>
                   )}
                 />
@@ -227,7 +256,7 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
             <div className="flex justify-end gap-2">
               <Button 
                 type="submit" 
-                disabled={isLoading}
+                disabled={isLoading || !form.formState.isDirty}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
@@ -238,4 +267,4 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
       </CardContent>
     </Card>
   );
-} 
+}

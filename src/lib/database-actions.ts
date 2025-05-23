@@ -1,18 +1,18 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { InvoiceFormValues } from '@/components/invoice-form';
-import { getAllInvoices as dbGetAllInvoices, 
-         getInvoiceById as dbGetInvoiceById,
-         saveInvoice as dbSaveInvoice, 
-         deleteInvoice as dbDeleteInvoice,
-         getCompanyInfo as dbGetCompanyInfo,
-         saveCompanyInfo as dbSaveCompanyInfo,
-         type StoredInvoice } from './database';
-
-// Note: These server actions will use the direct database access since
-// they run on the server. Electron integration happens at the client-side
-// component level.
+import { 
+  getAllInvoices as dbGetAllInvoices, 
+  getInvoiceById as dbGetInvoiceById,
+  saveInvoice as dbSaveInvoice, 
+  deleteInvoice as dbDeleteInvoice,
+  getCompanyInfo as dbGetCompanyInfo,
+  saveCompanyInfo as dbSaveCompanyInfo,
+  type StoredInvoice,
+  type CompanyData
+} from './database';
 
 export async function getAllInvoices(): Promise<StoredInvoice[]> {
   try {
@@ -59,7 +59,7 @@ export async function deleteInvoice(id: string): Promise<boolean> {
   }
 }
 
-export async function getCompanyInfo() {
+export async function getCompanyInfo(): Promise<CompanyData | null> {
   try {
     return await dbGetCompanyInfo();
   } catch (error) {
@@ -68,24 +68,15 @@ export async function getCompanyInfo() {
   }
 }
 
-export async function saveCompanyInfo(company: {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  gstin: string;
-  bank_name: string;
-  bank_account: string;
-  bank_ifsc: string;
-}): Promise<boolean> {
+export async function saveCompanyInfo(company: CompanyData): Promise<boolean> {
   try {
     const result = await dbSaveCompanyInfo(company);
     if (result) {
-      revalidatePath('/settings');
+      revalidatePath('/settings'); // Revalidate settings page after company info update
     }
     return result;
   } catch (error) {
     console.error('Error in saveCompanyInfo action:', error);
     return false;
   }
-} 
+}

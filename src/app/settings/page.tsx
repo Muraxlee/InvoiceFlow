@@ -19,9 +19,14 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
-import { CompanySettingsForm } from "@/components/company-settings-form";
-import { getCompanyInfo as getDbCompanyInfo, saveCompanyInfo as saveDbCompanyInfo } from "@/lib/database-wrapper"; 
-import UserManagementSettings from "./user-management-settings"; // Import the new component
+import { CompanySettingsForm, type CompanyInfo } from "@/components/company-settings-form"; // Updated import
+import { getCompanyInfo as getDbCompanyInfo } from "@/lib/database-wrapper"; 
+import UserManagementSettings from "./user-management-settings";
+
+const initialCompanyInfo: CompanyInfo = {
+  name: '', address: '', phone: '', phone2: '', email: '', gstin: '',
+  bank_account_name: '', bank_name: '', bank_account: '', bank_ifsc: ''
+};
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -33,7 +38,7 @@ export default function SettingsPage() {
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); 
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); 
   const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState(""); 
-  const [companyInfo, setCompanyInfo] = useState<any>(null);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null); // Updated type
 
 
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
@@ -44,7 +49,6 @@ export default function SettingsPage() {
 
   const [currentDbPath, setCurrentDbPath] = useState<string | null>(null);
   const [isDbOperationLoading, setIsDbOperationLoading] = useState(false);
-  // const [isRestoreConfirmationOpen, setIsRestoreConfirmationOpen] = useState(false); // No longer directly managed here
   const restoreFileRef = useRef<HTMLInputElement>(null);
 
 
@@ -81,10 +85,10 @@ export default function SettingsPage() {
     const loadCompanyInfoFromDb = async () => {
       try {
         const info = await getDbCompanyInfo();
-        setCompanyInfo(info || { name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
+        setCompanyInfo(info || initialCompanyInfo); // Use initialCompanyInfo if info is null
       } catch (error) {
         console.error('Failed to load company info from DB:', error);
-        setCompanyInfo({ name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
+        setCompanyInfo(initialCompanyInfo);
       }
     };
     loadCompanyInfoFromDb();
@@ -118,7 +122,7 @@ export default function SettingsPage() {
                 await window.electronAPI.clearAllProducts(); success = true;
             } else if (dataType === 'allData' && window.electronAPI.clearAllData) { 
                 await window.electronAPI.clearAllData(); success = true; 
-                setCompanyInfo({ name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
+                setCompanyInfo(initialCompanyInfo);
             }
         } catch (error) {
             console.error(`Error clearing DB for ${dataType}:`, error);
@@ -200,22 +204,22 @@ export default function SettingsPage() {
   const handleThemeChange = useCallback((themeKey: string) => {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
-      Object.keys(AVAILABLE_THEMES).forEach(key => htmlElement.removeAttribute(`data-theme-${key}`));
-      htmlElement.setAttribute('data-theme', themeKey);
+      Object.keys(AVAILABLE_THEMES).forEach(key => htmlElement.removeAttribute(`data-theme-${key}`)); // This line seems incorrect for data-theme strategy
+      htmlElement.setAttribute('data-theme', themeKey); // This is the correct way
       localStorage.setItem(THEME_STORAGE_KEY, themeKey); setSelectedThemeKey(themeKey);
       if (themeKey === 'custom') {
           const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
           const root = document.documentElement;
-          if (storedCustomTheme.background) root.style.setProperty('--background', storedCustomTheme.background);
-          if (storedCustomTheme.foreground) root.style.setProperty('--foreground', storedCustomTheme.foreground);
-          if (storedCustomTheme.primary) root.style.setProperty('--primary', storedCustomTheme.primary);
+          if (storedCustomTheme.background) root.style.setProperty('--background', storedCustomTheme.background); else root.style.removeProperty('--background');
+          if (storedCustomTheme.foreground) root.style.setProperty('--foreground', storedCustomTheme.foreground); else root.style.removeProperty('--foreground');
+          if (storedCustomTheme.primary) root.style.setProperty('--primary', storedCustomTheme.primary); else root.style.removeProperty('--primary');
       } else { 
           const root = document.documentElement;
           root.style.removeProperty('--background'); root.style.removeProperty('--foreground'); root.style.removeProperty('--primary');
       }
       toast({ title: "Theme Updated", description: `Theme changed to ${AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]}.`});
     }
-  }, [toast]); // Removed customThemeValues from dependencies as it's not directly used
+  }, [toast]); 
 
   const handleSaveCustomTheme = () => {
     saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, customThemeValues); setOriginalCustomThemeValues(customThemeValues);
@@ -315,21 +319,20 @@ export default function SettingsPage() {
     } finally {
         setIsDbOperationLoading(false);
         if (restoreFileRef.current) restoreFileRef.current.value = ""; 
-        // setIsRestoreConfirmationOpen(false); // No longer needed here
     }
   };
 
   const triggerRestoreFilePicker = () => {
-    if (!window.electronAPI?.backupDatabase) {
-      toast({ title: "Backup Feature Not Available", description: "Cannot proceed with restore.", variant: "warning" });
+    if (!window.electronAPI?.backupDatabase) { // Check if backupDatabase exists before proceeding
+      toast({ title: "Backup Feature Not Available", description: "Cannot proceed with restore if backup feature is not available.", variant: "warning" });
       return;
     }
     setIsDbOperationLoading(true);
-    window.electronAPI.backupDatabase()
+    window.electronAPI.backupDatabase() // Call backup first
       .then(backupResult => {
         if (backupResult.success) {
           toast({ title: "Pre-Restore Backup Successful", description: `Current database backed up to ${backupResult.path}. You can now select a file to restore.`});
-          restoreFileRef.current?.click(); 
+          restoreFileRef.current?.click(); // Only open file picker after successful backup
         } else {
           toast({ title: "Pre-Restore Backup Failed", description: "Could not back up current database. Restore cancelled.", variant: "destructive" });
         }
@@ -362,10 +365,10 @@ export default function SettingsPage() {
         
         <TabsContent value="company" className="space-y-6">
          <CompanySettingsForm 
-            defaultValues={companyInfo} 
+            defaultValues={companyInfo || initialCompanyInfo} 
             onSuccess={async () => {
               const info = await getDbCompanyInfo();
-              setCompanyInfo(info);
+              setCompanyInfo(info || initialCompanyInfo); // Fallback to initial if null
               if (info?.name) {
                   saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, info.name);
                   setCurrentCompanyName(info.name); setCompanyNameInput(info.name);
@@ -381,7 +384,7 @@ export default function SettingsPage() {
                 <Label htmlFor="appTitle">Application Title</Label>
                 <div className="flex w-full max-w-md items-center gap-2">
                   <Input id="appTitle" placeholder="Enter application title" value={companyNameInput} onChange={(e) => setCompanyNameInput(e.target.value)} className="flex-1"/>
-                  <Button onClick={handleSaveAppTitle} size="sm" disabled={companyNameInput === currentCompanyName}><Save className="mr-2 h-4 w-4" /> Save</Button>
+                  <Button onClick={handleSaveAppTitle} size="sm" disabled={companyNameInput === currentCompanyName || !companyNameInput.trim()}><Save className="mr-2 h-4 w-4" /> Save</Button>
                 </div>
                 <p className="text-sm text-muted-foreground">Current: <span className="font-medium">{currentCompanyName}</span></p>
               </div>
@@ -499,7 +502,6 @@ export default function SettingsPage() {
                   cancelText="Cancel"
                 />
                 <input type="file" ref={restoreFileRef} accept=".db,.sqlite,.sqlite3" onChange={handleRestoreDatabaseFileSelected} style={{ display: 'none' }} />
-
               </div>
               <p className="text-xs text-muted-foreground">Restoring a database requires an application restart to apply changes reliably.</p>
             </CardContent>

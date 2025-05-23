@@ -32,14 +32,16 @@ async function seedDatabase() {
     // 1. Seed Company Information
     console.log('Seeding company information...');
     await db.run(`
-      INSERT INTO company (id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc)
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO company (id, name, address, phone, phone2, email, gstin, bank_account_name, bank_name, bank_account, bank_ifsc)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       'Innovatech Solutions Ltd.',
       '123 Tech Park, Silicon Alley, Mumbai, Maharashtra 400001',
       '+91 22 5555 0101',
+      '+91 22 5555 0102', // Secondary phone
       'contact@innovatech.co.in',
       '27AAPCI1234A1Z5',
+      'Innovatech Solutions Ltd.', // Account Holder Name
       'Global Commercial Bank',
       '001234567890123',
       'GCBL0000123'
@@ -68,8 +70,8 @@ async function seedDatabase() {
     ];
     for (const prod of products) {
       // For products, gstType would usually be based on rules, but for seeding, we assume IGST rates are primary
-      await db.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-        [prod.id, prod.name, prod.description, prod.price, prod.imageUrl, prod.gstCategory, prod.igstRate]
+      await db.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+        [prod.id, prod.name, prod.description, prod.price, prod.imageUrl, prod.gstCategory, prod.igstRate, prod.cgstRate, prod.sgstRate, prod.igstRate] // Using igstRate as the main gstRate for simplicity
       );
     }
     console.log(`${products.length} products seeded.`);
@@ -85,7 +87,12 @@ async function seedDatabase() {
         items: [
           { productId: 'PROD004', quantity: 1, price: 150000.00, description: 'Consulting Services - AI Implementation', gstCategory: 'SAC 998314', igstRate: 18 },
         ],
-        shipmentDetails: { shipDate: new Date(2024, 4, 2).toISOString(), trackingNumber: 'AWB7362876', carrierName: 'ProShip Logistics', shippingAddress: '789 Industrial Estate, Bangalore, Karnataka 560001' }
+        shipmentDetails: { 
+          shipDate: new Date(2024, 4, 2).toISOString(), trackingNumber: 'AWB7362876', carrierName: 'ProShip Logistics', 
+          consigneeName: 'Alpha Dynamics Receiving', consigneeAddress: '789 Industrial Estate, Receiving Dock, Bangalore, Karnataka 560001',
+          consigneeGstin: '29AAPCA1234B1Z0', consigneeStateCode: '29 - Karnataka', transportationMode: 'Road',
+          lrNo: 'LR7890', vehicleNo: 'KA01AB1234', dateOfSupply: new Date(2024, 4, 1).toISOString(), placeOfSupply: 'Bangalore'
+        }
       },
       { 
         id: 'INV202405150001', invoiceNumber: 'INV202405150001', customerId: 'CUST002', customerName: 'Beta Logistics Co.', customerEmail: 'info@betalogistics.com', customerAddress: '456 Supply Chain Rd, Chennai, Tamil Nadu 600002', 
@@ -96,7 +103,11 @@ async function seedDatabase() {
           { productId: 'PROD001', quantity: 2, price: 75000.00, description: 'Quantum AI Processor', gstCategory: 'HSN 8471', igstRate: 18 },
           { productId: 'PROD003', quantity: 1, price: 45000.00, description: 'Cybersecurity Suite - Enterprise', gstCategory: 'HSN 8523', igstRate: 12 },
         ],
-        shipmentDetails: null
+        shipmentDetails: {
+          consigneeName: 'Beta Logistics Warehouse', consigneeAddress: '456 Supply Chain Rd, Goods Inward, Chennai, Tamil Nadu 600002',
+          consigneeGstin: '33AABCB2345C1Z1', consigneeStateCode: '33 - Tamil Nadu', transportationMode: 'Sea',
+          lrNo: 'BLCH001', vehicleNo: 'VESSEL002', dateOfSupply: new Date(2024, 4, 18).toISOString(), placeOfSupply: 'Chennai Port'
+        }
       },
       { 
         id: 'INV202404200001', invoiceNumber: 'INV202404200001', customerId: 'CUST003', customerName: 'Gamma Retail Inc.', customerEmail: 'orders@gammaretail.in', customerAddress: '101 Market Street, New Delhi, Delhi 110001', 
@@ -106,7 +117,7 @@ async function seedDatabase() {
         items: [
           { productId: 'PROD002', quantity: 5, price: 5000.00, description: 'Cloud Data Storage - 1TB Plan (5 units)', gstCategory: 'SAC 9983', igstRate: 18 },
         ],
-        shipmentDetails: null
+        shipmentDetails: null // No shipment for this service invoice
       },
     ];
 
@@ -135,14 +146,22 @@ async function seedDatabase() {
 
       if (inv.shipmentDetails) {
         await db.run(`
-            INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, consigneeName, consigneeAddress, consigneeGstin, consigneeStateCode, transportationMode, lrNo, vehicleNo, dateOfSupply, placeOfSupply)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             inv.id,
             inv.shipmentDetails.shipDate,
             inv.shipmentDetails.trackingNumber,
             inv.shipmentDetails.carrierName,
-            inv.shipmentDetails.shippingAddress
+            inv.shipmentDetails.consigneeName,
+            inv.shipmentDetails.consigneeAddress,
+            inv.shipmentDetails.consigneeGstin,
+            inv.shipmentDetails.consigneeStateCode,
+            inv.shipmentDetails.transportationMode,
+            inv.shipmentDetails.lrNo,
+            inv.shipmentDetails.vehicleNo,
+            inv.shipmentDetails.dateOfSupply,
+            inv.shipmentDetails.placeOfSupply
         ]);
       }
     }
@@ -163,107 +182,46 @@ async function seedDatabase() {
 // Initialize database schema (from database.ts logic, simplified)
 async function ensureSchema() {
   console.log(`Ensuring schema for database at: ${dbPath}`);
-  const db = await open({
+  const dbHandle = await open({
     filename: dbPath,
     driver: sqlite3.Database
   });
   
-  await db.exec(`
+  await dbHandle.exec(`
     CREATE TABLE IF NOT EXISTS invoices (
-      id TEXT PRIMARY KEY,
-      invoiceNumber TEXT UNIQUE,
-      customerId TEXT,
-      customerName TEXT,
-      customerEmail TEXT,
-      customerAddress TEXT,
-      invoiceDate TEXT,
-      dueDate TEXT,
-      notes TEXT,
-      termsAndConditions TEXT,
-      invoiceImage TEXT,
-      status TEXT,
-      amount REAL,
-      paymentStatus TEXT,
-      paymentMethod TEXT
+      id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
     );
-    
     CREATE TABLE IF NOT EXISTS invoice_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      invoiceId TEXT,
-      productId TEXT,
-      description TEXT,
-      quantity REAL,
-      price REAL,
-      gstCategory TEXT,
-      gstType TEXT, 
-      gstRate REAL,
-      FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+      id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
     );
-    
     CREATE TABLE IF NOT EXISTS shipment_details (
-      invoiceId TEXT PRIMARY KEY,
-      shipDate TEXT,
-      trackingNumber TEXT,
-      carrierName TEXT,
-      shippingAddress TEXT,
-      FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+      invoiceId TEXT PRIMARY KEY, shipDate TEXT, trackingNumber TEXT, carrierName TEXT, consigneeName TEXT, consigneeAddress TEXT, consigneeGstin TEXT, consigneeStateCode TEXT, transportationMode TEXT, lrNo TEXT, vehicleNo TEXT, dateOfSupply TEXT, placeOfSupply TEXT, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
     );
-    
     CREATE TABLE IF NOT EXISTS company (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      address TEXT,
-      phone TEXT,
-      email TEXT,
-      gstin TEXT,
-      bank_name TEXT,
-      bank_account TEXT,
-      bank_ifsc TEXT
+      id INTEGER PRIMARY KEY, name TEXT NOT NULL, address TEXT, phone TEXT, phone2 TEXT, email TEXT, gstin TEXT, bank_account_name TEXT, bank_name TEXT, bank_account TEXT, bank_ifsc TEXT
     );
-    
     CREATE TABLE IF NOT EXISTS customers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT,
-      phone TEXT,
-      address TEXT
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
     );
-    
     CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      price REAL,
-      imageUrl TEXT,
-      gstCategory TEXT,
-      gstRate REAL, 
-      gstType TEXT 
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL
     );
-    
     CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT NOT NULL,
-      name TEXT,
-      email TEXT,
-      isActive INTEGER DEFAULT 1,
-      isSystemAdmin INTEGER DEFAULT 0
+      id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL, name TEXT, email TEXT, isActive INTEGER DEFAULT 1, isSystemAdmin INTEGER DEFAULT 0
     );
   `);
 
-  // Check if admin user exists, create if not
-  const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
+  const adminExists = await dbHandle.get('SELECT * FROM users WHERE username = ?', ['admin']);
   if (!adminExists) {
-    const hashedPassword = await hash('admin123', 10); // Use a secure password hashing method
-    await db.run(
+    const hashedPassword = await hash('admin123', 10); 
+    await dbHandle.run(
       'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      ['admin', 'admin', hashedPassword, 'admin', 'System Administrator', 'admin@invoiceflow.com', 1, 1]
+      [`user_admin_${Date.now()}`, 'admin', hashedPassword, 'admin', 'System Administrator', 'admin@invoiceflow.com', 1, 1]
     );
     console.log('Default admin user created by seed script.');
   }
   
-  await db.close();
+  await dbHandle.close();
   console.log('Schema ensured.');
 }
 

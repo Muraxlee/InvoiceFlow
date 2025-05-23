@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
     // This is the Turbopack-friendly way to handle packages
     // that should not be bundled for server-side environments
     // (Server Components, Route Handlers, Server Actions).
-    serverComponentsExternalPackages: ['sqlite3', 'better-sqlite3'],
+    serverComponentsExternalPackages: ['sqlite3', 'better-sqlite3', 'bcrypt'],
   },
 };
 

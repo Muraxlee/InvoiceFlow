@@ -16,12 +16,12 @@ import {
   Package,
   BarChart3,
   Settings as SettingsIcon,
-  Users as UsersIcon,
+  // Users as UsersIcon, // No longer needed here for sub-item
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type NavItem = {
   href: string;
@@ -29,7 +29,7 @@ type NavItem = {
   icon: LucideIcon;
   tooltip: string;
   adminOnly?: boolean;
-  subItems?: NavItem[];
+  subItems?: NavItem[]; // Optional sub-items
 };
 
 const businessManagementNavItems: NavItem[] = [
@@ -44,36 +44,51 @@ const businessManagementNavItems: NavItem[] = [
     icon: SettingsIcon,
     tooltip: 'Application Settings',
     adminOnly: true,
-    subItems: [
-      { href: '/settings/users', label: 'User Management', icon: UsersIcon, tooltip: 'Manage Users', adminOnly: true },
-    ]
+    // subItems: [ // Removed User Management sub-item
+    //   { href: '/settings/users', label: 'User Management', icon: UsersIcon, tooltip: 'Manage Users', adminOnly: true },
+    // ]
   },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
-  const userRole = 'admin'; // Placeholder
+  // Placeholder for user role logic
+  // const userRole = useAuth().user?.role || 'user'; // Example: Assuming useAuth hook
 
   const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(() => {
+    // Determine if any accordion item should be open by default
     const activeParent = businessManagementNavItems.find(item =>
       item.subItems?.some(subItem => pathname.startsWith(subItem.href))
     );
     return activeParent?.href;
   });
 
+  useEffect(() => {
+    // Update open accordion item if path changes and belongs to a different parent
+    const activeParent = businessManagementNavItems.find(item =>
+      item.subItems?.some(subItem => pathname.startsWith(subItem.href))
+    );
+    if (activeParent && openAccordionItem !== activeParent.href) {
+      setOpenAccordionItem(activeParent.href);
+    } else if (!activeParent && openAccordionItem) {
+      // If no parent is active, close any open accordion
+      // setOpenAccordionItem(undefined); // Decide if this behavior is desired
+    }
+  }, [pathname, openAccordionItem]);
+
+
   const renderNavItem = (item: NavItem, isSubItem = false) => {
-    // For regular items or sub-items, isActive is a direct match or if it's the dashboard route at root.
-    // For a parent item like "Settings", it's active if the current path starts with its href.
     const isActive = isSubItem 
       ? pathname === item.href
-      : (pathname === item.href || (item.href === "/dashboard" && pathname === "/") || (item.subItems && pathname.startsWith(item.href)));
+      : (pathname === item.href || (item.href === "/dashboard" && pathname === "/"));
+      // For parent items like Settings, we don't need to check startsWith anymore if it has no subItems
 
     const buttonClass = cn(
       "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",
-      isActive && !isSubItem && "bg-sidebar-primary text-sidebar-primary-foreground font-medium", // Parent active style
-      isActive && isSubItem && "bg-sidebar-accent text-sidebar-accent-foreground font-medium", // Sub-item active style
+      isActive && !isSubItem && "bg-sidebar-primary text-sidebar-primary-foreground font-medium",
+      isActive && isSubItem && "bg-sidebar-accent text-sidebar-accent-foreground font-medium",
       !isActive && "font-normal",
-      isSubItem && "pl-8 text-sm h-9 group-[[data-state=collapsed]]:hidden"
+      isSubItem && "pl-8 text-sm h-9 group-[[data-state=collapsed]]:hidden" // Adjusted for sub-items
     );
 
     return (
@@ -85,7 +100,7 @@ export function AppNav() {
             aria-label={item.tooltip}
             className={buttonClass}
           >
-            {isActive && !isSubItem && ( // Active indicator for parent items
+            {isActive && !isSubItem && (
               <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-sm group-[[data-state=collapsed]]:hidden"></span>
             )}
             <item.icon className={cn("h-5 w-5 shrink-0", isActive ? (isSubItem ? "text-sidebar-accent-foreground":"text-sidebar-primary-foreground") : "text-sidebar-foreground/70", isSubItem && "h-4 w-4")} />
@@ -106,26 +121,27 @@ export function AppNav() {
         className="w-full group-[[data-state=collapsed]]:hidden"
       >
         {businessManagementNavItems.map(item => {
+          // If item has subItems and sidebar is expanded, render as AccordionItem
           if (item.subItems && item.subItems.length > 0) {
-            const isParentSettingsActive = pathname.startsWith(item.href);
+             const isParentActive = item.subItems.some(subItem => pathname.startsWith(subItem.href));
             return (
               <AccordionItem value={item.href} key={item.href} className="border-none">
+                 {/* Main item part of the AccordionTrigger, acts as link if href is main settings page */}
                 <SidebarMenuItem className="relative mb-0">
-                  <AccordionTrigger
+                   <AccordionTrigger
                     className={cn(
                       "flex items-center justify-between w-full text-left", 
                       "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center hover:no-underline",
-                      isParentSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
+                      isParentActive && !pathname.startsWith(item.href + "/") && "bg-sidebar-primary text-sidebar-primary-foreground font-medium" // Style if parent itself active
                     )}
                   >
-                    <Link href={item.href} legacyBehavior passHref>
-                      <a className="flex items-center flex-grow mr-2"> {/* Link wraps icon and label */}
-                        {isParentSettingsActive && (
+                    {/* The Link component now wraps the icon and label for direct navigation */}
+                    <Link href={item.href} className="flex items-center flex-grow mr-2">
+                       {isParentActive && !pathname.startsWith(item.href + "/") && ( // Active indicator for parent link
                            <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-sm group-[[data-state=collapsed]]:hidden"></span>
                         )}
-                        <item.icon className={cn("h-5 w-5 shrink-0", isParentSettingsActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70")} />
-                        <span className="group-[[data-state=collapsed]]:hidden ml-2">{item.label}</span>
-                      </a>
+                      <item.icon className={cn("h-5 w-5 shrink-0", isParentActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70")} />
+                      <span className="group-[[data-state=collapsed]]:hidden ml-2">{item.label}</span>
                     </Link>
                     {/* Chevron is automatically added by AccordionTrigger */}
                   </AccordionTrigger>
@@ -138,6 +154,7 @@ export function AppNav() {
               </AccordionItem>
             );
           }
+          // If item has no subItems, render as a direct link
           return renderNavItem(item);
         })}
       </Accordion>

@@ -20,7 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
-import { getCompanyInfo as getDbCompanyInfo, saveCompanyInfo as saveDbCompanyInfo } from "@/lib/database-wrapper"; // Using wrapper
+import { getCompanyInfo as getDbCompanyInfo, saveCompanyInfo as saveDbCompanyInfo } from "@/lib/database-wrapper"; 
+import UserManagementSettings from "./user-management-settings"; // Import the new component
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -38,14 +39,12 @@ export default function SettingsPage() {
   const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   
-  // For localStorage settings backup
   const [lastSettingsBackupTimestamp, setLastSettingsBackupTimestamp] = useState<number | null>(null);
   const importSettingsFileRef = useRef<HTMLInputElement>(null);
 
-  // For Electron DB Backup/Restore
   const [currentDbPath, setCurrentDbPath] = useState<string | null>(null);
   const [isDbOperationLoading, setIsDbOperationLoading] = useState(false);
-  const [isRestoreConfirmationOpen, setIsRestoreConfirmationOpen] = useState(false);
+  // const [isRestoreConfirmationOpen, setIsRestoreConfirmationOpen] = useState(false); // No longer directly managed here
   const restoreFileRef = useRef<HTMLInputElement>(null);
 
 
@@ -75,12 +74,11 @@ export default function SettingsPage() {
     const storedBackupTimestamp = loadFromLocalStorage<number | null>(LAST_BACKUP_TIMESTAMP_KEY, null);
     setLastSettingsBackupTimestamp(storedBackupTimestamp);
     
-    if (typeof window !== 'undefined') { // Ensure this only runs client-side
+    if (typeof window !== 'undefined') { 
         setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
     }
 
     const loadCompanyInfoFromDb = async () => {
-      // database-wrapper handles Electron vs API
       try {
         const info = await getDbCompanyInfo();
         setCompanyInfo(info || { name: '', address: '', phone: '', email: '', gstin: '', bank_name: '', bank_account: '', bank_ifsc: '' });
@@ -202,7 +200,7 @@ export default function SettingsPage() {
   const handleThemeChange = useCallback((themeKey: string) => {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
-      Object.keys(AVAILABLE_THEMES).forEach(key => htmlElement.removeAttribute(`data-theme-${key}`)); // Should be removeAttribute('data-theme')
+      Object.keys(AVAILABLE_THEMES).forEach(key => htmlElement.removeAttribute(`data-theme-${key}`));
       htmlElement.setAttribute('data-theme', themeKey);
       localStorage.setItem(THEME_STORAGE_KEY, themeKey); setSelectedThemeKey(themeKey);
       if (themeKey === 'custom') {
@@ -217,7 +215,7 @@ export default function SettingsPage() {
       }
       toast({ title: "Theme Updated", description: `Theme changed to ${AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]}.`});
     }
-  }, [toast]);
+  }, [toast]); // Removed customThemeValues from dependencies as it's not directly used
 
   const handleSaveCustomTheme = () => {
     saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, customThemeValues); setOriginalCustomThemeValues(customThemeValues);
@@ -238,17 +236,17 @@ export default function SettingsPage() {
       [GOOGLE_AI_API_KEY_STORAGE_KEY]: loadFromLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""),
       [INVOICE_CONFIG_KEY]: loadFromLocalStorage(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} }),
       [CUSTOM_THEME_STORAGE_KEY]: loadFromLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES),
-      appVersion: "1.0.0" // Example version
+      appVersion: "1.0.0" 
     };
     const jsonString = JSON.stringify(settingsData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = href;
-    link.download = `invoiceflow_settings_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
+    link.download = `invoiceflow_app_settings_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
     setLastSettingsBackupTimestamp(Date.now()); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, Date.now());
-    toast({ title: "Settings Exported", description: "Application settings (from local storage) have been exported." });
+    toast({ title: "Application Settings Exported", description: "Settings from local storage have been exported." });
   };
 
   const handleImportSettingsFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,7 +303,7 @@ export default function SettingsPage() {
     }
     setIsDbOperationLoading(true);
     try {
-        const result = await window.electronAPI.restoreDatabase(file.path); // file.path is Electron specific
+        const result = await window.electronAPI.restoreDatabase(file.path); 
         if (result.success) {
             toast({ title: "Database Restore Successful", description: "Database restored. Please restart the application for changes to take full effect." });
         } else {
@@ -316,13 +314,12 @@ export default function SettingsPage() {
         toast({ title: "Database Restore Error", description: error.message || "An error occurred during restore.", variant: "destructive" });
     } finally {
         setIsDbOperationLoading(false);
-        if (restoreFileRef.current) restoreFileRef.current.value = ""; // Reset file input
-        setIsRestoreConfirmationOpen(false); // Close dialog
+        if (restoreFileRef.current) restoreFileRef.current.value = ""; 
+        // setIsRestoreConfirmationOpen(false); // No longer needed here
     }
   };
 
   const triggerRestoreFilePicker = () => {
-    // First mandatory backup
     if (!window.electronAPI?.backupDatabase) {
       toast({ title: "Backup Feature Not Available", description: "Cannot proceed with restore.", variant: "warning" });
       return;
@@ -332,7 +329,7 @@ export default function SettingsPage() {
       .then(backupResult => {
         if (backupResult.success) {
           toast({ title: "Pre-Restore Backup Successful", description: `Current database backed up to ${backupResult.path}. You can now select a file to restore.`});
-          restoreFileRef.current?.click(); // Open file picker after successful backup
+          restoreFileRef.current?.click(); 
         } else {
           toast({ title: "Pre-Restore Backup Failed", description: "Could not back up current database. Restore cancelled.", variant: "destructive" });
         }
@@ -343,7 +340,6 @@ export default function SettingsPage() {
       })
       .finally(() => {
         setIsDbOperationLoading(false);
-        // We don't close the dialog here, user needs to pick a file for restore
       });
   };
 
@@ -356,11 +352,12 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="company" className="space-y-4">
-        <TabsList className="w-full grid grid-cols-2 md:grid-cols-4">
+        <TabsList className="w-full grid grid-cols-2 md:grid-cols-5">
           <TabsTrigger value="company" className="flex items-center gap-2"><Building className="h-4 w-4" /><span className="hidden sm:inline">Company</span></TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2"><Palette className="h-4 w-4" /><span className="hidden sm:inline">Appearance</span></TabsTrigger>
           <TabsTrigger value="modules" className="flex items-center gap-2"><FileCog className="h-4 w-4" /><span className="hidden sm:inline">Modules</span></TabsTrigger>
-          <TabsTrigger value="data" className="flex items-center gap-2"><DatabaseZap className="h-4 w-4" /><span className="hidden sm:inline">Data Management</span></TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2"><UsersRound className="h-4 w-4" /><span className="hidden sm:inline">Users</span></TabsTrigger>
+          <TabsTrigger value="data" className="flex items-center gap-2"><DatabaseZap className="h-4 w-4" /><span className="hidden sm:inline">Data</span></TabsTrigger>
         </TabsList>
         
         <TabsContent value="company" className="space-y-6">
@@ -464,10 +461,14 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+           <UserManagementSettings />
+        </TabsContent>
         
         <TabsContent value="data" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Database Management (SQLite)</CardTitle><CardDescription>Backup or restore your main application database.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Database Management (SQLite)</CardTitle><CardDescription>Backup or restore your main application database (invoices, customers, products, users, company info).</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
                 <Label>Active Database Path</Label>
@@ -497,7 +498,6 @@ export default function SettingsPage() {
                   onConfirm={triggerRestoreFilePicker}
                   cancelText="Cancel"
                 />
-                {/* Hidden file input for restore */}
                 <input type="file" ref={restoreFileRef} accept=".db,.sqlite,.sqlite3" onChange={handleRestoreDatabaseFileSelected} style={{ display: 'none' }} />
 
               </div>

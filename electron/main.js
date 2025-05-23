@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const url = require('url');
@@ -26,6 +27,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
         invoiceNumber TEXT UNIQUE,
+        customerId TEXT,
         customerName TEXT,
         customerEmail TEXT,
         customerAddress TEXT,
@@ -35,16 +37,30 @@ async function initDatabase() {
         termsAndConditions TEXT,
         invoiceImage TEXT,
         status TEXT,
-        amount REAL
+        amount REAL,
+        paymentStatus TEXT,
+        paymentMethod TEXT
       );
       
       CREATE TABLE IF NOT EXISTS invoice_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         invoiceId TEXT,
+        productId TEXT,
         description TEXT,
         quantity REAL,
         price REAL,
         gstCategory TEXT,
+        gstType TEXT, 
+        gstRate REAL,
+        FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS shipment_details (
+        invoiceId TEXT PRIMARY KEY,
+        shipDate TEXT,
+        trackingNumber TEXT,
+        carrierName TEXT,
+        shippingAddress TEXT,
         FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
       
@@ -58,6 +74,26 @@ async function initDatabase() {
         bank_name TEXT,
         bank_account TEXT,
         bank_ifsc TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS customers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        address TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        imageUrl TEXT,
+        description TEXT,
+        price REAL,
+        gstCategory TEXT,
+        igstRate REAL,
+        cgstRate REAL,
+        sgstRate REAL
       );
     `);
     
@@ -123,15 +159,36 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle IPC calls for database operations
+// --- Invoice IPC Handlers ---
 ipcMain.handle('get-all-invoices', async () => {
   try {
     const invoices = await db.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
     for (const invoice of invoices) {
       const items = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
-      invoice.items = items;
+      invoice.items = items; // these are simplified, form expects more detail
       invoice.invoiceDate = new Date(invoice.invoiceDate);
       invoice.dueDate = new Date(invoice.dueDate);
+      // Note: full item structure including GST types/rates might be needed by form
+      invoice.items = items.map(item => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price,
+        gstCategory: item.gstCategory,
+        // Defaulting GST types and rates if not in DB or for older records
+        applyIgst: item.gstType === 'IGST' || !item.gstType, // Default to IGST if type is missing
+        applyCgst: item.gstType === 'CGST_SGST',
+        applySgst: item.gstType === 'CGST_SGST',
+        igstRate: item.gstRate !== undefined ? item.gstRate : 18,
+        cgstRate: item.gstType === 'CGST_SGST' && item.gstRate !== undefined ? item.gstRate / 2 : 9, // Simplification
+        sgstRate: item.gstType === 'CGST_SGST' && item.gstRate !== undefined ? item.gstRate / 2 : 9, // Simplification
+      }));
+
+      const shipmentDetails = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+      invoice.shipmentDetails = shipmentDetails || { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" };
+      if (invoice.shipmentDetails.shipDate) {
+        invoice.shipmentDetails.shipDate = new Date(invoice.shipmentDetails.shipDate);
+      }
     }
     return invoices;
   } catch (error) {
@@ -145,9 +202,28 @@ ipcMain.handle('get-invoice-by-id', async (event, id) => {
     const invoice = await db.get('SELECT * FROM invoices WHERE id = ?', [id]);
     if (!invoice) return null;
     
-    invoice.items = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
+    const items = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
     invoice.invoiceDate = new Date(invoice.invoiceDate);
     invoice.dueDate = new Date(invoice.dueDate);
+    invoice.items = items.map(item => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price,
+        gstCategory: item.gstCategory,
+        applyIgst: item.gstType === 'IGST' || !item.gstType,
+        applyCgst: item.gstType === 'CGST_SGST',
+        applySgst: item.gstType === 'CGST_SGST',
+        igstRate: item.gstRate !== undefined ? item.gstRate : 18,
+        cgstRate: item.gstType === 'CGST_SGST' && item.gstRate !== undefined ? item.gstRate / 2 : 9,
+        sgstRate: item.gstType === 'CGST_SGST' && item.gstRate !== undefined ? item.gstRate / 2 : 9,
+      }));
+    
+    const shipmentDetails = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
+    invoice.shipmentDetails = shipmentDetails || { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" };
+     if (invoice.shipmentDetails.shipDate) {
+        invoice.shipmentDetails.shipDate = new Date(invoice.shipmentDetails.shipDate);
+      }
     return invoice;
   } catch (error) {
     console.error('Error getting invoice:', error);
@@ -161,37 +237,65 @@ ipcMain.handle('save-invoice', async (event, invoice) => {
     
     await db.run(`
       INSERT OR REPLACE INTO invoices (
-        id, invoiceNumber, customerName, customerEmail, customerAddress, 
-        invoiceDate, dueDate, notes, termsAndConditions, invoiceImage, status, amount
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, 
+        invoiceDate, dueDate, notes, termsAndConditions, invoiceImage, status, amount,
+        paymentStatus, paymentMethod
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       invoice.id,
       invoice.invoiceNumber,
+      invoice.customerId,
       invoice.customerName,
       invoice.customerEmail || '',
       invoice.customerAddress || '',
-      invoice.invoiceDate,
-      invoice.dueDate,
+      invoice.invoiceDate, // Should be ISO string from preload
+      invoice.dueDate,     // Should be ISO string from preload
       invoice.notes || '',
       invoice.termsAndConditions || '',
       invoice.invoiceImage || '',
       invoice.status,
-      invoice.amount
+      invoice.amount,
+      invoice.paymentStatus,
+      invoice.paymentMethod || ''
     ]);
     
     await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
     
     for (const item of invoice.items) {
+      let gstType = 'IGST';
+      let gstRate = item.igstRate;
+      if (item.applyCgst || item.applySgst) {
+        gstType = 'CGST_SGST';
+        gstRate = item.cgstRate + item.sgstRate; // Or handle based on which is primary
+      }
+
       await db.run(`
-        INSERT INTO invoice_items (invoiceId, description, quantity, price, gstCategory)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         invoice.id,
+        item.productId,
         item.description,
         item.quantity,
         item.price,
-        item.gstCategory || ''
+        item.gstCategory || '',
+        gstType,
+        gstRate
       ]);
+    }
+
+    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+    if (invoice.shipmentDetails) {
+        await db.run(`
+            INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress)
+            VALUES (?, ?, ?, ?, ?)
+        `,[
+            invoice.id,
+            invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null,
+            invoice.shipmentDetails.trackingNumber,
+            invoice.shipmentDetails.carrierName,
+            invoice.shipmentDetails.shippingAddress
+        ]);
     }
     
     await db.run('COMMIT');
@@ -206,6 +310,7 @@ ipcMain.handle('save-invoice', async (event, invoice) => {
 ipcMain.handle('delete-invoice', async (event, id) => {
   try {
     await db.run('BEGIN TRANSACTION');
+    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [id]);
     await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
     await db.run('DELETE FROM invoices WHERE id = ?', [id]);
     await db.run('COMMIT');
@@ -217,6 +322,7 @@ ipcMain.handle('delete-invoice', async (event, id) => {
   }
 });
 
+// --- Company Info Handlers ---
 ipcMain.handle('get-company-info', async () => {
   try {
     return await db.get('SELECT * FROM company WHERE id = 1');
@@ -247,4 +353,110 @@ ipcMain.handle('save-company-info', async (event, company) => {
     console.error('Error saving company info:', error);
     throw error;
   }
-}); 
+});
+
+// --- Customer Handlers ---
+ipcMain.handle('get-all-customers', async () => {
+  try {
+    return await db.all('SELECT * FROM customers ORDER BY name');
+  } catch (error) {
+    console.error('Error getting customers:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('add-customer', async (event, customer) => {
+  try {
+    await db.run(
+      'INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)',
+      [customer.id, customer.name, customer.email, customer.phone, customer.address]
+    );
+    return true;
+  } catch (error) {
+    console.error('Error adding customer:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('delete-customer', async (event, id) => {
+  try {
+    await db.run('DELETE FROM customers WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Error deleting customer:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('clear-all-customers', async () => {
+  try {
+    await db.run('DELETE FROM customers');
+    return true;
+  } catch (error) {
+    console.error('Error clearing customers:', error);
+    throw error;
+  }
+});
+
+// --- Product Handlers ---
+ipcMain.handle('get-all-products', async () => {
+  try {
+    return await db.all('SELECT * FROM products ORDER BY name');
+  } catch (error) {
+    console.error('Error getting products:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('add-product', async (event, product) => {
+  try {
+    await db.run(
+      'INSERT INTO products (id, name, imageUrl, description, price, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [product.id, product.name, product.imageUrl, product.description, product.price, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]
+    );
+    return true;
+  } catch (error) {
+    console.error('Error adding product:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('delete-product', async (event, id) => {
+  try {
+    await db.run('DELETE FROM products WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('clear-all-products', async () => {
+  try {
+    await db.run('DELETE FROM products');
+    return true;
+  } catch (error) {
+    console.error('Error clearing products:', error);
+    throw error;
+  }
+});
+
+// --- General Data Clear Handler ---
+ipcMain.handle('clear-all-data', async () => {
+  try {
+    await db.run('BEGIN TRANSACTION');
+    await db.run('DELETE FROM invoice_items');
+    await db.run('DELETE FROM shipment_details');
+    await db.run('DELETE FROM invoices');
+    await db.run('DELETE FROM customers');
+    await db.run('DELETE FROM products');
+    await db.run('DELETE FROM company WHERE id = 1'); // Keep company table, clear row
+    // Note: User table is not cleared by this generic action for security.
+    await db.run('COMMIT');
+    return true;
+  } catch (error) {
+    console.error('Error clearing all data:', error);
+    await db.run('ROLLBACK');
+    throw error;
+  }
+});

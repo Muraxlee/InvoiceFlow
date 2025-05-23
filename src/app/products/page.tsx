@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -8,7 +9,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PackagePlus, MoreHorizontal, Edit, Trash2, Info } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -21,16 +21,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const LOCAL_STORAGE_KEY = "app_products";
-
-const defaultProducts = [
-  { id: "PROD001", name: "Premium Widget", imageUrl:"https://placehold.co/60x60.png", description: "A high-quality widget for all your needs.", price: 2999.99, gstCategory: "HSN 8471", igstRate: 18, cgstRate: 9, sgstRate: 9 },
-  { id: "PROD002", name: "Standard Gadget", imageUrl:"https://placehold.co/60x60.png", description: "Reliable and affordable gadget.", price: 1550.50, gstCategory: "HSN 8517", igstRate: 12, cgstRate: 6, sgstRate: 6 },
-  { id: "PROD003", name: "Luxury Gizmo", imageUrl:"https://placehold.co/60x60.png", description: "Top-of-the-line gizmo with advanced features.", price: 9900.00, gstCategory: "HSN 9006", igstRate: 28, cgstRate: 14, sgstRate: 14 },
-];
-
-export type Product = typeof defaultProducts[0];
-
+// Define Product type based on ProductFormValues and expected DB structure
+export interface Product extends ProductFormValues {
+  // id is already in ProductFormValues
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -38,73 +32,82 @@ export default function ProductsPage() {
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedProducts = loadFromLocalStorage<Product[]>(LOCAL_STORAGE_KEY, defaultProducts);
-    
-    // Migration: Convert old products with standardGstRate/reducedGstRate/specialGstRate to new structure
-    const migratedProducts = storedProducts.map(product => {
-      if ('standardGstRate' in product) {
-        const { standardGstRate, reducedGstRate, specialGstRate, ...rest } = product as any;
-        const igstRate = standardGstRate || 18;
-        const cgstRate = reducedGstRate || Math.ceil(igstRate / 2);
-        const sgstRate = specialGstRate || Math.floor(igstRate / 2);
-        
-        return {
-          ...rest,
-          igstRate,
-          cgstRate,
-          sgstRate
-        };
+    async function fetchProducts() {
+      setIsDataLoading(true);
+      if (window.electronAPI) {
+        try {
+          const fetchedProducts = await window.electronAPI.getAllProducts();
+          setProducts(fetchedProducts);
+        } catch (error) {
+          console.error("Error fetching products:", error);
+          toast({ title: "Error", description: "Could not load products.", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
       }
-      return product;
-    });
-    
-    setProducts(migratedProducts);
-    
-    // Save migrated products if there's a difference
-    if (JSON.stringify(storedProducts) !== JSON.stringify(migratedProducts)) {
-      saveToLocalStorage(LOCAL_STORAGE_KEY, migratedProducts);
+      setIsDataLoading(false);
     }
-  }, []);
+    fetchProducts();
+  }, [toast]);
 
-  const handleDeleteProduct = (productId: string) => {
-    const updatedProducts = products.filter(p => p.id !== productId);
-    setProducts(updatedProducts);
-    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
-    toast({
-      title: "Product Deleted",
-      description: `Product ${productId} has been successfully deleted.`,
-    });
+  const handleDeleteProduct = async (productId: string) => {
+    if (window.electronAPI) {
+      try {
+        const success = await window.electronAPI.deleteProduct(productId);
+        if (success) {
+          setProducts(prev => prev.filter(p => p.id !== productId));
+          toast({
+            title: "Product Deleted",
+            description: `Product ${productId} has been successfully deleted.`,
+          });
+        } else {
+          throw new Error("Failed to delete product via Electron API");
+        }
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        toast({ title: "Error", description: "Could not delete product.", variant: "destructive" });
+      }
+    }
   };
 
   const handleAddProduct = async (data: ProductFormValues) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (products.some(p => p.id === data.id)) {
-      toast({
-        title: "Error: Product ID Exists",
-        description: `A product with ID ${data.id} already exists. Please use a unique ID.`,
-        variant: "destructive",
-      });
+    if (window.electronAPI) {
+      try {
+        // Check for duplicate ID client-side
+        if (products.some(p => p.id === data.id)) {
+          toast({
+            title: "Error: Product ID Exists",
+            description: `A product with ID ${data.id} already exists. Please use a unique ID.`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+        const success = await window.electronAPI.addProduct(data);
+        if (success) {
+          setProducts(prev => [...prev, data]); // Optimistically update UI or re-fetch
+          setIsLoading(false);
+          setIsAddProductDialogOpen(false);
+          toast({
+            title: "Product Added",
+            description: `Product ${data.name} has been successfully added.`,
+          });
+        } else {
+          throw new Error("Failed to add product via Electron API");
+        }
+      } catch (error) {
+        console.error("Error adding product:", error);
+        toast({ title: "Error", description: "Could not add product.", variant: "destructive" });
+        setIsLoading(false);
+      }
+    } else {
       setIsLoading(false);
-      return;
     }
-    
-    const newProduct: Product = { ...data };
-    const updatedProducts = [...products, newProduct];
-    setProducts(updatedProducts);
-    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
-    
-    setIsLoading(false);
-    setIsAddProductDialogOpen(false);
-    toast({
-      title: "Product Added",
-      description: `Product ${data.name} has been successfully added.`,
-    });
   };
 
   const handleEditProduct = (product: Product) => {
@@ -114,23 +117,24 @@ export default function ProductsPage() {
 
   const handleSaveEditedProduct = async (data: ProductFormValues) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    // Placeholder for Electron API call to update product
+    // For now, just updates local state and shows a toast
+    // await window.electronAPI.updateProduct(data);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+    
     const updatedProducts = products.map(p => 
       p.id === data.id ? { ...data } : p
     );
-    
     setProducts(updatedProducts);
-    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedProducts);
+    // await window.electronAPI.saveProducts(updatedProducts); // If saving all products at once
     
     setIsLoading(false);
     setIsEditProductDialogOpen(false);
     setCurrentProduct(null);
     
     toast({
-      title: "Product Updated",
-      description: `Product ${data.name} has been successfully updated.`,
+      title: "Product Updated (Placeholder)",
+      description: `Product ${data.name} has been updated in the UI. DB update via Electron API is a placeholder.`,
     });
   };
 
@@ -169,7 +173,7 @@ export default function ProductsPage() {
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
-              Update the product details below.
+              Update the product details below. (Edit functionality is a placeholder)
             </DialogDescription>
           </DialogHeader>
           {currentProduct && (
@@ -192,6 +196,11 @@ export default function ProductsPage() {
           <CardDescription>A list of all products.</CardDescription>
         </CardHeader>
         <CardContent>
+        {isDataLoading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -299,7 +308,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">₹{(product.price || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -334,7 +343,8 @@ export default function ProductsPage() {
               ))}
             </TableBody>
           </Table>
-           {products.length === 0 && (
+          )}
+           {!isDataLoading && products.length === 0 && (
             <p className="py-4 text-center text-muted-foreground">No products found. Add a new product to get started.</p>
           )}
         </CardContent>

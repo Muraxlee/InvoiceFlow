@@ -1,3 +1,4 @@
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose IPC functionality to renderer process
@@ -5,10 +6,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Invoice operations
   getAllInvoices: () => ipcRenderer.invoke('get-all-invoices'),
   getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
-  saveInvoice: (invoice) => ipcRenderer.invoke('save-invoice', invoice),
+  saveInvoice: (invoice) => {
+    // Ensure Date objects are converted to ISO strings for IPC
+    const serializedInvoice = {
+      ...invoice,
+      invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : invoice.invoiceDate,
+      dueDate: invoice.dueDate instanceof Date ? invoice.dueDate.toISOString() : invoice.dueDate,
+      shipmentDetails: invoice.shipmentDetails ? {
+        ...invoice.shipmentDetails,
+        shipDate: invoice.shipmentDetails.shipDate instanceof Date ? invoice.shipmentDetails.shipDate.toISOString() : invoice.shipmentDetails.shipDate,
+      } : undefined,
+    };
+    return ipcRenderer.invoke('save-invoice', serializedInvoice);
+  },
   deleteInvoice: (id) => ipcRenderer.invoke('delete-invoice', id),
   
   // Company operations
   getCompanyInfo: () => ipcRenderer.invoke('get-company-info'),
-  saveCompanyInfo: (data) => ipcRenderer.invoke('save-company-info', data)
-}); 
+  saveCompanyInfo: (data) => ipcRenderer.invoke('save-company-info', data),
+
+  // Customer operations
+  getAllCustomers: () => ipcRenderer.invoke('get-all-customers'),
+  addCustomer: (customer) => ipcRenderer.invoke('add-customer', customer),
+  deleteCustomer: (id) => ipcRenderer.invoke('delete-customer', id),
+  clearAllCustomers: () => ipcRenderer.invoke('clear-all-customers'),
+
+  // Product operations
+  getAllProducts: () => ipcRenderer.invoke('get-all-products'),
+  addProduct: (product) => ipcRenderer.invoke('add-product', product),
+  deleteProduct: (id) => ipcRenderer.invoke('delete-product', id),
+  clearAllProducts: () => ipcRenderer.invoke('clear-all-products'),
+
+  // General data operations
+  clearAllData: () => ipcRenderer.invoke('clear-all-data'),
+});

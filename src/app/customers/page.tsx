@@ -9,71 +9,98 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CustomerForm, type CustomerFormValues } from "@/components/customer-form";
 
-const LOCAL_STORAGE_KEY = "app_customers";
-
-const defaultCustomers = [
-  { id: "CUST001", name: "Alpha Inc.", email: "contact@alpha.com", phone: "555-0101", address: "123 Tech Road, Silicon Valley, CA" },
-  { id: "CUST002", name: "Beta LLC", email: "info@betallc.dev", phone: "555-0102", address: "456 Code Lane, Austin, TX" },
-  { id: "CUST003", name: "Gamma Co.", email: "support@gammaco.io", phone: "555-0103", address: "789 Byte Street, New York, NY" },
-];
-
-export type Customer = typeof defaultCustomers[0];
+// Define Customer type based on CustomerFormValues and expected DB structure
+export interface Customer extends CustomerFormValues {
+  // id is already in CustomerFormValues
+}
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedCustomers = loadFromLocalStorage<Customer[]>(LOCAL_STORAGE_KEY, defaultCustomers);
-    setCustomers(storedCustomers);
-  }, []);
+    async function fetchCustomers() {
+      setIsDataLoading(true);
+      if (window.electronAPI) {
+        try {
+          const fetchedCustomers = await window.electronAPI.getAllCustomers();
+          setCustomers(fetchedCustomers);
+        } catch (error) {
+          console.error("Error fetching customers:", error);
+          toast({ title: "Error", description: "Could not load customers.", variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
+      }
+      setIsDataLoading(false);
+    }
+    fetchCustomers();
+  }, [toast]);
 
-  const handleDeleteCustomer = (customerId: string) => {
-    const updatedCustomers = customers.filter(c => c.id !== customerId);
-    setCustomers(updatedCustomers);
-    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
-    toast({
-      title: "Customer Deleted",
-      description: `Customer ${customerId} has been successfully deleted.`,
-    });
+  const handleDeleteCustomer = async (customerId: string) => {
+    if (window.electronAPI) {
+      try {
+        const success = await window.electronAPI.deleteCustomer(customerId);
+        if (success) {
+          setCustomers(prev => prev.filter(c => c.id !== customerId));
+          toast({
+            title: "Customer Deleted",
+            description: `Customer ${customerId} has been successfully deleted.`,
+          });
+        } else {
+          throw new Error("Failed to delete customer via Electron API");
+        }
+      } catch (error) {
+        console.error("Error deleting customer:", error);
+        toast({ title: "Error", description: "Could not delete customer.", variant: "destructive" });
+      }
+    }
   };
 
   const handleAddCustomer = async (data: CustomerFormValues) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    if (window.electronAPI) {
+      try {
+        // Check for duplicate ID client-side before calling API
+        if (customers.some(c => c.id === data.id)) {
+          toast({
+            title: "Error: Customer ID Exists",
+            description: `A customer with ID ${data.id} already exists. Please use a unique ID.`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
 
-    if (customers.some(c => c.id === data.id)) {
-      toast({
-        title: "Error: Customer ID Exists",
-        description: `A customer with ID ${data.id} already exists. Please use a unique ID.`,
-        variant: "destructive",
-      });
+        const success = await window.electronAPI.addCustomer(data);
+        if (success) {
+          setCustomers(prev => [...prev, data]); // Optimistically update UI or re-fetch
+          setIsLoading(false);
+          setIsAddCustomerDialogOpen(false);
+          toast({
+            title: "Customer Added",
+            description: `Customer ${data.name} has been successfully added.`,
+          });
+        } else {
+          throw new Error("Failed to add customer via Electron API");
+        }
+      } catch (error) {
+        console.error("Error adding customer:", error);
+        toast({ title: "Error", description: "Could not add customer.", variant: "destructive" });
+        setIsLoading(false);
+      }
+    } else {
       setIsLoading(false);
-      return;
     }
-
-    const newCustomer: Customer = { ...data };
-    const updatedCustomers = [...customers, newCustomer];
-    setCustomers(updatedCustomers);
-    saveToLocalStorage(LOCAL_STORAGE_KEY, updatedCustomers);
-    
-    setIsLoading(false);
-    setIsAddCustomerDialogOpen(false);
-    toast({
-      title: "Customer Added",
-      description: `Customer ${data.name} has been successfully added.`,
-    });
   };
-
 
   return (
     <div className="space-y-6">
@@ -110,60 +137,66 @@ export default function CustomersPage() {
           <CardDescription>A list of all customers.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.id}</TableCell>
-                  <TableCell>{customer.name}</TableCell>
-                  <TableCell><Link href={`mailto:${customer.email}`} className="hover:underline flex items-center gap-1"><Mail className="h-3 w-3 text-muted-foreground"/> {customer.email}</Link></TableCell>
-                  <TableCell><Link href={`tel:${customer.phone}`} className="hover:underline flex items-center gap-1"><Phone className="h-3 w-3 text-muted-foreground"/> {customer.phone}</Link></TableCell>
-                  <TableCell className="text-sm text-muted-foreground truncate max-w-xs flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0"/>{customer.address}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                           <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => alert(`Edit customer ${customer.id}. This is a placeholder. Implement edit form and functionality.`)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <ConfirmDialog
-                          triggerButton={
-                            <DropdownMenuItem 
-                              className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full"
-                              onSelect={(e) => e.preventDefault()}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          }
-                          title={`Delete Customer ${customer.name}`}
-                          description="Are you sure you want to delete this customer? This action cannot be undone."
-                          onConfirm={() => handleDeleteCustomer(customer.id)}
-                          confirmText="Yes, Delete"
-                          confirmVariant="destructive"
-                        />
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {isDataLoading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-           {customers.length === 0 && (
+              </TableHeader>
+              <TableBody>
+                {customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.id}</TableCell>
+                    <TableCell>{customer.name}</TableCell>
+                    <TableCell><Link href={`mailto:${customer.email}`} className="hover:underline flex items-center gap-1"><Mail className="h-3 w-3 text-muted-foreground"/> {customer.email}</Link></TableCell>
+                    <TableCell><Link href={`tel:${customer.phone}`} className="hover:underline flex items-center gap-1"><Phone className="h-3 w-3 text-muted-foreground"/> {customer.phone}</Link></TableCell>
+                    <TableCell className="text-sm text-muted-foreground truncate max-w-xs flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0"/>{customer.address}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(`Edit customer ${customer.id}. This is a placeholder.`)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <ConfirmDialog
+                            triggerButton={
+                              <DropdownMenuItem 
+                                className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full"
+                                onSelect={(e) => e.preventDefault()}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            }
+                            title={`Delete Customer ${customer.name}`}
+                            description="Are you sure you want to delete this customer? This action cannot be undone."
+                            onConfirm={() => handleDeleteCustomer(customer.id)}
+                            confirmText="Yes, Delete"
+                            confirmVariant="destructive"
+                          />
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+           {!isDataLoading && customers.length === 0 && (
             <p className="py-4 text-center text-muted-foreground">No customers found. Add a new customer to get started.</p>
           )}
         </CardContent>
@@ -171,4 +204,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-

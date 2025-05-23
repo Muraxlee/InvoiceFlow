@@ -61,6 +61,15 @@ interface ElectronAPI {
   updateUser: (userId: string, userData: Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password?: string }) => Promise<boolean>;
   deleteUser: (userId: string) => Promise<boolean>;
   validateUserCredentials: (credentials: {username: string, password_NOT_Hashed_Yet: string}) => Promise<UserListData | null>;
+
+  // Database Backup/Restore operations
+  getDatabasePath: () => Promise<string>;
+  backupDatabase: () => Promise<{success: boolean; path?: string; message?: string}>;
+  restoreDatabase: (sourceFilePath: string) => Promise<{success: boolean; message?: string}>;
+  
+  // Generic dialogs (optional, if you want to trigger main process dialogs from renderer)
+  showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
+  showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
 }
 
 declare global {

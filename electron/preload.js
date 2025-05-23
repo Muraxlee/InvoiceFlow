@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAllInvoices: () => ipcRenderer.invoke('get-all-invoices'),
   getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
   saveInvoice: (invoice) => {
+    // Ensure dates are serialized if they are Date objects
     const serializedInvoice = {
       ...invoice,
       invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : invoice.invoiceDate,
@@ -44,4 +45,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateUser: (userId, userData) => ipcRenderer.invoke('update-user', { userId, userData }),
   deleteUser: (userId) => ipcRenderer.invoke('delete-user', userId),
   validateUserCredentials: (credentials) => ipcRenderer.invoke('validate-user-credentials', credentials),
+
+  // Database Backup/Restore operations
+  getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
+  backupDatabase: () => ipcRenderer.invoke('backup-database'),
+  restoreDatabase: (sourceFilePath) => ipcRenderer.invoke('restore-database', sourceFilePath),
+  // For file dialogs that need to be initiated from renderer but executed in main
+  showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
+  showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),
 });

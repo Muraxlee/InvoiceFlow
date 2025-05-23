@@ -2,7 +2,7 @@
 'use server';
 
 import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { open, type Database } from 'sqlite';
 import { InvoiceFormValues } from '@/components/invoice-form';
 import path from 'path';
 import { hash, compare } from 'bcrypt';
@@ -24,17 +24,36 @@ export interface User {
   isSystemAdmin: boolean;
 }
 
-let db: any = null;
+let db: Database | null = null;
+
+// Function to determine the database path
+// This needs to be callable from both Electron main process and Next.js server context
+function getDbPath() {
+  // Check if running in Electron's main process by trying to access electron app module
+  try {
+    // This 'require' will only work in Node.js environments (like Electron main or Next.js server)
+    // It will fail in browser/renderer, but this function is not intended for renderer.
+    const electronApp = require('electron').app;
+    if (electronApp) {
+      return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
+    }
+  } catch (e) {
+    // If 'electron' module is not found, we are likely in Next.js server context
+    // Or the seed script which runs directly with Node.
+  }
+  // Fallback for Next.js server-side or seed script (development)
+  return path.join(process.cwd(), 'invoiceflow.db');
+}
+
 
 // Initialize the database
-export async function initDatabase() {
+export async function initDatabase(): Promise<Database> {
   if (db) return db;
   
   try {
-    const dbPath = process.env.NODE_ENV === 'development' 
-      ? path.join(process.cwd(), 'invoiceflow.db') // For Next.js server-side in dev
-      : path.join(require('electron').app.getPath('userData'), 'invoiceflow.db'); // For Electron
-    
+    const dbPath = getDbPath();
+    console.log('Database path:', dbPath); // Log the path being used
+
     db = await open({
       filename: dbPath,
       driver: sqlite3.Database
@@ -138,44 +157,55 @@ export async function initDatabase() {
       ]);
       console.log('Default admin user created in database.ts');
     }
-    
+    console.log('Database initialized successfully');
     return db;
   } catch (error) {
     console.error('Database initialization error in database.ts:', error);
+    // If db initialization failed, make sure db remains null
+    db = null; 
     throw error;
+  }
+}
+
+// Function to close the database connection, useful for Electron app shutdown
+export async function closeDatabase() {
+  if (db) {
+    await db.close();
+    db = null;
+    console.log('Database connection closed.');
   }
 }
 
 // User management functions
 export async function getAllUsers(): Promise<Omit<User, 'password'>[]> {
-  await initDatabase();
-  const usersData = await db.all('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users ORDER BY username');
+  const currentDb = await initDatabase();
+  const usersData = await currentDb.all('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users ORDER BY username');
   return usersData.map((u: any) => ({ ...u, isActive: !!u.isActive, isSystemAdmin: !!u.isSystemAdmin }));
 }
 
 export async function getUserById(id: string): Promise<Omit<User, 'password'> | null> {
-  await initDatabase();
-  const userData = await db.get('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users WHERE id = ?', [id]);
+  const currentDb = await initDatabase();
+  const userData = await currentDb.get('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users WHERE id = ?', [id]);
   if (!userData) return null;
   return { ...userData, isActive: !!userData.isActive, isSystemAdmin: !!userData.isSystemAdmin };
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
-  await initDatabase();
-  const userData = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+  const currentDb = await initDatabase();
+  const userData = await currentDb.get('SELECT * FROM users WHERE username = ?', [username]);
    if (!userData) return null;
   return { ...userData, isActive: !!userData.isActive, isSystemAdmin: !!userData.isSystemAdmin };
 }
 
 export async function createUser(userData: Omit<User, 'id' | 'isSystemAdmin'>): Promise<string> {
-  await initDatabase();
-  const existingUser = await db.get('SELECT id FROM users WHERE username = ?', [userData.username]);
+  const currentDb = await initDatabase();
+  const existingUser = await currentDb.get('SELECT id FROM users WHERE username = ?', [userData.username]);
   if (existingUser) {
     throw new Error('Username already exists.');
   }
   const hashedPassword = await hash(userData.password!, 10); // Password must be provided for new user
   const newUserId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-  await db.run(
+  await currentDb.run(
     'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [newUserId, userData.username, hashedPassword, userData.role, userData.name || '', userData.email || '', userData.isActive ? 1 : 0, 0]
   );
@@ -183,15 +213,15 @@ export async function createUser(userData: Omit<User, 'id' | 'isSystemAdmin'>): 
 }
 
 export async function updateUser(id: string, userData: Partial<Omit<User, 'id' | 'isSystemAdmin'>>): Promise<boolean> {
-  await initDatabase();
-  const currentUser = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+  const currentDb = await initDatabase();
+  const currentUser = await currentDb.get('SELECT * FROM users WHERE id = ?', [id]);
   if (!currentUser) throw new Error('User not found.');
 
   const updates: string[] = [];
   const params: any[] = [];
 
   if (userData.username && userData.username !== currentUser.username) {
-    const existingUser = await db.get('SELECT id FROM users WHERE username = ? AND id != ?', [userData.username, id]);
+    const existingUser = await currentDb.get('SELECT id FROM users WHERE username = ? AND id != ?', [userData.username, id]);
     if (existingUser) throw new Error('Username already exists.');
     updates.push('username = ?');
     params.push(userData.username);
@@ -222,23 +252,23 @@ export async function updateUser(id: string, userData: Partial<Omit<User, 'id' |
 
   const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
   params.push(id);
-  await db.run(query, params);
+  await currentDb.run(query, params);
   return true;
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
-  await initDatabase();
-  const user = await db.get('SELECT isSystemAdmin FROM users WHERE id = ?', [id]);
+  const currentDb = await initDatabase();
+  const user = await currentDb.get('SELECT isSystemAdmin FROM users WHERE id = ?', [id]);
   if (!user) throw new Error('User not found.');
   if (user.isSystemAdmin) throw new Error('System admin user cannot be deleted.');
   
-  await db.run('DELETE FROM users WHERE id = ?', [id]);
+  await currentDb.run('DELETE FROM users WHERE id = ?', [id]);
   return true;
 }
 
 export async function validateUserCredentials(username: string, passwordAttempt: string): Promise<Omit<User, 'password'> | null> {
-  await initDatabase();
-  const user = await getUserByUsername(username);
+  const currentDb = await initDatabase();
+  const user = await getUserByUsername(username); // This already uses currentDb via initDatabase()
   if (!user || !user.isActive || !user.password) return null;
 
   const isMatch = await compare(passwordAttempt, user.password);
@@ -251,29 +281,34 @@ export async function validateUserCredentials(username: string, passwordAttempt:
 
 // Get all invoices
 export async function getAllInvoices(): Promise<StoredInvoice[]> {
-  await initDatabase();
-  const invoices = await db.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
+  const currentDb = await initDatabase();
+  const invoices = await currentDb.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
   const result: StoredInvoice[] = [];
+  const allProds = await getAllProducts(); // Fetch once
+
   for (const invoice of invoices) {
-    const items = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
-    const shipmentDetails = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+    const items = await currentDb.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
+    const shipmentDetails = await currentDb.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
     result.push({
       ...invoice,
       invoiceDate: new Date(invoice.invoiceDate),
       dueDate: new Date(invoice.dueDate),
-      items: items.map(item => ({
-        productId: item.productId,
-        description: item.description,
-        quantity: item.quantity,
-        price: item.price,
-        gstCategory: item.gstCategory || '',
-        applyIgst: item.gstType === 'IGST' || !item.gstType,
-        applyCgst: item.gstType === 'CGST_SGST',
-        applySgst: item.gstType === 'CGST_SGST',
-        igstRate: item.gstType === 'IGST' ? (item.gstRate || 18) : (products.find(p=>p.id === item.productId)?.igstRate || 18),
-        cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : 9) : (products.find(p=>p.id === item.productId)?.cgstRate || 9),
-        sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : 9) : (products.find(p=>p.id === item.productId)?.sgstRate || 9),
-      })),
+      items: items.map(item => {
+        const product = allProds.find(p=>p.id === item.productId);
+        return {
+            productId: item.productId,
+            description: item.description,
+            quantity: item.quantity,
+            price: item.price,
+            gstCategory: item.gstCategory || '',
+            applyIgst: item.gstType === 'IGST' || !item.gstType,
+            applyCgst: item.gstType === 'CGST_SGST',
+            applySgst: item.gstType === 'CGST_SGST',
+            igstRate: item.gstType === 'IGST' ? (item.gstRate ?? product?.igstRate ?? 18) : (product?.igstRate ?? 18),
+            cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (product?.cgstRate ?? 9)) : (product?.cgstRate ?? 9),
+            sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (product?.sgstRate ?? 9)) : (product?.sgstRate ?? 9),
+        };
+      }),
       shipmentDetails: shipmentDetails ? {
         shipDate: shipmentDetails.shipDate ? new Date(shipmentDetails.shipDate) : null,
         trackingNumber: shipmentDetails.trackingNumber,
@@ -286,15 +321,15 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
 }
 
 export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
-  await initDatabase();
-  await db.run('BEGIN TRANSACTION');
+  const currentDb = await initDatabase();
+  await currentDb.run('BEGIN TRANSACTION');
   try {
-    await db.run(`
+    await currentDb.run(`
       INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, invoiceImage, status, amount, paymentStatus, paymentMethod) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
       [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate.toISOString(), invoice.notes || '', invoice.termsAndConditions || '', invoice.invoiceImage || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
     );
-    await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
+    await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
     for (const item of invoice.items) {
       let gstType = 'IGST';
       let gstRate = item.igstRate;
@@ -302,50 +337,53 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
         gstType = 'CGST_SGST';
         gstRate = (item.cgstRate || 0) + (item.sgstRate || 0);
       }
-      await db.run('INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+      await currentDb.run('INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
         [invoice.id, item.productId, item.description, item.quantity, item.price, item.gstCategory || '', gstType, gstRate]
       );
     }
-    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+    await currentDb.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
     if (invoice.shipmentDetails) {
-        await db.run('INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress) VALUES (?, ?, ?, ?, ?)',
+        await currentDb.run('INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress) VALUES (?, ?, ?, ?, ?)',
         [invoice.id, invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null, invoice.shipmentDetails.trackingNumber, invoice.shipmentDetails.carrierName, invoice.shipmentDetails.shippingAddress]);
     }
-    await db.run('COMMIT');
+    await currentDb.run('COMMIT');
     return true;
   } catch (error) {
     console.error('Error saving invoice in database.ts:', error);
-    await db.run('ROLLBACK');
+    await currentDb.run('ROLLBACK');
     return false;
   }
 }
 
 export async function getInvoiceById(id: string): Promise<StoredInvoice | null> {
-  await initDatabase();
-  const invoiceData = await db.get('SELECT * FROM invoices WHERE id = ?', [id]);
+  const currentDb = await initDatabase();
+  const invoiceData = await currentDb.get('SELECT * FROM invoices WHERE id = ?', [id]);
   if (!invoiceData) return null;
-  const itemsData = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
-  const shipmentDetailsData = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
+  const itemsData = await currentDb.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
+  const shipmentDetailsData = await currentDb.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
   
-  const products = await getAllProducts(); // Fetch product details for GST rates
+  const allProducts = await getAllProducts(); // Fetch product details for GST rates
 
   return {
     ...invoiceData,
     invoiceDate: new Date(invoiceData.invoiceDate),
     dueDate: new Date(invoiceData.dueDate),
-    items: itemsData.map(item => ({
-      productId: item.productId,
-      description: item.description,
-      quantity: item.quantity,
-      price: item.price,
-      gstCategory: item.gstCategory || '',
-      applyIgst: item.gstType === 'IGST' || !item.gstType, // Default to IGST if type is missing
-      applyCgst: item.gstType === 'CGST_SGST',
-      applySgst: item.gstType === 'CGST_SGST',
-      igstRate: item.gstType === 'IGST' ? (item.gstRate ?? products.find(p=>p.id === item.productId)?.igstRate ?? 18) : (products.find(p=>p.id === item.productId)?.igstRate ?? 18),
-      cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (products.find(p=>p.id === item.productId)?.cgstRate ?? 9)) : (products.find(p=>p.id === item.productId)?.cgstRate ?? 9),
-      sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (products.find(p=>p.id === item.productId)?.sgstRate ?? 9)) : (products.find(p=>p.id === item.productId)?.sgstRate ?? 9),
-    })),
+    items: itemsData.map(item => {
+      const product = allProducts.find(p=>p.id === item.productId);
+      return {
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price,
+        gstCategory: item.gstCategory || '',
+        applyIgst: item.gstType === 'IGST' || !item.gstType, // Default to IGST if type is missing
+        applyCgst: item.gstType === 'CGST_SGST',
+        applySgst: item.gstType === 'CGST_SGST',
+        igstRate: item.gstType === 'IGST' ? (item.gstRate ?? product?.igstRate ?? 18) : (product?.igstRate ?? 18),
+        cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (product?.cgstRate ?? 9)) : (product?.cgstRate ?? 9),
+        sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (product?.sgstRate ?? 9)) : (product?.sgstRate ?? 9),
+      };
+    }),
     shipmentDetails: shipmentDetailsData ? {
       shipDate: shipmentDetailsData.shipDate ? new Date(shipmentDetailsData.shipDate) : null,
       trackingNumber: shipmentDetailsData.trackingNumber,
@@ -356,25 +394,25 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
 }
 
 export async function deleteInvoice(id: string): Promise<boolean> {
-  await initDatabase();
-  await db.run('BEGIN TRANSACTION');
+  const currentDb = await initDatabase();
+  await currentDb.run('BEGIN TRANSACTION');
   try {
-    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [id]);
-    await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
-    await db.run('DELETE FROM invoices WHERE id = ?', [id]);
-    await db.run('COMMIT');
+    await currentDb.run('DELETE FROM shipment_details WHERE invoiceId = ?', [id]);
+    await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
+    await currentDb.run('DELETE FROM invoices WHERE id = ?', [id]);
+    await currentDb.run('COMMIT');
     return true;
   } catch (error) {
     console.error('Error deleting invoice in database.ts:', error);
-    await db.run('ROLLBACK');
+    await currentDb.run('ROLLBACK');
     return false;
   }
 }
 
 export async function saveCompanyInfo(company: any): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('INSERT OR REPLACE INTO company (id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)',
+    await currentDb.run('INSERT OR REPLACE INTO company (id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)',
       [company.name, company.address, company.phone, company.email, company.gstin, company.bank_name, company.bank_account, company.bank_ifsc]
     );
     return true;
@@ -385,9 +423,9 @@ export async function saveCompanyInfo(company: any): Promise<boolean> {
 }
 
 export async function getCompanyInfo() {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    return await db.get('SELECT * FROM company WHERE id = 1');
+    return await currentDb.get('SELECT * FROM company WHERE id = 1');
   } catch (error) {
     console.error('Error getting company info in database.ts:', error);
     return null;
@@ -395,21 +433,26 @@ export async function getCompanyInfo() {
 }
 
 export async function addCustomer(customer: any): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', 
+    // Check if customer ID already exists
+    const existingCustomer = await currentDb.get('SELECT id FROM customers WHERE id = ?', [customer.id]);
+    if (existingCustomer) {
+        throw new Error(`Customer with ID ${customer.id} already exists.`);
+    }
+    await currentDb.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', 
       [customer.id, customer.name, customer.email, customer.phone, customer.address]);
     return true;
   } catch (error) {
     console.error('Error adding customer in database.ts:', error);
-    return false;
+    throw error; // Re-throw to be caught by Electron IPC handler
   }
 }
 
 export async function getAllCustomers() {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    return await db.all('SELECT * FROM customers ORDER BY name');
+    return await currentDb.all('SELECT * FROM customers ORDER BY name');
   } catch (error) {
     console.error('Error getting all customers in database.ts:', error);
     return [];
@@ -417,9 +460,9 @@ export async function getAllCustomers() {
 }
 
 export async function deleteCustomer(id: string): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('DELETE FROM customers WHERE id = ?', [id]);
+    await currentDb.run('DELETE FROM customers WHERE id = ?', [id]);
     return true;
   } catch (error) {
     console.error('Error deleting customer in database.ts:', error);
@@ -428,9 +471,9 @@ export async function deleteCustomer(id: string): Promise<boolean> {
 }
 
 export async function clearAllCustomers(): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('DELETE FROM customers');
+    await currentDb.run('DELETE FROM customers');
     return true;
   } catch (error) {
     console.error('Error clearing customers in database.ts:', error);
@@ -439,21 +482,26 @@ export async function clearAllCustomers(): Promise<boolean> {
 }
 
 export async function addProduct(product: any): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+    // Check if product ID already exists
+    const existingProduct = await currentDb.get('SELECT id FROM products WHERE id = ?', [product.id]);
+    if (existingProduct) {
+        throw new Error(`Product with ID ${product.id} already exists.`);
+    }
+    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
       [product.id, product.name, product.description, product.price, product.imageUrl, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]);
     return true;
   } catch (error) {
     console.error('Error adding product in database.ts:', error);
-    return false;
+    throw error; // Re-throw
   }
 }
 
 export async function getAllProducts() {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    return await db.all('SELECT * FROM products ORDER BY name');
+    return await currentDb.all('SELECT * FROM products ORDER BY name');
   } catch (error) {
     console.error('Error getting all products in database.ts:', error);
     return [];
@@ -461,9 +509,9 @@ export async function getAllProducts() {
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('DELETE FROM products WHERE id = ?', [id]);
+    await currentDb.run('DELETE FROM products WHERE id = ?', [id]);
     return true;
   } catch (error) {
     console.error('Error deleting product in database.ts:', error);
@@ -472,9 +520,9 @@ export async function deleteProduct(id: string): Promise<boolean> {
 }
 
 export async function clearAllProducts(): Promise<boolean> {
-  await initDatabase();
+  const currentDb = await initDatabase();
   try {
-    await db.run('DELETE FROM products');
+    await currentDb.run('DELETE FROM products');
     return true;
   } catch (error) {
     console.error('Error clearing products in database.ts:', error);
@@ -483,23 +531,24 @@ export async function clearAllProducts(): Promise<boolean> {
 }
 
 export async function clearAllData(): Promise<boolean> {
-  await initDatabase();
-  await db.run('BEGIN TRANSACTION');
+  const currentDb = await initDatabase();
+  await currentDb.run('BEGIN TRANSACTION');
   try {
-    await db.run('DELETE FROM invoice_items');
-    await db.run('DELETE FROM shipment_details');
-    await db.run('DELETE FROM invoices');
-    await db.run('DELETE FROM customers');
-    await db.run('DELETE FROM products');
-    await db.run('DELETE FROM company WHERE id = 1');
-    // Note: Users table is not cleared by this generic action for security.
-    // If you want to clear users too, you would need to do it explicitly,
-    // being careful not to delete the system admin if that's not desired.
-    await db.run('COMMIT');
+    await currentDb.run('DELETE FROM invoice_items');
+    await currentDb.run('DELETE FROM shipment_details');
+    await currentDb.run('DELETE FROM invoices');
+    await currentDb.run('DELETE FROM customers');
+    await currentDb.run('DELETE FROM products');
+    await currentDb.run('DELETE FROM company WHERE id = 1'); // Assumes company info has id 1
+    // Keep users table intact, especially the system admin.
+    await currentDb.run('COMMIT');
     return true;
   } catch (error) {
     console.error('Error clearing all data in database.ts:', error);
-    await db.run('ROLLBACK');
+    await currentDb.run('ROLLBACK');
     return false;
   }
 }
+
+// Export the getDbPath function for Electron main process to use
+export { getDbPath };

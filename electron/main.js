@@ -1,27 +1,32 @@
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const url = require('url');
+const fs = require('fs');
 const isDev = process.env.NODE_ENV !== 'production';
-const sqlite3 = require('sqlite3');
-const { open } = require('sqlite');
-const bcrypt = require('bcrypt'); // Required for password hashing
+// Note: sqlite3 and open are not directly used here anymore if all DB logic is in database.ts
+// const sqlite3 = require('sqlite3');
+// const { open } = require('sqlite');
+// const bcrypt = require('bcrypt'); // bcrypt is used within database.ts
 
-// Database connection
-let db;
+// Database connection - managed by database.ts
+// let db; // db instance is now managed within database.ts
 
 // Import database functions from src/lib/database
-// Note: Direct import from 'src' might need path adjustments or module aliasing
-// For simplicity, we'll assume direct relative path works or adjust later
-// This also means database.ts functions need to be compatible with Node.js environment
 const dbActions = require('../src/lib/database'); // Adjust path if needed
+
+// Keep a global reference of the window object, if you don't, the window will
+// be closed automatically when the JavaScript object is garbage collected.
+let mainWindow;
 
 
 async function initDatabase() {
   try {
     // Use the initDatabase function from database.ts which now handles path correctly
-    db = await dbActions.initDatabase();
-    console.log('Electron Main: Database initialized successfully using database.ts logic');
+    // This just ensures the DB is initialized on app start if needed by Electron directly,
+    // though most direct DB calls will come from IPC handlers calling dbActions.
+    await dbActions.initDatabase();
+    console.log('Electron Main: Database initialization check complete via database.ts logic');
   } catch (error) {
     console.error('Electron Main: Database initialization error:', error);
   }
@@ -39,7 +44,7 @@ function createWindow() {
   });
   mainWindow.setTitle('InvoiceFlow - Invoice Management System');
   const startUrl = isDev
-    ? 'http://localhost:9002'
+    ? 'http://localhost:9002' // Port from package.json dev script
     : url.format({
         pathname: path.join(__dirname, '../out/index.html'),
         protocol: 'file:',
@@ -55,7 +60,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await initDatabase();
+  await initDatabase(); // Ensure database is ready
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -64,7 +69,8 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
+  await dbActions.closeDatabase(); // Close DB connection when app closes
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -82,13 +88,27 @@ ipcMain.handle('save-company-info', async (event, company) => dbActions.saveComp
 
 // --- Customer Handlers ---
 ipcMain.handle('get-all-customers', async () => dbActions.getAllCustomers());
-ipcMain.handle('add-customer', async (event, customer) => dbActions.addCustomer(customer));
+ipcMain.handle('add-customer', async (event, customer) => {
+  try {
+    return await dbActions.addCustomer(customer);
+  } catch (error) {
+    console.error('Error in add-customer IPC handler:', error);
+    throw error; // Re-throw to be caught by renderer
+  }
+});
 ipcMain.handle('delete-customer', async (event, id) => dbActions.deleteCustomer(id));
 ipcMain.handle('clear-all-customers', async () => dbActions.clearAllCustomers());
 
 // --- Product Handlers ---
 ipcMain.handle('get-all-products', async () => dbActions.getAllProducts());
-ipcMain.handle('add-product', async (event, product) => dbActions.addProduct(product));
+ipcMain.handle('add-product', async (event, product) => {
+   try {
+    return await dbActions.addProduct(product);
+  } catch (error) {
+    console.error('Error in add-product IPC handler:', error);
+    throw error; // Re-throw to be caught by renderer
+  }
+});
 ipcMain.handle('delete-product', async (event, id) => dbActions.deleteProduct(id));
 ipcMain.handle('clear-all-products', async () => dbActions.clearAllProducts());
 
@@ -101,13 +121,12 @@ ipcMain.handle('get-all-users', async () => {
     return await dbActions.getAllUsers();
   } catch (error) {
     console.error('Error in get-all-users IPC handler:', error);
-    throw error; // Re-throw to be caught by renderer
+    throw error; 
   }
 });
 
 ipcMain.handle('create-user', async (event, userData) => {
   try {
-    // userData should include: username, password, role, name, email, isActive
     return await dbActions.createUser(userData);
   } catch (error) {
     console.error('Error in create-user IPC handler:', error);
@@ -117,7 +136,6 @@ ipcMain.handle('create-user', async (event, userData) => {
 
 ipcMain.handle('update-user', async (event, { userId, userData }) => {
   try {
-    // userData can be partial: username, password (optional), role, name, email, isActive
     return await dbActions.updateUser(userId, userData);
   } catch (error) {
     console.error('Error in update-user IPC handler:', error);
@@ -134,12 +152,64 @@ ipcMain.handle('delete-user', async (event, userId) => {
   }
 });
 
-ipcMain.handle('validate-user-credentials', async (event, { username, password }) => {
+ipcMain.handle('validate-user-credentials', async (event, { username, password_NOT_Hashed_Yet }) => {
   try {
-    return await dbActions.validateUserCredentials(username, password);
+    // The password_NOT_Hashed_Yet naming implies it's plain text from form.
+    // The validateUserCredentials function in database.ts should handle comparison with hashed password.
+    return await dbActions.validateUserCredentials(username, password_NOT_Hashed_Yet);
   } catch (error)
   {
     console.error('Error in validate-user-credentials IPC handler:', error);
+    throw error;
+  }
+});
+
+// --- Database Backup/Restore IPC Handlers ---
+ipcMain.handle('get-database-path', async () => {
+  try {
+    // dbActions.getDbPath() should be callable and return the Electron userData path for the DB
+    return dbActions.getDbPath();
+  } catch (error) {
+    console.error('Error getting database path:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('backup-database', async () => {
+  const currentDbPath = dbActions.getDbPath();
+  const defaultFileName = `invoiceflow_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+  
+  const { filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Backup Database',
+    defaultPath: path.join(app.getPath('documents'), defaultFileName),
+    filters: [{ name: 'Database Files', extensions: ['db'] }]
+  });
+
+  if (filePath) {
+    try {
+      await dbActions.closeDatabase(); // Ensure DB is closed before copying
+      fs.copyFileSync(currentDbPath, filePath);
+      await dbActions.initDatabase(); // Re-initialize DB connection
+      return { success: true, path: filePath };
+    } catch (error) {
+      console.error('Database backup failed:', error);
+      await dbActions.initDatabase(); // Attempt to re-initialize if closing failed before copy
+      throw error;
+    }
+  }
+  return { success: false, message: 'Backup cancelled by user.' };
+});
+
+ipcMain.handle('restore-database', async (event, sourceFilePath) => {
+  const targetDbPath = dbActions.getDbPath();
+  try {
+    await dbActions.closeDatabase(); // Ensure DB is closed before replacing
+    fs.copyFileSync(sourceFilePath, targetDbPath);
+    await dbActions.initDatabase(); // Re-initialize with the new DB file
+    return { success: true };
+  } catch (error) {
+    console.error('Database restore failed:', error);
+    await dbActions.initDatabase(); // Attempt to re-initialize if closing failed before copy
     throw error;
   }
 });

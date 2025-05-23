@@ -23,8 +23,6 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Placeholder: In a real app, you would call an authentication service here.
-    // For now, we'll simulate a login attempt that uses electronAPI if available.
     if (window.electronAPI && window.electronAPI.validateUserCredentials) {
       try {
         const user = await window.electronAPI.validateUserCredentials({ username, password_NOT_Hashed_Yet: password });
@@ -32,8 +30,8 @@ export default function LoginPage() {
           // TODO: Implement actual session management (e.g., using AuthContext)
           // For now, just show a success toast and redirect
           toast({
-            title: "Login Successful (Placeholder)",
-            description: `Welcome back, ${user.name || user.username}! Session management not yet implemented.`,
+            title: "Login Successful",
+            description: `Welcome back, ${user.name || user.username}!`,
           });
           router.push('/dashboard'); // Redirect to dashboard or intended page
         } else {
@@ -53,15 +51,16 @@ export default function LoginPage() {
       }
     } else {
       // Fallback for non-Electron environment or if API is missing
+      // This demo fallback should ideally be removed in a production Electron app
       if (username === 'admin' && password === 'admin123') {
         toast({
           title: "Login Successful (Demo)",
-          description: "Welcome back, Admin! This is a demo login.",
+          description: "Welcome back, Admin!",
         });
         router.push('/dashboard');
       } else {
         toast({
-          title: "Login Failed",
+          title: "Login Failed (Demo)",
           description: "Invalid username or password.",
           variant: "destructive",
         });
@@ -114,7 +113,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        Default credentials: admin / admin123
+        Default credentials for initial admin: admin / admin123
       </p>
     </div>
   );

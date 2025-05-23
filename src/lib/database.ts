@@ -45,9 +45,6 @@ let db: Database | null = null;
 function getDbPath() {
   try {
     // Check if running in Electron's main process by trying to require 'electron'
-    // This check might be problematic if 'electron' is not a direct dependency of this specific file's execution context
-    // or if tree-shaking/bundling removes the require if not used elsewhere in this module's direct import chain.
-    // A more robust way might be to pass an environment flag or use a global.
     const electronApp = require('electron').app;
     if (electronApp) {
       return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
@@ -526,4 +523,5 @@ export async function clearAllData(): Promise<boolean> {
 }
 
 export { getDbPath };
+    
     

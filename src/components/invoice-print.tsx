@@ -1,14 +1,15 @@
+
 'use client';
 
 import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
-import { StoredInvoice } from '@/lib/database';
+import { StoredInvoice } from '@/lib/database'; // Updated type
 import { formatDateFns } from 'date-fns';
 
 interface InvoicePrintProps {
   invoice: StoredInvoice;
-  company: any;
+  company: any; // Consider defining a Company type
   printType?: 'Original' | 'Duplicate' | 'Triplicate';
 }
 
@@ -23,120 +24,48 @@ export function InvoicePrint({ invoice, company, printType = 'Original' }: Invoi
     if (!printWindow) return;
 
     const printDocument = printWindow.document;
+    // Added more comprehensive styling for better print output
     printDocument.write(`
       <html>
         <head>
           <title>Print Invoice - ${invoice.invoiceNumber}</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              padding: 0;
-              color: #000;
-            }
-            .invoice-container {
-              max-width: 800px;
-              margin: 0 auto;
-              padding: 20px;
-              border: 1px solid #ddd;
-            }
-            .invoice-header {
-              text-align: center;
-              margin-bottom: 20px;
-              border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-            }
-            .invoice-header h1 {
-              margin: 5px 0;
-              font-size: 24px;
-              text-transform: uppercase;
-            }
-            .invoice-header h2 {
-              margin: 5px 0;
-              font-size: 18px;
-            }
-            .invoice-header p {
-              margin: 5px 0;
-              font-size: 14px;
-            }
-            .invoice-sections {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 20px;
-            }
-            .invoice-section {
-              width: 48%;
-              border: 1px solid #ddd;
-              padding: 10px;
-            }
-            .invoice-section h3 {
-              margin-top: 0;
-              margin-bottom: 10px;
-              font-size: 16px;
-              border-bottom: 1px solid #ddd;
-              padding-bottom: 5px;
-            }
-            .invoice-section p {
-              margin: 5px 0;
-              font-size: 14px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 20px;
-            }
-            th, td {
-              border: 1px solid #ddd;
-              padding: 8px;
-              text-align: left;
-            }
-            th {
-              background-color: #f8f8f8;
-            }
-            .total-row {
-              font-weight: bold;
-            }
-            .amount-in-words {
-              margin-bottom: 20px;
-              font-style: italic;
-            }
-            .footer-sections {
-              display: flex;
-              justify-content: space-between;
-              margin-top: 30px;
-            }
-            .bank-details, .notes, .summary {
-              width: 30%;
-              border: 1px solid #ddd;
-              padding: 10px;
-            }
-            .signature {
-              display: flex;
-              justify-content: space-between;
-              margin-top: 50px;
-            }
-            .signature div {
-              width: 40%;
-              text-align: center;
-              border-top: 1px solid #000;
-              padding-top: 10px;
-            }
+            body { font-family: 'Arial', sans-serif; margin: 20px; color: #333; font-size: 10pt; }
+            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
+            .header, .company-details, .customer-details, .invoice-details, .shipment-info { margin-bottom: 20px; }
+            .header h1 { text-align: center; color: #333; margin-bottom: 5px; font-size: 1.8em; text-transform: uppercase;}
+            .header h2 { text-align: center; color: #555; margin-bottom: 2px; font-size: 1.2em;}
+            .header p { text-align: center; color: #777; margin: 0; font-size: 0.9em; }
+            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom:20px; }
+            .details-section { padding:10px; border: 1px solid #f0f0f0; border-radius: 4px; }
+            .details-section h3 { margin-top: 0; font-size: 1em; color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
+            .details-section p { margin: 4px 0; font-size: 0.9em; }
+            .details-section p strong { color: #555; }
+            table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; }
+            table td, table th { padding: 8px; border: 1px solid #ddd; vertical-align: top; }
+            table th { background-color: #f8f8f8; font-weight: bold; text-align:center; }
+            table .description { width: 40%; }
+            table .number { text-align: right; }
+            .totals { margin-top: 20px; text-align: right; }
+            .totals table { width: auto; margin-left: auto; border: none; }
+            .totals table td, .totals table th { border: none; padding: 5px 8px; }
+            .totals table tr.heading td { background: #eee; border-bottom: 1px solid #ddd; font-weight: bold; }
+            .totals table tr.total td { border-top: 2px solid #eee; font-weight: bold; font-size: 1.1em; }
+            .notes-terms { margin-top: 30px; font-size: 0.85em; }
+            .notes-terms h4 { margin-bottom: 5px; }
+            .footer { text-align: center; font-size: 0.8em; color: #777; margin-top: 30px; padding-top:10px; border-top: 1px solid #eee; }
+            .print-type { text-align: right; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
             @media print {
-              .no-print {
-                display: none;
-              }
-              body {
-                margin: 0;
-                padding: 0;
-              }
-              .invoice-container {
-                border: none;
-              }
+              .no-print { display: none; }
+              body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .invoice-box { box-shadow: none; border: none; margin: 0; max-width: 100%; padding: 10px 0; }
             }
           </style>
         </head>
         <body>
-          ${content.innerHTML}
+          <div class="invoice-box">
+            ${content.innerHTML}
+          </div>
           <script>
             window.onload = function() { window.print(); window.close(); }
           </script>
@@ -146,197 +75,136 @@ export function InvoicePrint({ invoice, company, printType = 'Original' }: Invoi
     printDocument.close();
   };
 
-  // Calculate subtotal, tax, total
-  const subtotal = invoice.items.reduce(
-    (sum, item) => sum + (item.quantity || 0) * (item.price || 0),
-    0
-  );
-  const cgst = subtotal * 0.09;
-  const sgst = subtotal * 0.09;
-  const total = subtotal + cgst + sgst;
-
-  // Convert number to words function
-  function numberToWords(num: number) {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 
-      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    
-    if (num === 0) return 'Zero';
-    
-    const convertLessThanOneThousand = (num: number) => {
-      if (num < 20) return ones[num];
-      const digit = num % 10;
-      if (num < 100) return tens[Math.floor(num / 10)] + (digit ? ' ' + ones[digit] : '');
-      return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' and ' + convertLessThanOneThousand(num % 100) : '');
-    };
-    
-    let result = '';
-    let num_parts = [];
-    
-    // Break the number into billions, millions, thousands, etc.
-    while (num > 0) {
-      num_parts.push(num % 1000);
-      num = Math.floor(num / 1000);
-    }
-    
-    if (num_parts.length > 0 && num_parts[0] > 0)
-      result = convertLessThanOneThousand(num_parts[0]);
-    
-    if (num_parts.length > 1 && num_parts[1] > 0)
-      result = convertLessThanOneThousand(num_parts[1]) + ' Thousand ' + result;
-    
-    if (num_parts.length > 2 && num_parts[2] > 0)
-      result = convertLessThanOneThousand(num_parts[2]) + ' Lakh ' + result;
-    
-    if (num_parts.length > 3 && num_parts[3] > 0)
-      result = convertLessThanOneThousand(num_parts[3]) + ' Crore ' + result;
-    
-    return result.trim();
-  }
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return amount.toFixed(2);
-  };
-
-  // Get the cents/paise part for words
-  const getPaiseInWords = (amount: number) => {
-    const paise = Math.round((amount - Math.floor(amount)) * 100);
-    return paise > 0 ? ` and ${numberToWords(paise)} Paise` : '';
-  };
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total } = useMemo(() => {
+    const currentItems = invoice.items || [];
+    const sub = currentItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
+    let cgst = 0; let sgst = 0; let igst = 0;
+    currentItems.forEach(item => {
+      const itemAmount = (item.quantity || 0) * (item.price || 0);
+      if (item.applyIgst) igst += itemAmount * ((item.igstRate || 0) / 100);
+      if (item.applyCgst) cgst += itemAmount * ((item.cgstRate || 0) / 100);
+      if (item.applySgst) sgst += itemAmount * ((item.sgstRate || 0) / 100);
+    });
+    const tax = cgst + sgst + igst;
+    const grandTotal = sub + tax;
+    return { subtotal: sub, igstAmount: igst, cgstAmount: cgst, sgstAmount: sgst, totalTax: tax, total: grandTotal };
+  }, [invoice.items]);
 
   return (
     <>
-      <Button onClick={handlePrint} className="mb-4">
+      <Button onClick={handlePrint} className="mb-4 no-print">
         <Printer className="mr-2 h-4 w-4" /> Print {printType}
       </Button>
       
-      <div ref={printRef} className="invoice-container">
-        <div className="invoice-header">
+      <div ref={printRef} className="print-content">
+        <div className="print-type">{printType} Copy</div>
+        <div className="header">
           <h1>TAX INVOICE</h1>
-          <h2>{company?.name || "Seafarer's Naval Tailors"}</h2>
-          <p>{company?.address || "NEW NO 19, OLD NO 9, LINGI-II CHETTY ST, MANNAD, CHENNAI- 600001"}</p>
-          <p>{company?.phone || "+91 9841147133"}, {company?.email || "smabdulrab@gmail.com"}</p>
+          <h2>{company?.name || "Your Company Name"}</h2>
+          <p>{company?.address || "Your Company Address"}</p>
+          <p>Phone: {company?.phone || "N/A"} | Email: {company?.email || "N/A"}</p>
+          {company?.gstin && <p>GSTIN: {company.gstin}</p>}
         </div>
-        
-        <div className="invoice-sections">
-          <div className="invoice-section">
-            <h3>Invoice Information</h3>
+
+        <div className="details-grid">
+          <div className="details-section invoice-details">
+            <h3>Invoice Details</h3>
             <p><strong>Invoice No:</strong> {invoice.invoiceNumber}</p>
-            <p><strong>Invoice Date:</strong> {invoice.invoiceDate.toLocaleDateString()}</p>
-            <p><strong>GSTIN:</strong> {company?.gstin || "33AHDPA2286J1ZM"}</p>
-            <p><strong>Reverse Charge:</strong> No</p>
+            <p><strong>Invoice Date:</strong> {formatDateFns(new Date(invoice.invoiceDate), "dd-MMM-yyyy")}</p>
+            <p><strong>Due Date:</strong> {formatDateFns(new Date(invoice.dueDate), "dd-MMM-yyyy")}</p>
+            <p><strong>Status:</strong> {invoice.paymentStatus}</p>
+            {invoice.paymentMethod && <p><strong>Payment Method:</strong> {invoice.paymentMethod}</p>}
           </div>
-          
-          <div className="invoice-section">
-            <h3>Transport Information</h3>
-            <p><strong>Transportation Mode:</strong> -</p>
-            <p><strong>LR No:</strong> -</p>
-            <p><strong>Vehicle No:</strong> -</p>
-            <p><strong>Date of Supply:</strong> {invoice.invoiceDate.toLocaleDateString()}</p>
-            <p><strong>Place of Supply:</strong> -</p>
-          </div>
-        </div>
-        
-        <div className="invoice-sections">
-          <div className="invoice-section">
-            <h3>Details of Receiver (Billed to)</h3>
-            <p><strong>Name:</strong> {invoice.customerName}</p>
-            <p><strong>Address:</strong> {invoice.customerAddress || '-'}</p>
-            <p><strong>GSTIN:</strong> {'-'}</p>
-            <p><strong>Mobile No:</strong> {'-'}</p>
-            <p><strong>State / Code:</strong> {'-'}</p>
-          </div>
-          
-          <div className="invoice-section">
-            <h3>Details of Consignee (Shipped To)</h3>
-            <p><strong>Name:</strong> {invoice.customerName}</p>
-            <p><strong>Address:</strong> {invoice.customerAddress || '-'}</p>
-            <p><strong>GSTIN:</strong> {'-'}</p>
-            <p><strong>State / Code:</strong> {'-'}</p>
+
+          <div className="details-section customer-details">
+            <h3>Billed To</h3>
+            <p><strong>{invoice.customerName}</strong></p>
+            {invoice.customerAddress && <p>{invoice.customerAddress}</p>}
+            {invoice.customerEmail && <p>Email: {invoice.customerEmail}</p>}
+            {/* Add customer GSTIN here if available from customer object */}
           </div>
         </div>
         
+        {(invoice.shipmentDetails?.consigneeName || invoice.shipmentDetails?.transportationMode) && (
+          <div className="details-grid shipment-info">
+            <div className="details-section">
+              <h3>Shipped To (Consignee)</h3>
+              <p><strong>Name:</strong> {invoice.shipmentDetails?.consigneeName || invoice.customerName}</p>
+              <p><strong>Address:</strong> {invoice.shipmentDetails?.consigneeAddress || invoice.customerAddress || 'N/A'}</p>
+              {invoice.shipmentDetails?.consigneeGstin && <p><strong>GSTIN:</strong> {invoice.shipmentDetails.consigneeGstin}</p>}
+              {invoice.shipmentDetails?.consigneeStateCode && <p><strong>State/Code:</strong> {invoice.shipmentDetails.consigneeStateCode}</p>}
+            </div>
+            <div className="details-section">
+              <h3>Transport Information</h3>
+              <p><strong>Mode:</strong> {invoice.shipmentDetails?.transportationMode || 'N/A'}</p>
+              <p><strong>Date of Supply:</strong> {invoice.shipmentDetails?.dateOfSupply ? formatDateFns(new Date(invoice.shipmentDetails.dateOfSupply), "dd-MMM-yyyy") : 'N/A'}</p>
+              <p><strong>LR No.:</strong> {invoice.shipmentDetails?.lrNo || 'N/A'}</p>
+              <p><strong>Vehicle No.:</strong> {invoice.shipmentDetails?.vehicleNo || 'N/A'}</p>
+              <p><strong>Place of Supply:</strong> {invoice.shipmentDetails?.placeOfSupply || 'N/A'}</p>
+              {invoice.shipmentDetails?.carrierName && <p><strong>Carrier:</strong> {invoice.shipmentDetails.carrierName}</p>}
+              {invoice.shipmentDetails?.trackingNumber && <p><strong>Tracking #:</strong> {invoice.shipmentDetails.trackingNumber}</p>}
+              {invoice.shipmentDetails?.shipDate && <p><strong>Ship Date:</strong> {formatDateFns(new Date(invoice.shipmentDetails.shipDate), "dd-MMM-yyyy")}</p>}
+            </div>
+          </div>
+        )}
+
         <table>
           <thead>
             <tr>
-              <th>Sr.</th>
-              <th>Description</th>
+              <th>#</th>
+              <th className="description">Item & Description</th>
               <th>HSN/SAC</th>
               <th>Qty</th>
-              <th>Rate</th>
-              <th>Amount</th>
-              <th>CGST %</th>
-              <th>SGST %</th>
-              <th>IGST %</th>
-              <th>Total</th>
+              <th className="number">Rate (₹)</th>
+              <th className="number">Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, index) => {
-              const itemTotal = (item.quantity || 0) * (item.price || 0);
-              return (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>{item.description}</td>
-                  <td>{item.gstCategory || '-'}</td>
-                  <td>{item.quantity}</td>
-                  <td>{formatCurrency(item.price || 0)}</td>
-                  <td>{formatCurrency(itemTotal)}</td>
-                  <td>9.00</td>
-                  <td>9.00</td>
-                  <td>-</td>
-                  <td>{formatCurrency(itemTotal * 1.18)}</td>
-                </tr>
-              );
-            })}
-            <tr className="total-row">
-              <td colSpan={5}>Total</td>
-              <td>{formatCurrency(subtotal)}</td>
-              <td colSpan={2}>{formatCurrency(cgst + sgst)}</td>
-              <td>-</td>
-              <td>{formatCurrency(total)}</td>
-            </tr>
+            {invoice.items.map((item, index) => (
+              <tr key={index}>
+                <td>{index + 1}</td>
+                <td>
+                  <strong>{products.find(p => p.id === item.productId)?.name || 'N/A'}</strong><br />
+                  <small>{item.description}</small>
+                </td>
+                <td>{item.gstCategory || '-'}</td>
+                <td className="number">{item.quantity}</td>
+                <td className="number">{(item.price || 0).toFixed(2)}</td>
+                <td className="number">{((item.quantity || 0) * (item.price || 0)).toFixed(2)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
-        
-        <div className="amount-in-words">
-          <strong>Amount in Words:</strong> {numberToWords(Math.floor(total))}{getPaiseInWords(total)} Only
+
+        <div className="totals">
+          <table>
+            <tr><td>Subtotal:</td><td className="number">₹{subtotal.toFixed(2)}</td></tr>
+            {igstAmount > 0 && <tr><td>IGST Total:</td><td className="number">₹{igstAmount.toFixed(2)}</td></tr>}
+            {cgstAmount > 0 && <tr><td>CGST Total:</td><td className="number">₹{cgstAmount.toFixed(2)}</td></tr>}
+            {sgstAmount > 0 && <tr><td>SGST Total:</td><td className="number">₹{sgstAmount.toFixed(2)}</td></tr>}
+            <tr className="total"><td>Grand Total:</td><td className="number">₹{total.toFixed(2)}</td></tr>
+          </table>
         </div>
-        
-        <div className="footer-sections">
-          <div className="bank-details">
-            <h3>Bank Details</h3>
-            <p><strong>Account Name:</strong> {company?.name || "Seafarer Naval Tailor"}</p>
-            <p><strong>Bank A/C No:</strong> {company?.bank_account || "01662560007135"}</p>
-            <p><strong>Bank Name:</strong> {company?.bank_name || "HDFC BANK"}</p>
-            <p><strong>Bank IFSC:</strong> {company?.bank_ifsc || "HDFC0001166"}</p>
+
+        {company?.bank_name && (
+          <div className="notes-terms">
+            <h4>Bank Details:</h4>
+            <p>Bank: {company.bank_name} | A/C: {company.bank_account} | IFSC: {company.bank_ifsc}</p>
           </div>
-          
-          <div className="notes">
-            <h3>Notes</h3>
-            <p>{invoice.notes || "Test invoice created automatically"}</p>
-          </div>
-          
-          <div className="summary">
-            <h3>Summary</h3>
-            <p><strong>Sub Total:</strong> {formatCurrency(subtotal)}</p>
-            <p><strong>Total Tax:</strong> {formatCurrency(cgst + sgst)}</p>
-            <p><strong>Round Off:</strong> 0.00</p>
-            <p><strong>Grand Total:</strong> {formatCurrency(total)}</p>
-          </div>
+        )}
+
+        <div className="notes-terms">
+          {invoice.notes && <><h4>Notes:</h4><p>{invoice.notes}</p></>}
+          {invoice.termsAndConditions && <><h4>Terms & Conditions:</h4><p>{invoice.termsAndConditions}</p></>}
         </div>
-        
-        <div className="signature">
-          <div>
-            <p>Customer's Signature</p>
-          </div>
-          <div>
-            <p>For {company?.name || "Seafarer's Naval Tailors"}</p>
-            <p>Authorized Signatory</p>
-          </div>
+
+        <div className="footer">
+          <p>This is a computer-generated invoice.</p>
+          <p>For {company?.name || "Your Company Name"} | Authorized Signatory</p>
         </div>
       </div>
     </>
   );
-} 
+}
+
+    

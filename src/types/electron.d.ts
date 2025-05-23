@@ -1,8 +1,5 @@
 
-// Define the structure of StoredInvoice if it's complex and shared
-// For now, using 'any' for simplicity, but ideally, this would be a proper type.
-// Assuming InvoiceFormValues and other related types are defined elsewhere
-// and StoredInvoice is imported or defined in files using it.
+import type { User as AppUser } from '@/lib/database'; // Assuming User type is in database.ts
 
 interface CustomerData {
   id: string;
@@ -24,16 +21,22 @@ interface ProductData {
   sgstRate: number;
 }
 
+// For user data being passed to/from IPC, omit password for creation/update where appropriate
+type UserCreationData = Omit<AppUser, 'id' | 'isSystemAdmin'> & { password_NOT_Hashed_Yet: string }; // Or a more specific type
+type UserUpdateData = Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password_NOT_Hashed_Yet?: string };
+type UserListData = Omit<AppUser, 'password'>;
+
+
 interface ElectronAPI {
   // Invoice operations
-  getAllInvoices: () => Promise<any[]>; // Consider defining a stricter type for invoice
+  getAllInvoices: () => Promise<any[]>; 
   getInvoiceById: (id: string) => Promise<any | null>;
-  saveInvoice: (invoice: any) => Promise<boolean>; // Invoice data might need specific typing
+  saveInvoice: (invoice: any) => Promise<boolean>; 
   deleteInvoice: (id: string) => Promise<boolean>;
   
   // Company operations
-  getCompanyInfo: () => Promise<any | null>; // Define CompanyInfo type
-  saveCompanyInfo: (data: any) => Promise<boolean>; // Define CompanyInfo type for data
+  getCompanyInfo: () => Promise<any | null>; 
+  saveCompanyInfo: (data: any) => Promise<boolean>; 
 
   // Customer operations
   getAllCustomers: () => Promise<CustomerData[]>;
@@ -49,6 +52,15 @@ interface ElectronAPI {
 
   // General data operations
   clearAllData: () => Promise<boolean>;
+
+  // User Management operations
+  getAllUsers: () => Promise<UserListData[]>;
+  // For createUser, password is plain text from form, hashing happens in main/dbActions
+  createUser: (userData: Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'> & { password: string } ) => Promise<string | null>; // Returns new user ID or null
+  // For updateUser, password is plain text if being changed
+  updateUser: (userId: string, userData: Partial<Omit<AppUser, 'id' | 'isSystemAdmin' | 'password'>> & { password?: string }) => Promise<boolean>;
+  deleteUser: (userId: string) => Promise<boolean>;
+  validateUserCredentials: (credentials: {username: string, password_NOT_Hashed_Yet: string}) => Promise<UserListData | null>;
 }
 
 declare global {
@@ -57,5 +69,4 @@ declare global {
   }
 }
 
-// To make this file a module and avoid "Cannot be compiled under '--isolatedModules'"
 export {};

@@ -1,3 +1,4 @@
+
 'use server';
 
 import sqlite3 from 'sqlite3';
@@ -15,12 +16,12 @@ export interface StoredInvoice extends InvoiceFormValues {
 export interface User {
   id: string;
   username: string;
-  password: string; // This is hashed
+  password?: string; // Hashed password, optional for reads
   role: 'admin' | 'user';
   name: string;
   email: string;
   isActive: boolean;
-  isSystemAdmin: boolean; // If true, this user can't be deleted
+  isSystemAdmin: boolean;
 }
 
 let db: any = null;
@@ -30,14 +31,15 @@ export async function initDatabase() {
   if (db) return db;
   
   try {
-    const dbPath = path.join(process.cwd(), 'invoiceflow.db');
+    const dbPath = process.env.NODE_ENV === 'development' 
+      ? path.join(process.cwd(), 'invoiceflow.db') // For Next.js server-side in dev
+      : path.join(require('electron').app.getPath('userData'), 'invoiceflow.db'); // For Electron
     
     db = await open({
       filename: dbPath,
       driver: sqlite3.Database
     });
     
-    // Create tables if they don't exist
     await db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
@@ -106,8 +108,11 @@ export async function initDatabase() {
         price REAL,
         imageUrl TEXT,
         gstCategory TEXT,
-        gstType TEXT,
-        gstRate REAL
+        gstType TEXT, 
+        gstRate REAL,
+        igstRate REAL, 
+        cgstRate REAL,
+        sgstRate REAL 
       );
       
       CREATE TABLE IF NOT EXISTS users (
@@ -122,419 +127,137 @@ export async function initDatabase() {
       );
     `);
     
-    // Check if admin user exists, create if not
     const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
     if (!adminExists) {
-      // Create default admin user with password 'admin123'
       const hashedPassword = await hash('admin123', 10);
       await db.run(`
         INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        'admin',
-        'admin',
-        hashedPassword,
-        'admin',
-        'System Administrator',
-        'admin@invoiceflow.com',
-        1,
-        1
+        `user_admin_${Date.now()}`, 'admin', hashedPassword, 'admin', 'System Administrator', 'admin@invoiceflow.com', 1, 1
       ]);
-      console.log('Default admin user created');
+      console.log('Default admin user created in database.ts');
     }
     
     return db;
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('Database initialization error in database.ts:', error);
     throw error;
   }
 }
 
 // User management functions
-export async function getAllUsers(): Promise<User[]> {
-  try {
-    await initDatabase();
-    
-    const users = await db.all(`
-      SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users
-    `);
-    
-    return users.map(user => ({
-      ...user,
-      isActive: Boolean(user.isActive),
-      isSystemAdmin: Boolean(user.isSystemAdmin),
-      password: '' // Don't return the password
-    }));
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return [];
-  }
+export async function getAllUsers(): Promise<Omit<User, 'password'>[]> {
+  await initDatabase();
+  const usersData = await db.all('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users ORDER BY username');
+  return usersData.map((u: any) => ({ ...u, isActive: !!u.isActive, isSystemAdmin: !!u.isSystemAdmin }));
 }
 
 export async function getUserById(id: string): Promise<Omit<User, 'password'> | null> {
-  try {
-    await initDatabase();
-    
-    const user = await db.get(`
-      SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users WHERE id = ?
-    `, [id]);
-    
-    if (!user) return null;
-    
-    return {
-      ...user,
-      isActive: Boolean(user.isActive),
-      isSystemAdmin: Boolean(user.isSystemAdmin)
-    };
-  } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
-  }
+  await initDatabase();
+  const userData = await db.get('SELECT id, username, role, name, email, isActive, isSystemAdmin FROM users WHERE id = ?', [id]);
+  if (!userData) return null;
+  return { ...userData, isActive: !!userData.isActive, isSystemAdmin: !!userData.isSystemAdmin };
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
-  try {
-    await initDatabase();
-    
-    const user = await db.get(`
-      SELECT * FROM users WHERE username = ?
-    `, [username]);
-    
-    if (!user) return null;
-    
-    return {
-      ...user,
-      isActive: Boolean(user.isActive),
-      isSystemAdmin: Boolean(user.isSystemAdmin)
-    };
-  } catch (error) {
-    console.error('Error fetching user by username:', error);
-    return null;
-  }
+  await initDatabase();
+  const userData = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+   if (!userData) return null;
+  return { ...userData, isActive: !!userData.isActive, isSystemAdmin: !!userData.isSystemAdmin };
 }
 
-export async function createUser(user: Omit<User, 'id'>): Promise<string | null> {
-  try {
-    await initDatabase();
-    
-    // Check if username already exists
-    const existingUser = await db.get(`
-      SELECT id FROM users WHERE username = ?
-    `, [user.username]);
-    
-    if (existingUser) {
-      throw new Error('Username already exists');
-    }
-    
-    const hashedPassword = await hash(user.password, 10);
-    const userId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    
-    await db.run(`
-      INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      userId,
-      user.username,
-      hashedPassword,
-      user.role,
-      user.name || '',
-      user.email || '',
-      user.isActive ? 1 : 0,
-      0 // New users can't be system admins
-    ]);
-    
-    return userId;
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return null;
+export async function createUser(userData: Omit<User, 'id' | 'isSystemAdmin'>): Promise<string> {
+  await initDatabase();
+  const existingUser = await db.get('SELECT id FROM users WHERE username = ?', [userData.username]);
+  if (existingUser) {
+    throw new Error('Username already exists.');
   }
+  const hashedPassword = await hash(userData.password!, 10); // Password must be provided for new user
+  const newUserId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  await db.run(
+    'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [newUserId, userData.username, hashedPassword, userData.role, userData.name || '', userData.email || '', userData.isActive ? 1 : 0, 0]
+  );
+  return newUserId;
 }
 
 export async function updateUser(id: string, userData: Partial<Omit<User, 'id' | 'isSystemAdmin'>>): Promise<boolean> {
-  try {
-    await initDatabase();
-    
-    // Get the current user to check if it's a system admin
-    const currentUser = await getUserById(id);
-    
-    if (!currentUser) {
-      throw new Error('User not found');
-    }
-    
-    // Check if trying to update a system admin's role
-    if (currentUser.isSystemAdmin && userData.role === 'user') {
-      throw new Error('Cannot change system admin role');
-    }
-    
-    // Start building the query
-    let query = 'UPDATE users SET ';
-    const params: any[] = [];
-    const fields: string[] = [];
-    
-    if (userData.username !== undefined) {
-      // Check if username already exists for another user
-      const existingUser = await db.get(`
-        SELECT id FROM users WHERE username = ? AND id != ?
-      `, [userData.username, id]);
-      
-      if (existingUser) {
-        throw new Error('Username already exists');
-      }
-      
-      fields.push('username = ?');
-      params.push(userData.username);
-    }
-    
-    if (userData.password !== undefined) {
-      const hashedPassword = await hash(userData.password, 10);
-      fields.push('password = ?');
-      params.push(hashedPassword);
-    }
-    
-    if (userData.role !== undefined) {
-      fields.push('role = ?');
-      params.push(userData.role);
-    }
-    
-    if (userData.name !== undefined) {
-      fields.push('name = ?');
-      params.push(userData.name);
-    }
-    
-    if (userData.email !== undefined) {
-      fields.push('email = ?');
-      params.push(userData.email);
-    }
-    
-    if (userData.isActive !== undefined) {
-      fields.push('isActive = ?');
-      params.push(userData.isActive ? 1 : 0);
-    }
-    
-    if (fields.length === 0) {
-      // Nothing to update
-      return true;
-    }
-    
-    query += fields.join(', ') + ' WHERE id = ?';
-    params.push(id);
-    
-    await db.run(query, params);
-    
-    return true;
-  } catch (error) {
-    console.error('Error updating user:', error);
-    return false;
+  await initDatabase();
+  const currentUser = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+  if (!currentUser) throw new Error('User not found.');
+
+  const updates: string[] = [];
+  const params: any[] = [];
+
+  if (userData.username && userData.username !== currentUser.username) {
+    const existingUser = await db.get('SELECT id FROM users WHERE username = ? AND id != ?', [userData.username, id]);
+    if (existingUser) throw new Error('Username already exists.');
+    updates.push('username = ?');
+    params.push(userData.username);
   }
+  if (userData.password) {
+    const hashedPassword = await hash(userData.password, 10);
+    updates.push('password = ?');
+    params.push(hashedPassword);
+  }
+  if (userData.role && (!currentUser.isSystemAdmin || userData.role === 'admin')) { // System admin role cannot be changed from admin
+    updates.push('role = ?');
+    params.push(userData.role);
+  }
+  if (userData.name !== undefined) {
+    updates.push('name = ?');
+    params.push(userData.name);
+  }
+  if (userData.email !== undefined) {
+    updates.push('email = ?');
+    params.push(userData.email);
+  }
+  if (userData.isActive !== undefined && (!currentUser.isSystemAdmin || userData.isActive)) { // System admin cannot be deactivated
+    updates.push('isActive = ?');
+    params.push(userData.isActive ? 1 : 0);
+  }
+
+  if (updates.length === 0) return true;
+
+  const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+  params.push(id);
+  await db.run(query, params);
+  return true;
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
-  try {
-    await initDatabase();
-    
-    // Check if the user is a system admin
-    const user = await getUserById(id);
-    
-    if (!user) {
-      throw new Error('User not found');
-    }
-    
-    if (user.isSystemAdmin) {
-      throw new Error('Cannot delete system admin user');
-    }
-    
-    await db.run('DELETE FROM users WHERE id = ?', [id]);
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    return false;
-  }
+  await initDatabase();
+  const user = await db.get('SELECT isSystemAdmin FROM users WHERE id = ?', [id]);
+  if (!user) throw new Error('User not found.');
+  if (user.isSystemAdmin) throw new Error('System admin user cannot be deleted.');
+  
+  await db.run('DELETE FROM users WHERE id = ?', [id]);
+  return true;
 }
 
-export async function validateUserCredentials(username: string, password: string): Promise<Omit<User, 'password'> | null> {
-  try {
-    await initDatabase();
-    
-    const user = await getUserByUsername(username);
-    
-    if (!user || !user.isActive) {
-      return null;
-    }
-    
-    const passwordMatch = await compare(password, user.password);
-    
-    if (!passwordMatch) {
-      return null;
-    }
-    
-    const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-  } catch (error) {
-    console.error('Error validating user credentials:', error);
-    return null;
-  }
+export async function validateUserCredentials(username: string, passwordAttempt: string): Promise<Omit<User, 'password'> | null> {
+  await initDatabase();
+  const user = await getUserByUsername(username);
+  if (!user || !user.isActive || !user.password) return null;
+
+  const isMatch = await compare(passwordAttempt, user.password);
+  if (!isMatch) return null;
+
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
 }
+
 
 // Get all invoices
 export async function getAllInvoices(): Promise<StoredInvoice[]> {
-  try {
-    await initDatabase();
-    
-    const invoices = await db.all(`
-      SELECT * FROM invoices ORDER BY invoiceDate DESC
-    `);
-    
-    const result: StoredInvoice[] = [];
-    
-    for (const invoice of invoices) {
-      const items = await db.all(`
-        SELECT * FROM invoice_items WHERE invoiceId = ?
-      `, [invoice.id]);
-      
-      const shipmentDetails = await db.get(`
-        SELECT * FROM shipment_details WHERE invoiceId = ?
-      `, [invoice.id]);
-      
-      result.push({
-        ...invoice,
-        invoiceDate: new Date(invoice.invoiceDate),
-        dueDate: new Date(invoice.dueDate),
-        items: items.map(item => ({
-          productId: item.productId,
-          description: item.description,
-          quantity: item.quantity,
-          price: item.price,
-          gstCategory: item.gstCategory,
-          gstType: item.gstType || "IGST",
-          gstRate: item.gstRate || 18
-        })),
-        shipmentDetails: shipmentDetails ? {
-          shipDate: shipmentDetails.shipDate ? new Date(shipmentDetails.shipDate) : null,
-          trackingNumber: shipmentDetails.trackingNumber,
-          carrierName: shipmentDetails.carrierName,
-          shippingAddress: shipmentDetails.shippingAddress
-        } : {
-          shipDate: null,
-          trackingNumber: "",
-          carrierName: "",
-          shippingAddress: ""
-        }
-      });
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('Error fetching invoices:', error);
-    return [];
-  }
-}
-
-// Save invoice to database
-export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
-  try {
-    await initDatabase();
-    
-    // Start a transaction
-    await db.run('BEGIN TRANSACTION');
-    
-    // Insert invoice
-    await db.run(`
-      INSERT OR REPLACE INTO invoices (
-        id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, 
-        invoiceDate, dueDate, notes, termsAndConditions, invoiceImage, status, amount, 
-        paymentStatus, paymentMethod
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      invoice.id,
-      invoice.invoiceNumber,
-      invoice.customerId || '',
-      invoice.customerName,
-      invoice.customerEmail || '',
-      invoice.customerAddress || '',
-      invoice.invoiceDate.toISOString(),
-      invoice.dueDate.toISOString(),
-      invoice.notes || '',
-      invoice.termsAndConditions || '',
-      invoice.invoiceImage || '',
-      invoice.status,
-      invoice.amount,
-      invoice.paymentStatus || 'Unpaid',
-      invoice.paymentMethod || ''
-    ]);
-    
-    // Delete existing items
-    await db.run(`DELETE FROM invoice_items WHERE invoiceId = ?`, [invoice.id]);
-    
-    // Insert new items
-    for (const item of invoice.items) {
-      await db.run(`
-        INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        invoice.id,
-        item.productId || '',
-        item.description,
-        item.quantity,
-        item.price,
-        item.gstCategory || '',
-        item.gstType || 'IGST',
-        item.gstRate || 18
-      ]);
-    }
-    
-    // Handle shipment details
-    if (invoice.shipmentDetails) {
-      // Delete existing shipment details
-      await db.run(`DELETE FROM shipment_details WHERE invoiceId = ?`, [invoice.id]);
-      
-      // Insert new shipment details
-      if (invoice.shipmentDetails.shippingAddress || invoice.shipmentDetails.trackingNumber || invoice.shipmentDetails.carrierName) {
-        await db.run(`
-          INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress)
-          VALUES (?, ?, ?, ?, ?)
-        `, [
-          invoice.id,
-          invoice.shipmentDetails.shipDate ? invoice.shipmentDetails.shipDate.toISOString() : null,
-          invoice.shipmentDetails.trackingNumber || '',
-          invoice.shipmentDetails.carrierName || '',
-          invoice.shipmentDetails.shippingAddress || ''
-        ]);
-      }
-    }
-    
-    // Commit the transaction
-    await db.run('COMMIT');
-    
-    return true;
-  } catch (error) {
-    console.error('Error saving invoice:', error);
-    // Rollback in case of error
-    await db.run('ROLLBACK');
-    return false;
-  }
-}
-
-// Get invoice by id
-export async function getInvoiceById(id: string): Promise<StoredInvoice | null> {
-  try {
-    await initDatabase();
-    
-    const invoice = await db.get(`
-      SELECT * FROM invoices WHERE id = ?
-    `, [id]);
-    
-    if (!invoice) return null;
-    
-    const items = await db.all(`
-      SELECT * FROM invoice_items WHERE invoiceId = ?
-    `, [id]);
-    
-    const shipmentDetails = await db.get(`
-      SELECT * FROM shipment_details WHERE invoiceId = ?
-    `, [id]);
-    
-    return {
+  await initDatabase();
+  const invoices = await db.all('SELECT * FROM invoices ORDER BY invoiceDate DESC');
+  const result: StoredInvoice[] = [];
+  for (const invoice of invoices) {
+    const items = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
+    const shipmentDetails = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+    result.push({
       ...invoice,
       invoiceDate: new Date(invoice.invoiceDate),
       dueDate: new Date(invoice.dueDate),
@@ -543,197 +266,240 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
         description: item.description,
         quantity: item.quantity,
         price: item.price,
-        gstCategory: item.gstCategory,
-        gstType: item.gstType || "IGST",
-        gstRate: item.gstRate || 18
+        gstCategory: item.gstCategory || '',
+        applyIgst: item.gstType === 'IGST' || !item.gstType,
+        applyCgst: item.gstType === 'CGST_SGST',
+        applySgst: item.gstType === 'CGST_SGST',
+        igstRate: item.gstType === 'IGST' ? (item.gstRate || 18) : (products.find(p=>p.id === item.productId)?.igstRate || 18),
+        cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : 9) : (products.find(p=>p.id === item.productId)?.cgstRate || 9),
+        sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : 9) : (products.find(p=>p.id === item.productId)?.sgstRate || 9),
       })),
       shipmentDetails: shipmentDetails ? {
         shipDate: shipmentDetails.shipDate ? new Date(shipmentDetails.shipDate) : null,
         trackingNumber: shipmentDetails.trackingNumber,
         carrierName: shipmentDetails.carrierName,
         shippingAddress: shipmentDetails.shippingAddress
-      } : {
-        shipDate: null,
-        trackingNumber: "",
-        carrierName: "",
-        shippingAddress: ""
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching invoice:', error);
-    return null;
+      } : { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" }
+    });
   }
+  return result;
 }
 
-// Delete invoice
-export async function deleteInvoice(id: string): Promise<boolean> {
+export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
+  await initDatabase();
+  await db.run('BEGIN TRANSACTION');
   try {
-    await initDatabase();
-    
-    await db.run('BEGIN TRANSACTION');
-    
-    // Delete shipment details
-    await db.run(`DELETE FROM shipment_details WHERE invoiceId = ?`, [id]);
-    
-    // Delete items
-    await db.run(`DELETE FROM invoice_items WHERE invoiceId = ?`, [id]);
-    
-    // Delete the invoice
-    await db.run(`DELETE FROM invoices WHERE id = ?`, [id]);
-    
+    await db.run(`
+      INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, invoiceImage, status, amount, paymentStatus, paymentMethod) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+      [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate.toISOString(), invoice.notes || '', invoice.termsAndConditions || '', invoice.invoiceImage || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
+    );
+    await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
+    for (const item of invoice.items) {
+      let gstType = 'IGST';
+      let gstRate = item.igstRate;
+      if (item.applyCgst || item.applySgst) {
+        gstType = 'CGST_SGST';
+        gstRate = (item.cgstRate || 0) + (item.sgstRate || 0);
+      }
+      await db.run('INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+        [invoice.id, item.productId, item.description, item.quantity, item.price, item.gstCategory || '', gstType, gstRate]
+      );
+    }
+    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
+    if (invoice.shipmentDetails) {
+        await db.run('INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, shippingAddress) VALUES (?, ?, ?, ?, ?)',
+        [invoice.id, invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null, invoice.shipmentDetails.trackingNumber, invoice.shipmentDetails.carrierName, invoice.shipmentDetails.shippingAddress]);
+    }
     await db.run('COMMIT');
-    
     return true;
   } catch (error) {
-    console.error('Error deleting invoice:', error);
+    console.error('Error saving invoice in database.ts:', error);
     await db.run('ROLLBACK');
     return false;
   }
 }
 
-// Save company information
-export async function saveCompanyInfo(company: {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
-  gstin: string;
-  bank_name: string;
-  bank_account: string;
-  bank_ifsc: string;
-}): Promise<boolean> {
+export async function getInvoiceById(id: string): Promise<StoredInvoice | null> {
+  await initDatabase();
+  const invoiceData = await db.get('SELECT * FROM invoices WHERE id = ?', [id]);
+  if (!invoiceData) return null;
+  const itemsData = await db.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
+  const shipmentDetailsData = await db.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
+  
+  const products = await getAllProducts(); // Fetch product details for GST rates
+
+  return {
+    ...invoiceData,
+    invoiceDate: new Date(invoiceData.invoiceDate),
+    dueDate: new Date(invoiceData.dueDate),
+    items: itemsData.map(item => ({
+      productId: item.productId,
+      description: item.description,
+      quantity: item.quantity,
+      price: item.price,
+      gstCategory: item.gstCategory || '',
+      applyIgst: item.gstType === 'IGST' || !item.gstType, // Default to IGST if type is missing
+      applyCgst: item.gstType === 'CGST_SGST',
+      applySgst: item.gstType === 'CGST_SGST',
+      igstRate: item.gstType === 'IGST' ? (item.gstRate ?? products.find(p=>p.id === item.productId)?.igstRate ?? 18) : (products.find(p=>p.id === item.productId)?.igstRate ?? 18),
+      cgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (products.find(p=>p.id === item.productId)?.cgstRate ?? 9)) : (products.find(p=>p.id === item.productId)?.cgstRate ?? 9),
+      sgstRate: item.gstType === 'CGST_SGST' ? (item.gstRate ? item.gstRate / 2 : (products.find(p=>p.id === item.productId)?.sgstRate ?? 9)) : (products.find(p=>p.id === item.productId)?.sgstRate ?? 9),
+    })),
+    shipmentDetails: shipmentDetailsData ? {
+      shipDate: shipmentDetailsData.shipDate ? new Date(shipmentDetailsData.shipDate) : null,
+      trackingNumber: shipmentDetailsData.trackingNumber,
+      carrierName: shipmentDetailsData.carrierName,
+      shippingAddress: shipmentDetailsData.shippingAddress
+    } : { shipDate: null, trackingNumber: "", carrierName: "", shippingAddress: "" }
+  };
+}
+
+export async function deleteInvoice(id: string): Promise<boolean> {
+  await initDatabase();
+  await db.run('BEGIN TRANSACTION');
   try {
-    await initDatabase();
-    
-    await db.run(`
-      INSERT OR REPLACE INTO company (
-        id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc
-      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      company.name,
-      company.address,
-      company.phone,
-      company.email,
-      company.gstin,
-      company.bank_name,
-      company.bank_account,
-      company.bank_ifsc
-    ]);
-    
+    await db.run('DELETE FROM shipment_details WHERE invoiceId = ?', [id]);
+    await db.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
+    await db.run('DELETE FROM invoices WHERE id = ?', [id]);
+    await db.run('COMMIT');
     return true;
   } catch (error) {
-    console.error('Error saving company info:', error);
+    console.error('Error deleting invoice in database.ts:', error);
+    await db.run('ROLLBACK');
+    return false;
+  }
+}
+
+export async function saveCompanyInfo(company: any): Promise<boolean> {
+  await initDatabase();
+  try {
+    await db.run('INSERT OR REPLACE INTO company (id, name, address, phone, email, gstin, bank_name, bank_account, bank_ifsc) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [company.name, company.address, company.phone, company.email, company.gstin, company.bank_name, company.bank_account, company.bank_ifsc]
+    );
+    return true;
+  } catch (error) {
+    console.error('Error saving company info in database.ts:', error);
     return false;
   }
 }
 
 export async function getCompanyInfo() {
+  await initDatabase();
   try {
-    await initDatabase();
-    
-    const company = await db.get(`
-      SELECT * FROM company WHERE id = 1
-    `);
-    
-    return company || null;
+    return await db.get('SELECT * FROM company WHERE id = 1');
   } catch (error) {
-    console.error('Error fetching company info:', error);
+    console.error('Error getting company info in database.ts:', error);
     return null;
   }
 }
 
-// Save customer to database
-export async function saveCustomer(customer: {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-}): Promise<boolean> {
+export async function addCustomer(customer: any): Promise<boolean> {
+  await initDatabase();
   try {
-    await initDatabase();
-    
-    await db.run(`
-      INSERT OR REPLACE INTO customers (id, name, email, phone, address)
-      VALUES (?, ?, ?, ?, ?)
-    `, [
-      customer.id,
-      customer.name,
-      customer.email,
-      customer.phone,
-      customer.address
-    ]);
-    
+    await db.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', 
+      [customer.id, customer.name, customer.email, customer.phone, customer.address]);
     return true;
   } catch (error) {
-    console.error('Error saving customer:', error);
+    console.error('Error adding customer in database.ts:', error);
     return false;
   }
 }
 
-// Get all customers
 export async function getAllCustomers() {
+  await initDatabase();
   try {
-    await initDatabase();
-    
-    const customers = await db.all(`
-      SELECT * FROM customers ORDER BY name
-    `);
-    
-    return customers;
+    return await db.all('SELECT * FROM customers ORDER BY name');
   } catch (error) {
-    console.error('Error fetching customers:', error);
+    console.error('Error getting all customers in database.ts:', error);
     return [];
   }
 }
 
-// Save product to database
-export async function saveProduct(product: {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl: string;
-  gstCategory: string;
-  gstType: string;
-  gstRate: number;
-}): Promise<boolean> {
+export async function deleteCustomer(id: string): Promise<boolean> {
+  await initDatabase();
   try {
-    await initDatabase();
-    
-    await db.run(`
-      INSERT OR REPLACE INTO products (id, name, description, price, imageUrl, gstCategory, gstType, gstRate)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      product.id,
-      product.name,
-      product.description,
-      product.price,
-      product.imageUrl,
-      product.gstCategory,
-      product.gstType,
-      product.gstRate
-    ]);
-    
+    await db.run('DELETE FROM customers WHERE id = ?', [id]);
     return true;
   } catch (error) {
-    console.error('Error saving product:', error);
+    console.error('Error deleting customer in database.ts:', error);
     return false;
   }
 }
 
-// Get all products
-export async function getAllProducts() {
+export async function clearAllCustomers(): Promise<boolean> {
+  await initDatabase();
   try {
-    await initDatabase();
-    
-    const products = await db.all(`
-      SELECT * FROM products ORDER BY name
-    `);
-    
-    return products;
+    await db.run('DELETE FROM customers');
+    return true;
   } catch (error) {
-    console.error('Error fetching products:', error);
+    console.error('Error clearing customers in database.ts:', error);
+    return false;
+  }
+}
+
+export async function addProduct(product: any): Promise<boolean> {
+  await initDatabase();
+  try {
+    await db.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+      [product.id, product.name, product.description, product.price, product.imageUrl, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]);
+    return true;
+  } catch (error) {
+    console.error('Error adding product in database.ts:', error);
+    return false;
+  }
+}
+
+export async function getAllProducts() {
+  await initDatabase();
+  try {
+    return await db.all('SELECT * FROM products ORDER BY name');
+  } catch (error) {
+    console.error('Error getting all products in database.ts:', error);
     return [];
   }
-} 
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  await initDatabase();
+  try {
+    await db.run('DELETE FROM products WHERE id = ?', [id]);
+    return true;
+  } catch (error) {
+    console.error('Error deleting product in database.ts:', error);
+    return false;
+  }
+}
+
+export async function clearAllProducts(): Promise<boolean> {
+  await initDatabase();
+  try {
+    await db.run('DELETE FROM products');
+    return true;
+  } catch (error) {
+    console.error('Error clearing products in database.ts:', error);
+    return false;
+  }
+}
+
+export async function clearAllData(): Promise<boolean> {
+  await initDatabase();
+  await db.run('BEGIN TRANSACTION');
+  try {
+    await db.run('DELETE FROM invoice_items');
+    await db.run('DELETE FROM shipment_details');
+    await db.run('DELETE FROM invoices');
+    await db.run('DELETE FROM customers');
+    await db.run('DELETE FROM products');
+    await db.run('DELETE FROM company WHERE id = 1');
+    // Note: Users table is not cleared by this generic action for security.
+    // If you want to clear users too, you would need to do it explicitly,
+    // being careful not to delete the system admin if that's not desired.
+    await db.run('COMMIT');
+    return true;
+  } catch (error) {
+    console.error('Error clearing all data in database.ts:', error);
+    await db.run('ROLLBACK');
+    return false;
+  }
+}

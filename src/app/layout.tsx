@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Metadata } from 'next'; // Keep for potential static metadata
@@ -16,6 +17,7 @@ import { UserNav } from '@/components/user-nav';
 import { useEffect, useState, useCallback } from 'react'; 
 import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
 import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY } from '@/components/font-settings';
+// import { AuthProvider } from '@/contexts/auth-context'; // Will be uncommented when AuthProvider is ready
 
 export const metadataBase: Metadata = {
   title: 'Dynamic Company App', 
@@ -47,6 +49,7 @@ export default function RootLayout({
   const [currentThemeKey, setCurrentThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyName, setCompanyName] = useState<string>(DEFAULT_COMPANY_NAME);
   const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
+  const [isMounted, setIsMounted] = useState(false); // To prevent hydration issues with localStorage
 
   const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
     const root = document.documentElement;
@@ -67,9 +70,9 @@ export default function RootLayout({
   const applyTheme = useCallback((themeKey: string) => {
     const htmlElement = document.documentElement;
     Object.keys(AVAILABLE_THEMES).forEach(key => {
-      htmlElement.removeAttribute(`data-theme-${key}`); 
+      htmlElement.removeAttribute(`data-theme-${key}`); // Should be removeAttribute('data-theme') then set new one
     });
-    htmlElement.setAttribute('data-theme', themeKey);
+    htmlElement.setAttribute('data-theme', themeKey); // This applies the theme based on globals.css
     localStorage.setItem(THEME_STORAGE_KEY, themeKey);
     setCurrentThemeKey(themeKey);
 
@@ -77,11 +80,13 @@ export default function RootLayout({
       const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
       applyCustomThemeVariables(storedCustomTheme);
     } else {
-      resetCustomThemeVariables(); // Clear any inline styles if not custom
+      resetCustomThemeVariables(); 
     }
   }, [applyCustomThemeVariables, resetCustomThemeVariables]);
 
   useEffect(() => {
+    setIsMounted(true); // Component has mounted, safe to use localStorage
+
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
     if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
       applyTheme(storedThemeKey);
@@ -89,23 +94,16 @@ export default function RootLayout({
       applyTheme(DEFAULT_THEME_KEY);
     }
 
-    // Load and apply font preference
     const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY);
-    if (storedFontKey) {
-      const htmlElement = document.documentElement;
-      htmlElement.classList.add(`font-${storedFontKey}`);
-      
-      if (storedFontKey !== "system") {
-        document.body.style.fontFamily = `'${storedFontKey.charAt(0).toUpperCase() + storedFontKey.slice(1)}', sans-serif`;
-      } else {
-        document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif";
-      }
-    } else {
-      // Apply default font
-      const htmlElement = document.documentElement;
-      htmlElement.classList.add(`font-${DEFAULT_FONT_KEY}`);
-      document.body.style.fontFamily = `'${DEFAULT_FONT_KEY.charAt(0).toUpperCase() + DEFAULT_FONT_KEY.slice(1)}', sans-serif`;
-    }
+    const htmlElement = document.documentElement;
+    const fontKeys = ['inter', 'roboto', 'open-sans', 'montserrat', 'poppins', 'lato', 'nunito', 'system'];
+    fontKeys.forEach(key => htmlElement.classList.remove(`font-${key}`));
+    
+    const activeFontKey = storedFontKey || DEFAULT_FONT_KEY;
+    htmlElement.classList.add(`font-${activeFontKey}`);
+    document.body.style.fontFamily = activeFontKey === "system"
+      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
+      : `'${activeFontKey.charAt(0).toUpperCase() + activeFontKey.slice(1)}', sans-serif`;
 
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyName(storedCompanyName);
@@ -120,7 +118,7 @@ export default function RootLayout({
           applyTheme(event.newValue);
         }
       }
-      if (event.key === COMPANY_NAME_STORAGE_KEY && event.newValue) {
+      if (event.key === COMPANY_NAME_STORAGE_KEY) {
         const newName = event.newValue ? JSON.parse(event.newValue) : DEFAULT_COMPANY_NAME;
         setCompanyName(newName);
         setCompanyInitial(newName.substring(0,1).toUpperCase() || 'Q');
@@ -133,23 +131,12 @@ export default function RootLayout({
         applyCustomThemeVariables(newCustomTheme);
       }
       if (event.key === FONT_STORAGE_KEY && event.newValue) {
-        const htmlElement = document.documentElement;
-        
-        // Remove all existing font classes
-        const fontKeys = ['inter', 'roboto', 'open-sans', 'montserrat', 'poppins', 'lato', 'nunito', 'system'];
-        fontKeys.forEach(key => {
-          htmlElement.classList.remove(`font-${key}`);
-        });
-        
-        // Add new font class
-        htmlElement.classList.add(`font-${event.newValue}`);
-        
-        // Apply to body
-        if (event.newValue !== "system") {
-          document.body.style.fontFamily = `'${event.newValue.charAt(0).toUpperCase() + event.newValue.slice(1)}', sans-serif`;
-        } else {
-          document.body.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif";
-        }
+        const newFontKey = event.newValue || DEFAULT_FONT_KEY;
+        fontKeys.forEach(key => htmlElement.classList.remove(`font-${key}`));
+        htmlElement.classList.add(`font-${newFontKey}`);
+        document.body.style.fontFamily = newFontKey === "system"
+          ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
+          : `'${newFontKey.charAt(0).toUpperCase() + newFontKey.slice(1)}', sans-serif`;
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -158,17 +145,34 @@ export default function RootLayout({
     };
   }, [applyTheme, currentThemeKey, applyCustomThemeVariables]);
 
+  // Prevent rendering anything until isMounted is true to avoid hydration mismatches
+  // related to localStorage access.
+  if (!isMounted) {
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <title>{DEFAULT_COMPANY_NAME}</title>
+          <meta name="description" content={String(metadataBase.description)} />
+        </head>
+        <body className="antialiased">
+          {/* Minimal loader or skeleton can go here if desired */}
+        </body>
+      </html>
+    );
+  }
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    // <AuthProvider> // Will be uncommented when AuthProvider is ready
+    <html lang="en" suppressHydrationWarning data-theme={currentThemeKey}>
       <head>
         {/* Title is now set dynamically in useEffect */}
         <meta name="description" content={String(metadataBase.description)} />
       </head>
       <body
-        className="antialiased"
+        className="antialiased" 
+        // style={{ fontFamily: `var(--font-${currentFontKey})` }} // Managed by class on html
       >
-        <SidebarProvider defaultOpen> {/* `defaultOpen` controls initial state on desktop */}
+        <SidebarProvider defaultOpen> 
           <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
             <SidebarHeader className="p-3 border-b border-sidebar-border">
               <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
@@ -190,10 +194,10 @@ export default function RootLayout({
               <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
               
               <div className="flex-1 flex justify-center px-4">
-                {/* Global search input removed from top header */}
+                {/* Search input removed */}
               </div>
 
-              <div className="flex items-center gap-2 ml-auto"> {/* Added ml-auto to push UserNav to the right */}
+              <div className="flex items-center gap-2 ml-auto">
                 <UserNav />
               </div>
             </header>
@@ -208,5 +212,6 @@ export default function RootLayout({
         <Toaster />
       </body>
     </html>
+    // </AuthProvider>
   );
 }

@@ -1,6 +1,9 @@
+
 import { redirect } from 'next/navigation';
 
 export default function HomePage() {
-  redirect('/dashboard');
-  // return null; // redirect will handle this
+  // For now, redirect to login. Once auth is implemented, this might redirect
+  // to dashboard if logged in, or login if not.
+  redirect('/login'); 
+  // return null; 
 }

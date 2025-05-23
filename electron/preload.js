@@ -1,13 +1,11 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose IPC functionality to renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Invoice operations
   getAllInvoices: () => ipcRenderer.invoke('get-all-invoices'),
   getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
   saveInvoice: (invoice) => {
-    // Ensure Date objects are converted to ISO strings for IPC
     const serializedInvoice = {
       ...invoice,
       invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : invoice.invoiceDate,
@@ -39,4 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // General data operations
   clearAllData: () => ipcRenderer.invoke('clear-all-data'),
+
+  // User Management operations
+  getAllUsers: () => ipcRenderer.invoke('get-all-users'),
+  createUser: (userData) => ipcRenderer.invoke('create-user', userData),
+  updateUser: (userId, userData) => ipcRenderer.invoke('update-user', { userId, userData }),
+  deleteUser: (userId) => ipcRenderer.invoke('delete-user', userId),
+  validateUserCredentials: (credentials) => ipcRenderer.invoke('validate-user-credentials', credentials),
 });

@@ -4,7 +4,7 @@
 import sqlite3 from 'sqlite3';
 import { open, type Database } from 'sqlite';
 // Changed from '@/components/invoice-form'
-import type { InvoiceFormValues } from '../../components/invoice-form'; 
+import type { InvoiceFormValues } from '../../components/invoice-form';
 import path from 'path';
 import { hash, compare } from 'bcrypt';
 
@@ -18,7 +18,7 @@ export interface StoredInvoice extends InvoiceFormValues {
 export interface User {
   id: string;
   username: string;
-  password?: string; 
+  password?: string;
   role: 'admin' | 'user';
   name: string;
   email: string;
@@ -31,10 +31,10 @@ export interface CompanyData {
   name: string;
   address: string;
   phone: string;
-  phone2?: string; 
+  phone2?: string;
   email: string;
   gstin?: string;
-  bank_account_name?: string; 
+  bank_account_name?: string;
   bank_name?: string;
   bank_account?: string;
   bank_ifsc?: string;
@@ -45,6 +45,9 @@ let db: Database | null = null;
 function getDbPath() {
   try {
     // Check if running in Electron's main process by trying to require 'electron'
+    // This check might be problematic if 'electron' is not a direct dependency of this specific file's execution context
+    // or if tree-shaking/bundling removes the require if not used elsewhere in this module's direct import chain.
+    // A more robust way might be to pass an environment flag or use a global.
     const electronApp = require('electron').app;
     if (electronApp) {
       return path.join(electronApp.getPath('userData'), 'invoiceflow.db');
@@ -58,7 +61,7 @@ function getDbPath() {
 
 export async function initDatabase(): Promise<Database> {
   if (db) return db;
-  
+
   try {
     const dbPath = getDbPath();
     console.log('Database path:', dbPath);
@@ -67,7 +70,7 @@ export async function initDatabase(): Promise<Database> {
       filename: dbPath,
       driver: sqlite3.Database
     });
-    
+
     await db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
@@ -76,32 +79,32 @@ export async function initDatabase(): Promise<Database> {
         id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS shipment_details (
-        invoiceId TEXT PRIMARY KEY, 
-        shipDate TEXT, 
-        trackingNumber TEXT, 
-        carrierName TEXT, 
-        consigneeName TEXT, 
-        consigneeAddress TEXT, 
-        consigneeGstin TEXT, 
-        consigneeStateCode TEXT, 
-        transportationMode TEXT, 
-        lrNo TEXT, 
-        vehicleNo TEXT, 
-        dateOfSupply TEXT, 
-        placeOfSupply TEXT, 
+        invoiceId TEXT PRIMARY KEY,
+        shipDate TEXT,
+        trackingNumber TEXT,
+        carrierName TEXT,
+        consigneeName TEXT,
+        consigneeAddress TEXT,
+        consigneeGstin TEXT,
+        consigneeStateCode TEXT,
+        transportationMode TEXT,
+        lrNo TEXT,
+        vehicleNo TEXT,
+        dateOfSupply TEXT,
+        placeOfSupply TEXT,
         FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
       CREATE TABLE IF NOT EXISTS company (
-        id INTEGER PRIMARY KEY, 
-        name TEXT NOT NULL, 
-        address TEXT, 
-        phone TEXT, 
-        phone2 TEXT, 
-        email TEXT, 
-        gstin TEXT, 
-        bank_account_name TEXT, 
-        bank_name TEXT, 
-        bank_account TEXT, 
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        address TEXT,
+        phone TEXT,
+        phone2 TEXT,
+        email TEXT,
+        gstin TEXT,
+        bank_account_name TEXT,
+        bank_name TEXT,
+        bank_account TEXT,
         bank_ifsc TEXT
       );
       -- If company table exists and needs updating:
@@ -111,20 +114,20 @@ export async function initDatabase(): Promise<Database> {
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
       CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL 
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL
       );
       CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY, 
-        username TEXT UNIQUE NOT NULL, 
-        password TEXT NOT NULL, 
-        role TEXT NOT NULL, 
-        name TEXT, 
-        email TEXT, 
-        isActive INTEGER DEFAULT 1, 
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL,
+        name TEXT,
+        email TEXT,
+        isActive INTEGER DEFAULT 1,
         isSystemAdmin INTEGER DEFAULT 0
       );
     `);
-    
+
     const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
     if (!adminExists) {
       const hashedPassword = await hash('admin123', 10);
@@ -138,7 +141,7 @@ export async function initDatabase(): Promise<Database> {
     return db;
   } catch (error) {
     console.error('Database initialization error in database.ts:', error);
-    db = null; 
+    db = null;
     throw error;
   }
 }
@@ -191,7 +194,7 @@ export async function updateUser(id: string, userData: Partial<Omit<User, 'id' |
   const currentUser = await currentDb.get('SELECT * FROM users WHERE id = ?', [id]);
   if (!currentUser) throw new Error('User not found.');
 
-  const updates: string[] = []; 
+  const updates: string[] = [];
   const params: any[] = [];
 
   if (userData.username && userData.username !== currentUser.username) {
@@ -216,7 +219,7 @@ export async function updateUser(id: string, userData: Partial<Omit<User, 'id' |
 
   if (updates.length === 0) return true; // No changes to apply
 
-  const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`; 
+  const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
   params.push(id);
   await currentDb.run(query, params);
   return true;
@@ -233,7 +236,7 @@ export async function deleteUser(id: string): Promise<boolean> {
 export async function validateUserCredentials(username: string, passwordAttempt: string): Promise<Omit<User, 'password'> | null> {
   const currentDb = await initDatabase();
   const user = await getUserByUsername(username); // This already returns the full User object including hashed password
-  if (!user || !user.isActive || !user.password) return null; 
+  if (!user || !user.isActive || !user.password) return null;
   const isMatch = await compare(passwordAttempt, user.password);
   if (!isMatch) return null;
   const { password, ...userWithoutPassword } = user;
@@ -278,9 +281,9 @@ export async function getAllInvoices(): Promise<StoredInvoice[]> {
         vehicleNo: shipment.vehicleNo || "",
         dateOfSupply: shipment.dateOfSupply ? new Date(shipment.dateOfSupply) : null,
         placeOfSupply: shipment.placeOfSupply || ""
-      } : { 
-        shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "", 
-        consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "", 
+      } : {
+        shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
+        consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
         dateOfSupply: null, placeOfSupply: ""
       }
     });
@@ -292,29 +295,29 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
   const currentDb = await initDatabase();
   await currentDb.run('BEGIN TRANSACTION');
   try {
-    await currentDb.run(`
-      INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+    await currentDb.run(\`
+      INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
       [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate.toISOString(), invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
     );
     await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
     for (const item of invoice.items) {
       let gstType = 'IGST'; let gstRate = item.igstRate;
       if (item.applyCgst || item.applySgst) { gstType = 'CGST_SGST'; gstRate = (item.cgstRate || 0) + (item.sgstRate || 0); }
-      await currentDb.run('INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+      await currentDb.run('INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstType, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [invoice.id, item.productId, item.description, item.quantity, item.price, item.gstCategory || '', gstType, gstRate]
       );
     }
-    
+
     await currentDb.run('DELETE FROM shipment_details WHERE invoiceId = ?', [invoice.id]);
     if (invoice.shipmentDetails) {
-        await currentDb.run(`
-          INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, consigneeName, consigneeAddress, consigneeGstin, consigneeStateCode, transportationMode, lrNo, vehicleNo, dateOfSupply, placeOfSupply) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        await currentDb.run(\`
+          INSERT INTO shipment_details (invoiceId, shipDate, trackingNumber, carrierName, consigneeName, consigneeAddress, consigneeGstin, consigneeStateCode, transportationMode, lrNo, vehicleNo, dateOfSupply, placeOfSupply)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
         [
-          invoice.id, 
-          invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null, 
-          invoice.shipmentDetails.trackingNumber, 
+          invoice.id,
+          invoice.shipmentDetails.shipDate ? new Date(invoice.shipmentDetails.shipDate).toISOString() : null,
+          invoice.shipmentDetails.trackingNumber,
           invoice.shipmentDetails.carrierName,
           invoice.shipmentDetails.consigneeName,
           invoice.shipmentDetails.consigneeAddress,
@@ -372,9 +375,9 @@ export async function getInvoiceById(id: string): Promise<StoredInvoice | null> 
       vehicleNo: shipmentData.vehicleNo || "",
       dateOfSupply: shipmentData.dateOfSupply ? new Date(shipmentData.dateOfSupply) : null,
       placeOfSupply: shipmentData.placeOfSupply || ""
-    } : { 
-      shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "", 
-      consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "", 
+    } : {
+      shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
+      consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
       dateOfSupply: null, placeOfSupply: ""
     }
   };
@@ -400,27 +403,27 @@ export async function deleteInvoice(id: string): Promise<boolean> {
 export async function saveCompanyInfo(company: CompanyData): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
-    await currentDb.run(`
-      INSERT OR REPLACE INTO company (id, name, address, phone, phone2, email, gstin, bank_account_name, bank_name, bank_account, bank_ifsc) 
-      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    await currentDb.run(\`
+      INSERT OR REPLACE INTO company (id, name, address, phone, phone2, email, gstin, bank_account_name, bank_name, bank_account, bank_ifsc)
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
       [company.name, company.address, company.phone, company.phone2 || null, company.email, company.gstin || null, company.bank_account_name || null, company.bank_name || null, company.bank_account || null, company.bank_ifsc || null]
-    ); 
+    );
     return true;
-  } catch (error) { 
-    console.error('Error saving company info:', error); 
-    return false; 
+  } catch (error) {
+    console.error('Error saving company info:', error);
+    return false;
   }
 }
 
 export async function getCompanyInfo(): Promise<CompanyData | null> {
   const currentDb = await initDatabase();
-  try { 
+  try {
     const company = await currentDb.get('SELECT * FROM company WHERE id = 1');
     return company || null;
   }
-  catch (error) { 
-    console.error('Error getting company info:', error); 
-    return null; 
+  catch (error) {
+    console.error('Error getting company info:', error);
+    return null;
   }
 }
 
@@ -436,8 +439,8 @@ export async function addCustomer(customer: Customer): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingCustomer = await currentDb.get('SELECT id FROM customers WHERE id = ?', [customer.id]);
-    if (existingCustomer) throw new Error(`Customer with ID ${customer.id} already exists.`);
-    await currentDb.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)', 
+    if (existingCustomer) throw new Error(\`Customer with ID ${customer.id} already exists.\`);
+    await currentDb.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)',
       [customer.id, customer.name, customer.email, customer.phone, customer.address]);
     return true;
   } catch (error) { console.error('Error adding customer:', error); throw error; }
@@ -477,8 +480,8 @@ export async function addProduct(product: Product): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingProduct = await currentDb.get('SELECT id FROM products WHERE id = ?', [product.id]);
-    if (existingProduct) throw new Error(`Product with ID ${product.id} already exists.`);
-    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+    if (existingProduct) throw new Error(\`Product with ID ${product.id} already exists.\`);
+    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [product.id, product.name, product.description, product.price, product.imageUrl || null, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]);
     return true;
   } catch (error) { console.error('Error adding product:', error); throw error; }
@@ -512,16 +515,15 @@ export async function clearAllData(): Promise<boolean> {
     await currentDb.run('DELETE FROM invoices');
     await currentDb.run('DELETE FROM customers');
     await currentDb.run('DELETE FROM products');
-    await currentDb.run('DELETE FROM company WHERE id = 1'); 
+    await currentDb.run('DELETE FROM company WHERE id = 1');
     // Note: Users are not cleared by this "business data" clear function.
     await currentDb.run('COMMIT'); return true;
-  } catch (error) { 
-    console.error('Error clearing all data:', error); 
-    await currentDb.run('ROLLBACK'); 
-    return false; 
+  } catch (error) {
+    console.error('Error clearing all data:', error);
+    await currentDb.run('ROLLBACK');
+    return false;
   }
 }
 
 export { getDbPath };
-
     

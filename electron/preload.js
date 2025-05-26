@@ -6,28 +6,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAllInvoices: () => ipcRenderer.invoke('get-all-invoices'),
   getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
   saveInvoice: (invoice) => {
-    // Ensure dates are properly serialized or passed as null
-    const serializedInvoice = {
-      ...invoice,
-      invoiceDate: invoice.invoiceDate instanceof Date ? invoice.invoiceDate.toISOString() : invoice.invoiceDate,
-      dueDate: invoice.dueDate instanceof Date ? invoice.dueDate.toISOString() : (invoice.dueDate === null ? null : invoice.dueDate),
-      shipmentDetails: invoice.shipmentDetails ? {
-        ...invoice.shipmentDetails,
-        shipDate: invoice.shipmentDetails.shipDate instanceof Date 
-          ? invoice.shipmentDetails.shipDate.toISOString() 
-          : (invoice.shipmentDetails.shipDate === null ? null : invoice.shipmentDetails.shipDate),
-        dateOfSupply: invoice.shipmentDetails.dateOfSupply instanceof Date 
-          ? invoice.shipmentDetails.dateOfSupply.toISOString() 
-          : (invoice.shipmentDetails.dateOfSupply === null ? null : invoice.shipmentDetails.dateOfSupply),
-      } : undefined, // or null if your backend expects it
-    };
-    return ipcRenderer.invoke('save-invoice', serializedInvoice);
+    // At this point, 'invoice' should have dates as ISO strings or null
+    // as prepared by database-electron.ts. We can pass it directly.
+    return ipcRenderer.invoke('save-invoice', invoice);
   },
   deleteInvoice: (id) => ipcRenderer.invoke('delete-invoice', id),
   
   // Company operations
   getCompanyInfo: () => ipcRenderer.invoke('get-company-info'),
-  saveCompanyInfo: (data) => ipcRenderer.invoke('save-company-info', data),
+  saveCompanyInfo: (data) => ipcRenderer.invoke('save-company-info', data), // Data should be prepared by database-electron.ts
 
   // Customer operations
   getAllCustomers: () => ipcRenderer.invoke('get-all-customers'),

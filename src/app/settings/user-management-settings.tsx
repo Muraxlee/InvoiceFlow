@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 // PageHeader removed as this content will be part of a tab
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,7 @@ export default function UserManagementSettings() { // Renamed component
     defaultValues: { username: "", password: "", name: "", email: "", role: "user", isActive: true },
   });
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsDataLoading(true);
     if (window.electronAPI) {
       try {
@@ -85,11 +84,11 @@ export default function UserManagementSettings() { // Renamed component
       toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
     }
     setIsDataLoading(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchUsers();
-  }, [toast]); // toast dependency likely not needed here, but keeping for consistency with original
+  }, [fetchUsers]);
 
   const handleAddUser = async (data: UserFormValues) => {
     setIsLoading(true);

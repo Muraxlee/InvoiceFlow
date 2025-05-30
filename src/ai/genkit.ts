@@ -1,10 +1,12 @@
+// This is a placeholder implementation while AI functionality is disabled
+// To restore AI functionality, restore the original file from ai_backup
 
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
-
-// Ensure GOOGLE_API_KEY is loaded from .env by dotenv in src/ai/dev.ts
-// Explicitly pass the API key to the plugin.
-export const ai = genkit({
-  plugins: [googleAI({apiKey: process.env.GOOGLE_API_KEY})],
-  model: 'googleai/gemini-2.0-flash',
-});
+// Create a dummy AI provider that doesn't depend on external APIs
+export const ai = {
+  generate: async () => {
+    return { text: "AI functionality is temporarily disabled" };
+  },
+  chat: async () => {
+    return { text: "AI functionality is temporarily disabled" };
+  }
+};

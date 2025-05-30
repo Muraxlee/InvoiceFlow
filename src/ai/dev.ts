@@ -1,6 +1,6 @@
-
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/gst-suggestion.ts';
-import '@/ai/flows/sales-enhancement-flow.ts';
+// AI flows are temporarily disabled
+// To restore AI functionality, restore the original files from ai_backup
+import "@/ai/placeholder";

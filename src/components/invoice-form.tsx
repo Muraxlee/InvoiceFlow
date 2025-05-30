@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,11 +19,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label"; // Ensure Label is imported
-import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus } from "lucide-react";
+import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
-// Removed: import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/flows/gst-suggestion";
+import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/placeholder";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig } from "@/lib/localStorage";
@@ -64,6 +63,9 @@ const invoiceSchema = z.object({
   customerName: z.string().min(1, "Customer name is required (auto-filled on selection)."),
   customerEmail: z.string().email("Invalid email address (auto-filled on selection).").optional().or(z.literal('')),
   customerAddress: z.string().optional(),
+  customerGstin: z.string().optional().or(z.literal('')),
+  customerState: z.string().optional().or(z.literal('')),
+  customerStateCode: z.string().optional().or(z.literal('')),
   invoiceNumber: z.string().min(1, "Invoice number is required."),
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   dueDate: z.date().optional().nullable(),
@@ -117,7 +119,7 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   const prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
   const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
 
-  let currentCounter = config.dailyCounters[dateKey] || 0;
+  const currentCounter = config.dailyCounters[dateKey] || 0;
   // If incrementing, always use counter + 1. If not incrementing (just generating example),
   // use counter + 1 if counter > 0, otherwise use 1 (for the first number of the day).
   const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
@@ -141,24 +143,27 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [products, setProducts] = useState<Product[]>([]);
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  // Removed AI GST Suggestion state:
-  // const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
-  // const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
+  const [gstSuggestions, setGstSuggestions] = useState<(GstSuggestionOutput | null)[]>([]);
+  const [loadingGst, setLoadingGst] = useState<boolean[]>([]);
 
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
   const [showDueDate, setShowDueDate] = useState(false);
   const [applyRoundOff, setApplyRoundOff] = useState(false);
+  const [sameAsBilling, setSameAsBilling] = useState(true);
+  // Add a state to force recalculation
+  const [recalculationKey, setRecalculationKey] = useState(0);
 
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
       customerId: "", customerName: "", customerEmail: "", customerAddress: "",
+      customerGstin: "", customerState: "", customerStateCode: "",
       invoiceNumber: "", invoiceDate: new Date(), dueDate: null,
       items: [{
-        productId: "", description: "", quantity: 1, price: 0, gstCategory: "",
+        productId: "", description: "", quantity: 1, price: 0,
         applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9
       }],
       notes: "", termsAndConditions: "", paymentStatus: "Unpaid", paymentMethod: "",
@@ -206,6 +211,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       customerName: defaultValuesProp?.customerName || "",
       customerEmail: defaultValuesProp?.customerEmail || "",
       customerAddress: defaultValuesProp?.customerAddress || "",
+      customerGstin: defaultValuesProp?.customerGstin || "",
+      customerState: defaultValuesProp?.customerState || "",
+      customerStateCode: defaultValuesProp?.customerStateCode || "",
       invoiceNumber: initialInvoiceNumber,
       invoiceDate: initialInvoiceDate || new Date(),
       dueDate: initialDueDate, 
@@ -217,7 +225,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         cgstRate: Number(item.cgstRate || 9),
         sgstRate: Number(item.sgstRate || 9),
       })) : [{
-        productId: "", description: "", quantity: 1, price: 0, gstCategory: "",
+        productId: "", description: "", quantity: 1, price: 0,
         applyIgst: true, applyCgst: false, applySgst: false,
         igstRate: 18, cgstRate: 9, sgstRate: 9
       }],
@@ -281,37 +289,56 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue(`items.${index}.productId`, product.id);
       form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.price`, product.price);
-      form.setValue(`items.${index}.gstCategory`, product.gstCategory || "");
+      form.setValue(`items.${index}.gstCategory`, product.hsn || "");
       form.setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
       form.setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
       form.setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
       form.setValue(`items.${index}.applyIgst`, true); 
       form.setValue(`items.${index}.applyCgst`, false);
       form.setValue(`items.${index}.applySgst`, false);
-      form.trigger(`items.${index}`); 
+      
+      // Force immediate recalculation
+      setRecalculationKey(prev => prev + 1);
+      
       setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
     }
   };
 
   const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
     if (type === 'igst') {
+      // Set IGST value based on input, when IGST is selected, CGST+SGST must be unselected
       form.setValue(`items.${index}.applyIgst`, value);
       if (value) { 
+        // If turning on IGST, turn off CGST+SGST
         form.setValue(`items.${index}.applyCgst`, false);
         form.setValue(`items.${index}.applySgst`, false);
+      } else if (!form.getValues(`items.${index}.applyCgst`)) {
+        // If turning off IGST and CGST is also off, force CGST+SGST on
+        form.setValue(`items.${index}.applyCgst`, true);
+        form.setValue(`items.${index}.applySgst`, true);
       }
     } else if (type === 'cgstSgst') { 
+      // CGST and SGST always go together
       form.setValue(`items.${index}.applyCgst`, value);
       form.setValue(`items.${index}.applySgst`, value);
       if (value) { 
+        // If turning on CGST+SGST, turn off IGST
         form.setValue(`items.${index}.applyIgst`, false);
+      } else if (!form.getValues(`items.${index}.applyIgst`)) {
+        // If turning off CGST+SGST and IGST is also off, force IGST on
+        form.setValue(`items.${index}.applyIgst`, true);
       }
     }
   
+    // Make sure at least one type of GST is selected
     const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
     if (!applyIgst && !applyCgst && !applySgst) {
+      // Default to IGST if nothing is selected
       form.setValue(`items.${index}.applyIgst`, true);
     }
+    
+    // Force immediate recalculation
+    setRecalculationKey(prev => prev + 1);
   };
 
   const handleSelectCustomer = (customerId: string) => {
@@ -321,8 +348,18 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue("customerName", customer.name, { shouldValidate: true });
       form.setValue("customerEmail", customer.email || "", { shouldValidate: true });
       form.setValue("customerAddress", customer.address || "", { shouldValidate: true });
-      form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
-      form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true }); 
+      form.setValue("customerGstin", customer.gstin || "", { shouldValidate: true });
+      form.setValue("customerState", customer.state || "", { shouldValidate: true });
+      form.setValue("customerStateCode", customer.stateCode || "", { shouldValidate: true });
+      
+      // If sameAsBilling is true, also update the consignee details
+      if (sameAsBilling) {
+        form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
+      }
+      
       setIsCustomerSelected(true);
       setIsCustomerPopoverOpen(false); 
     } else {
@@ -330,8 +367,15 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   };
 
+  // Watch for changes to items, including deeply nested fields
   const watchItems = form.watch("items");
   const watchInvoiceDate = form.watch("invoiceDate");
+
+  // Run real-time calculation when any invoice item field changes
+  useEffect(() => {
+    form.trigger();
+    setRecalculationKey(prev => prev + 1);
+  }, [watchItems, form]);
 
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
     const currentItems = form.getValues("items") || [];
@@ -359,7 +403,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchItems, form, applyRoundOff]);
+  }, [watchItems, form, applyRoundOff, recalculationKey]);
 
   const handleCancel = () => {
     if (onCancel) onCancel();
@@ -367,7 +411,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   };
 
   const handleFormSubmit = (data: InvoiceFormValues) => {
-    let submissionData = { ...data };
+    const submissionData = { ...data };
     if (!showDueDate) {
       submissionData.dueDate = null;
     }
@@ -381,6 +425,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
             return; 
         }
     }
+    
+    // Add roundOffApplied flag to the submission data
+    submissionData.roundOffApplied = applyRoundOff;
+    
     onSubmit(submissionData);
   };
 
@@ -392,6 +440,18 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   }, [showDueDate, watchInvoiceDate, form]);
 
+  // Add an effect to handle the sameAsBilling checkbox changes
+  useEffect(() => {
+    if (sameAsBilling && form.getValues("customerId")) {
+      const customer = customers.find(c => c.id === form.getValues("customerId"));
+      if (customer) {
+        form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
+        form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
+      }
+    }
+  }, [sameAsBilling, form, customers]);
 
   if (isDataLoading && typeof window !== 'undefined') { 
     return (
@@ -414,76 +474,177 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 name="customerId"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Select Customer *</FormLabel>
-                    {isDataLoading && customers.length === 0 ? (
-                      <div className="flex items-center justify-center p-4 border rounded-md h-[40px]">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : !isDataLoading && customers.length === 0 ? (
-                       <div className="p-4 text-sm border rounded-md bg-muted/50 text-muted-foreground">
-                         No customers found. Please
-                         <Button variant="link" asChild className="px-1 py-0 h-auto"><Link href="/customers">add a customer</Link></Button>
-                         first.
-                       </div>
-                    ) : (
-                      <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                    <FormLabel>Customer *</FormLabel>
+                    <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                      <PopoverTrigger asChild>
                         <FormControl>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn( "w-full justify-between", !field.value && "text-muted-foreground")}
-                            >
-                              <div className="flex w-full justify-between items-center">
-                                <span className="truncate">
-                                {field.value ? customers.find( (customer) => customer && customer.id === field.value )?.name || "Select customer..." : "Select customer..."}
-                                </span>
-                                <UserPlus className="ml-auto h-4 w-4 opacity-50" />
-                              </div>
-                            </Button>
-                          </PopoverTrigger>
+                          <Button variant="outline" role="combobox" aria-expanded={isCustomerPopoverOpen} className={cn("w-full justify-between", isCustomerSelected ? "bg-muted" : "text-muted-foreground")}>
+                            <span className={cn("truncate", isCustomerSelected ? "font-medium" : "")}>
+                              {isCustomerSelected ? customers.find((customer) => customer.id === field.value)?.name : "Select customer..."}
+                            </span>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
                         </FormControl>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder="Search customers..." />
-                              <CommandList>
-                                <CommandEmpty>
-                                  <div className="py-2 text-center text-sm"> No customer found.
-                                    <Button variant="link" size="sm" asChild className="px-1">
-                                      <Link href="/customers">Add New Customer</Link>
-                                    </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command shouldFilter={true}>
+                          <CommandInput placeholder="Type customer name to search..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>
+                              <div className="py-2 text-center text-sm">
+                                No customer found.
+                                <Button variant="link" size="sm" asChild className="px-1">
+                                  <Link href="/customers/new">Add New Customer</Link>
+                                </Button>
+                              </div>
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {customers.filter(customer => !!customer).map((customer) => (
+                                <CommandItem
+                                  key={customer.id}
+                                  value={customer.name}
+                                  onSelect={() => handleSelectCustomer(customer.id)}
+                                >
+                                  <div className="flex items-center w-full">
+                                    <Check className={cn(
+                                      "mr-2 h-4 w-4",
+                                      customer.id === field.value ? "opacity-100" : "opacity-0"
+                                    )} />
+                                    <div className="flex items-center">
+                                      <span className="truncate">{customer.name}</span>
+                                    </div>
                                   </div>
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {customers.filter(customer => !!customer).map((customer) => (
-                                    <CommandItem
-                                      key={customer.id}
-                                      value={customer.name} 
-                                      onSelect={() => handleSelectCustomer(customer.id)}
-                                    >
-                                      <Check className={cn( "mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
-                                      {customer.name} ({customer.id})
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                    )}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                    <FormDescription className="mt-1">
+                      Cannot find the customer? <Link href="/customers/new" className="text-primary hover:underline">Add a new customer</Link>
+                    </FormDescription>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="customerName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Name *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="Customer Name" 
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField control={form.control} name="customerName" render={({ field }) => (
-                <FormItem> <FormLabel>Customer Name</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")} /></FormControl> <FormMessage /> </FormItem>
-              )} />
-              <FormField control={form.control} name="customerEmail" render={({ field }) => (
-                <FormItem> <FormLabel>Customer Email</FormLabel> <FormControl><Input placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")}/></FormControl> <FormMessage /> </FormItem>
-              )} />
-              <FormField control={form.control} name="customerAddress" render={({ field }) => (
-                <FormItem> <FormLabel>Billing Address</FormLabel> <FormControl><Textarea placeholder="Auto-filled" {...field} value={field.value || ''} readOnly={isCustomerSelected} className={cn(isCustomerSelected ? "bg-muted/50 cursor-not-allowed" : "")}/></FormControl> <FormMessage /> </FormItem>
-              )} />
+              
+              <FormField
+                control={form.control}
+                name="customerEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Email</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="customer@example.com" 
+                        type="email" 
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="customerGstin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer GSTIN</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="e.g., 22AAAAA0000A1Z5" 
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="customerState"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="e.g., Tamil Nadu" 
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="customerStateCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State Code</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="e.g., 33" 
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="customerAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Address</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        {...field} 
+                        placeholder="Billing Address" 
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -606,9 +767,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               }}>
                                 <FormControl>
                                   <PopoverTrigger asChild>
-                                    <Button variant="outline" className="w-full justify-between mt-1">
+                                    <Button variant="outline" className={cn("w-full justify-between mt-1", itemField.value ? "bg-muted" : "")}>
                                       <div className="flex w-full justify-between items-center">
-                                        <span className="truncate">
+                                        <span className={cn("truncate", itemField.value ? "font-medium" : "")}>
                                           {itemField.value 
                                             ? products.find(p => p && p.id === itemField.value)?.name || "Select..." 
                                             : "Select product..."
@@ -620,8 +781,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                   </PopoverTrigger>
                                 </FormControl>
                                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                                  <Command>
-                                    <CommandInput placeholder="Search products..." />
+                                  <Command shouldFilter={true}>
+                                    <CommandInput placeholder="Type product name to search..." />
                                     <CommandList>
                                       <CommandEmpty>
                                         <div className="py-2 text-center text-sm">
@@ -644,17 +805,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                                 product.id === itemField.value ? "opacity-100" : "opacity-0"
                                               )} />
                                               <div className="flex items-center">
-                                                <Image 
-                                                  src={product.imageUrl || "https://placehold.co/30x30.png"} 
-                                                  alt={product.name} 
-                                                  width={30} 
-                                                  height={30}
-                                                  data-ai-hint="item product"
-                                                  className="rounded-md mr-2 aspect-square object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.src = "https://placehold.co/30x30.png?text=Error";
-                                                  }}
-                                                />
                                                 <span className="truncate">{product.name}</span>
                                               </div>
                                             </div>
@@ -672,16 +822,47 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                       />
                   </div>
                   <FormField control={form.control} name={`items.${index}.quantity`} render={({ field: itemField }) => (
-                    <FormItem className="col-span-3 md:col-span-1"> <FormLabel>Qty *</FormLabel> <FormControl><Input type="number" placeholder="1" {...itemField} className="mt-1"/></FormControl> <FormMessage /> </FormItem>
+                    <FormItem className="col-span-3 md:col-span-1"> 
+                      <FormLabel>Qty *</FormLabel> 
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="1" 
+                          {...itemField} 
+                          className="mt-1"
+                          onChange={(e) => {
+                            itemField.onChange(e);
+                            // Force immediate recalculation after quantity changes
+                            setRecalculationKey(prev => prev + 1);
+                          }}
+                        />
+                      </FormControl> 
+                      <FormMessage /> 
+                    </FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.price`} render={({ field: itemField }) => (
-                    <FormItem className="col-span-4 md:col-span-2"> <FormLabel>Price (₹) *</FormLabel> <FormControl><Input type="number" placeholder="0.00" {...itemField} className="mt-1"/></FormControl> <FormMessage /> </FormItem>
+                    <FormItem className="col-span-4 md:col-span-2"> 
+                      <FormLabel>Price (₹) *</FormLabel> 
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="0.00" 
+                          {...itemField} 
+                          className="mt-1"
+                          onChange={(e) => {
+                            itemField.onChange(e);
+                            // Force immediate recalculation after price changes
+                            setRecalculationKey(prev => prev + 1);
+                          }}
+                        />
+                      </FormControl> 
+                      <FormMessage /> 
+                    </FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: itemField }) => (
-                    <FormItem className="col-span-5 md:col-span-3"> <FormLabel>Tax Category</FormLabel>
+                    <FormItem className="col-span-5 md:col-span-3"> <FormLabel>HSN/SAC Code</FormLabel>
                       <div className="flex items-center gap-2 mt-1">
-                        <FormControl><Input placeholder="e.g. HSN 1234" {...itemField} value={itemField.value || ''} /></FormControl>
-                        {/* AI Suggestion Button Removed */}
+                        <FormControl><Input placeholder="HSN Code" {...itemField} value={itemField.value || ''} readOnly className="bg-muted" /></FormControl>
                       </div> <FormMessage />
                     </FormItem>
                   )} />
@@ -716,10 +897,14 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 </div>
               ))}
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({
-              productId: "", description: "", quantity: 1, price: 0, gstCategory: "",
-              applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9,
-            })} className="mt-4">
+            <Button type="button" variant="outline" size="sm" onClick={() => {
+              append({
+                productId: "", description: "", quantity: 1, price: 0,
+                applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9
+              });
+              // Force recalculation when a new item is added
+              setRecalculationKey(prev => prev + 1);
+            }} className="mt-4">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Item
             </Button>
           </CardContent>
@@ -739,7 +924,14 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                  <div className="flex justify-between font-bold text-lg border-t pt-1 mt-1"><span >Grand Total:</span> <span>₹{finalTotal.toFixed(2)}</span></div>
             </div>
             <div className="flex items-center space-x-2 self-end pt-2">
-                <Switch id="round-off-switch" checked={applyRoundOff} onCheckedChange={setApplyRoundOff} />
+                <Switch 
+                  id="round-off-switch" 
+                  checked={applyRoundOff} 
+                  onCheckedChange={(checked) => {
+                    setApplyRoundOff(checked);
+                    setRecalculationKey(prev => prev + 1);
+                  }} 
+                />
                 <Label htmlFor="round-off-switch" className="text-sm">Round Off Total</Label>
             </div>
           </CardFooter>
@@ -749,20 +941,29 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
           <CardHeader><CardTitle>Shipment & Transport Details (Optional)</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div>
+              <div className="flex items-center space-x-2 mb-4">
+                <Checkbox 
+                  id="same-as-billing" 
+                  checked={sameAsBilling} 
+                  onCheckedChange={(checked) => setSameAsBilling(checked === true)}
+                />
+                <Label htmlFor="same-as-billing">Same as billing address</Label>
+              </div>
+              
               <h4 className="text-md font-medium mb-3">Consignee (Shipped To)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="shipmentDetails.consigneeName" render={({ field }) => (
-                  <FormItem><FormLabel>Consignee Name</FormLabel><FormControl><Input placeholder="Name of recipient" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Consignee Name</FormLabel><FormControl><Input placeholder="Name of recipient" {...field} value={field.value || ''} readOnly={sameAsBilling} className={cn(sameAsBilling ? "bg-muted/50 cursor-not-allowed" : "")} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="shipmentDetails.consigneeGstin" render={({ field }) => (
                   <FormItem><FormLabel>Consignee GSTIN</FormLabel><FormControl><Input placeholder="GSTIN if applicable" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="shipmentDetails.consigneeAddress" render={({ field }) => (
-                <FormItem className="mt-4"><FormLabel>Consignee Address</FormLabel><FormControl><Textarea placeholder="Full shipping address" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                <FormItem className="mt-4"><FormLabel>Consignee Address</FormLabel><FormControl><Textarea placeholder="Full shipping address" {...field} value={field.value || ''} readOnly={sameAsBilling} className={cn(sameAsBilling ? "bg-muted/50 cursor-not-allowed" : "")} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="shipmentDetails.consigneeStateCode" render={({ field }) => (
-                <FormItem className="mt-4"><FormLabel>Consignee State / Code</FormLabel><FormControl><Input placeholder="e.g., Tamil Nadu / 33" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                <FormItem className="mt-4"><FormLabel>Consignee State / Code</FormLabel><FormControl><Input placeholder="e.g., Tamil Nadu / 33" {...field} value={field.value || ''} readOnly={sameAsBilling} className={cn(sameAsBilling ? "bg-muted/50 cursor-not-allowed" : "")} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
 

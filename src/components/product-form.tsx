@@ -14,7 +14,6 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, HelpCircle } from "lucide-react";
 import type { Product } from "@/app/products/page"; // Assuming Product type is exported
 import { 
@@ -30,15 +29,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useEffect } from "react";
 
 const productSchema = z.object({
   id: z.string().min(1, "Product ID is required"),
   name: z.string().min(1, "Product name is required"),
-  imageUrl: z.string().url("Must be a valid URL (e.g., https://placehold.co/60x60.png)").or(z.literal("")).optional()
-    .transform(value => value === "" ? `https://placehold.co/60x60.png?text=${value || "Product"}` : value),
-  description: z.string().min(1, "Description is required"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
-  gstCategory: z.string().min(1, "Tax Category is required (e.g., HSN 8471)"),
+  hsn: z.string().min(1, "HSN/SAC code is required"),
   igstRate: z.coerce.number().min(0).default(18),
   cgstRate: z.coerce.number().min(0).default(9),
   sgstRate: z.coerce.number().min(0).default(9),
@@ -57,23 +54,28 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: defaultValues || {
-      id: "",
+      id: `PROD${Date.now().toString().slice(-6)}`,
       name: "",
-      imageUrl: "",
-      description: "",
       price: 0,
-      gstCategory: "",
+      hsn: "",
       igstRate: 18,
       cgstRate: 9,
       sgstRate: 9,
     },
   });
+  
+  // Auto-generate product ID for new products
+  useEffect(() => {
+    if (!defaultValues?.id) {
+      // Create a more unique product ID format with a random component
+      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const timestamp = Date.now().toString().slice(-6);
+      const generatedId = `P${timestamp}${randomPart}`;
+      form.setValue("id", generatedId);
+    }
+  }, [defaultValues, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
-    // Ensure imageUrl has a default if empty, which transform should handle
-     if (!data.imageUrl || data.imageUrl.trim() === "") {
-      data.imageUrl = `https://placehold.co/60x60.png?text=${encodeURIComponent(data.name.substring(0,10) || 'Img')}`;
-    }
     await onSubmit(data);
   };
 
@@ -87,8 +89,11 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
             <FormItem>
               <FormLabel>Product ID</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., PROD004" {...field} />
+                <Input placeholder="Auto-generated" {...field} readOnly className="bg-muted" />
               </FormControl>
+              <FormDescription>
+                Auto-generated unique product code
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -101,32 +106,6 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
               <FormLabel>Product Name</FormLabel>
               <FormControl>
                 <Input placeholder="e.g., Eco-Friendly Water Bottle" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Image URL (Optional)</FormLabel>
-              <FormControl>
-                <Input placeholder="https://placehold.co/60x60.png" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Describe the product" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -148,13 +127,16 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
           />
           <FormField
             control={form.control}
-            name="gstCategory"
+            name="hsn"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Tax Category (HSN/SAC)</FormLabel>
+                <FormLabel>HSN/SAC Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., HSN 8471" {...field} />
+                  <Input placeholder="e.g., 8471" {...field} />
                 </FormControl>
+                <FormDescription>
+                  Harmonized System code for GST classification
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

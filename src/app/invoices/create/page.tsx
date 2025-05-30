@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -29,7 +28,7 @@ export default function CreateInvoicePage() {
               itemsTotalTax += itemAmount * ((item.sgstRate || 0) / 100);
           }
       });
-      let calculatedAmount = itemsSubtotal + itemsTotalTax;
+      const calculatedAmount = itemsSubtotal + itemsTotalTax;
       // This amount should ideally come directly from InvoiceForm's finalTotal if rounding is applied there.
       // For now, assume calculatedAmount is what we need.
       // If InvoiceForm has a way to expose its final rounded total, use that instead.

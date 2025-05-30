@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -8,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -27,7 +26,7 @@ export default function CustomersPage() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setIsDataLoading(true);
     if (window.electronAPI) {
       try {
@@ -41,11 +40,11 @@ export default function CustomersPage() {
       toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
     }
     setIsDataLoading(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchCustomers();
-  }, [toast]);
+  }, [fetchCustomers]);
 
   const handleDeleteCustomer = async (customerId: string) => {
     if (window.electronAPI) {
@@ -71,16 +70,6 @@ export default function CustomersPage() {
     setIsLoading(true);
     if (window.electronAPI) {
       try {
-        if (customers.some(c => c.id === data.id)) {
-          toast({
-            title: "Error: Customer ID Exists",
-            description: `A customer with ID ${data.id} already exists. Please use a unique ID.`,
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
-
         const success = await window.electronAPI.addCustomer(data);
         if (success) {
           await fetchCustomers(); // Re-fetch to get the latest list including the new one
@@ -113,10 +102,13 @@ export default function CustomersPage() {
     setIsLoading(true);
     if (window.electronAPI && currentCustomer) {
       try {
-        // If ID is not being changed, this check might be simplified
-        // For now, assume ID cannot be changed during edit or it's handled by update logic.
-        // If data.id !== currentCustomer.id, you'd need a more complex update/migration logic.
-        const success = await window.electronAPI.updateCustomer(currentCustomer.id, data);
+        // Ensure the ID is not changed from the original customer
+        const updateData = { 
+          ...data,
+          id: currentCustomer.id // Preserve the original ID
+        };
+        
+        const success = await window.electronAPI.updateCustomer(currentCustomer.id, updateData);
         if (success) {
           await fetchCustomers(); // Re-fetch to get the updated list
           setIsLoading(false);

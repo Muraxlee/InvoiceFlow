@@ -1,21 +1,23 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Added CardContent, Description, Header, Title
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/invoice-form';
 import { InvoicePrint } from '@/components/invoice-print';
-import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText } from 'lucide-react';
+import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2Icon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { type StoredInvoice } from '@/lib/database';
 import { getInvoiceById, saveInvoice, getCompanyInfo } from '@/lib/database-wrapper';
 import { format as formatDateFns, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -85,11 +87,15 @@ export default function InvoiceDetailPage() {
         }
       });
       const totalAmount = subtotal + totalTaxAmount;
+      
+      // Apply rounding if roundOffApplied is true
+      const finalAmount = data.roundOffApplied ? Math.round(totalAmount) : totalAmount;
 
       const updatedInvoice: StoredInvoice = {
         ...invoice, // Spread existing invoice to keep ID and other non-form fields
         ...data,    // Spread form data
-        amount: totalAmount, // Set the recalculated amount
+        amount: finalAmount, // Set the recalculated amount
+        roundOffApplied: data.roundOffApplied // Make sure roundOffApplied is preserved
       };
       
       const success = await saveInvoice(updatedInvoice);
@@ -133,30 +139,50 @@ export default function InvoiceDetailPage() {
     );
   };
   
-  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total } = useMemo(() => {
-    if (!invoice) return { subtotal: 0, igstAmount:0, cgstAmount:0, sgstAmount:0, totalTax: 0, total: 0 };
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, finalTotal, roundOffDifference } = (() => {
+    if (!invoice) return { 
+      subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, 
+      totalTax: 0, total: 0, finalTotal: 0, roundOffDifference: 0 
+    };
+    
     const currentItems = invoice.items || [];
-    const sub = currentItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
-    let cgst = 0; let sgst = 0; let igst = 0;
-    currentItems.forEach(item => {
+    const sub = currentItems.reduce((acc: number, item: any) => acc + (item.quantity || 0) * (item.price || 0), 0);
+    let igst = 0, cgst = 0, sgst = 0;
+    
+    currentItems.forEach((item: any) => {
       const itemAmount = (item.quantity || 0) * (item.price || 0);
       if (item.applyIgst) igst += itemAmount * ((item.igstRate || 0) / 100);
       if (item.applyCgst) cgst += itemAmount * ((item.cgstRate || 0) / 100);
       if (item.applySgst) sgst += itemAmount * ((item.sgstRate || 0) / 100);
     });
-    const tax = cgst + sgst + igst;
-    const grandTotal = sub + tax;
-    return { subtotal: sub, igstAmount: igst, cgstAmount: cgst, sgstAmount: sgst, totalTax: tax, total: grandTotal };
-  }, [invoice]);
+    
+    const tax = igst + cgst + sgst;
+    const totalBeforeRound = sub + tax;
+    let roundOff = 0;
+    let finalAmount = totalBeforeRound;
+    
+    // Apply rounding if roundOffApplied is true
+    if (invoice.roundOffApplied) {
+      finalAmount = Math.round(totalBeforeRound);
+      roundOff = finalAmount - totalBeforeRound;
+    }
+    
+    return {
+      subtotal: sub,
+      igstAmount: igst,
+      cgstAmount: cgst, 
+      sgstAmount: sgst,
+      totalTax: tax,
+      total: totalBeforeRound,
+      finalTotal: finalAmount,
+      roundOffDifference: roundOff
+    };
+  })();
 
-
-  if (isLoading && !invoice) { // Show full page loader only if invoice is not yet loaded
+  if (isLoading && !invoice) {
     return (
-      <div className="flex justify-center items-center h-[calc(100vh-10rem)]">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading invoice...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -190,9 +216,9 @@ export default function InvoiceDetailPage() {
             {!isEditing && (
               <Button onClick={() => setIsEditing(true)}><Pencil className="mr-2 h-4 w-4" /> Edit Invoice</Button>
             )}
-             {isEditing && (
-              <Button onClick={form.handleSubmit(handleSave)} disabled={isLoading}> {/* Assuming form is accessible or trigger via form's own submit */}
-                <Save className="mr-2 h-4 w-4" /> {isLoading ? 'Saving...' : 'Save Changes'}
+            {isEditing && (
+              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isLoading}>
+                Cancel
               </Button>
             )}
           </div>
@@ -235,7 +261,9 @@ export default function InvoiceDetailPage() {
                 <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
                   <DetailItem label="Name" value={invoice.customerName} icon={UserCircle} />
                   <DetailItem label="Email" value={invoice.customerEmail} />
+                  <DetailItem label="GSTIN" value={invoice.customerGstin || 'N/A'} />
                   <DetailItem label="Billing Address" value={invoice.customerAddress} />
+                  <DetailItem label="State/Code" value={invoice.customerState && invoice.customerStateCode ? `${invoice.customerState} / ${invoice.customerStateCode}` : 'N/A'} />
                 </dl>
               </CardContent>
             </Card>
@@ -278,7 +306,7 @@ export default function InvoiceDetailPage() {
                     <thead className="bg-muted/50">
                       <tr className="border-b">
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground text-xs">#</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground text-xs">Product / Service</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground text-xs">Product Name</th>
                         <th className="text-right py-2 px-3 font-medium text-muted-foreground text-xs">Qty</th>
                         <th className="text-right py-2 px-3 font-medium text-muted-foreground text-xs">Price (₹)</th>
                         <th className="text-right py-2 px-3 font-medium text-muted-foreground text-xs">Amount (₹)</th>
@@ -288,7 +316,9 @@ export default function InvoiceDetailPage() {
                       {invoice.items.map((item, index) => (
                         <tr key={index} className="border-b last:border-b-0">
                           <td className="py-3 px-3 text-sm">{index + 1}</td>
-                          <td className="py-3 px-3 text-sm">{item.description || 'N/A'}</td>
+                          <td className="py-3 px-3 text-sm">
+                            {item.productName || item.description || item.productId || 'N/A'}
+                          </td>
                           <td className="text-right py-3 px-3 text-sm">{item.quantity}</td>
                           <td className="text-right py-3 px-3 text-sm">{(item.price || 0).toFixed(2)}</td>
                           <td className="text-right py-3 px-3 text-sm font-medium">{((item.quantity || 0) * (item.price || 0)).toFixed(2)}</td>
@@ -303,7 +333,11 @@ export default function InvoiceDetailPage() {
                         {igstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST:</span> <span>₹{igstAmount.toFixed(2)}</span></div>}
                         {cgstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">CGST:</span> <span>₹{cgstAmount.toFixed(2)}</span></div>}
                         {sgstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">SGST:</span> <span>₹{sgstAmount.toFixed(2)}</span></div>}
-                        <div className="flex justify-between text-md font-semibold border-t pt-1 mt-1"><span >Total:</span> <span>₹{total.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-md font-semibold border-t pt-1 mt-1"><span>Total Before Round Off:</span> <span>₹{total.toFixed(2)}</span></div>
+                        {invoice.roundOffApplied && roundOffDifference !== 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Round Off:</span> <span>{roundOffDifference >= 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>
+                        )}
+                        <div className="flex justify-between text-md font-bold border-t pt-1 mt-1"><span>Grand Total:</span> <span>₹{finalTotal.toFixed(2)}</span></div>
                     </div>
                 </div>
               </CardContent>

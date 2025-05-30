@@ -1,10 +1,10 @@
-
 // CommonJS version of database.ts for use in Electron main process
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
 const { hash, compare } = require('bcrypt');
 const { app } = require('electron');
+const util = require('util');
 
 let db = null;
 
@@ -29,7 +29,7 @@ async function initDatabase() {
   try {
     const dbPath = getDbPath();
     console.log('Database path:', dbPath);
-
+    
     db = await open({
       filename: dbPath,
       driver: sqlite3.Database
@@ -37,11 +37,41 @@ async function initDatabase() {
 
     await db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
-        id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
+        id TEXT PRIMARY KEY, 
+        invoiceNumber TEXT UNIQUE, 
+        customerId TEXT, 
+        customerName TEXT, 
+        customerEmail TEXT, 
+        customerAddress TEXT, 
+        customerGstin TEXT, 
+        customerState TEXT, 
+        customerStateCode TEXT, 
+        invoiceDate TEXT, 
+        dueDate TEXT, 
+        notes TEXT, 
+        termsAndConditions TEXT, 
+        status TEXT, 
+        amount REAL, 
+        paymentStatus TEXT, 
+        paymentMethod TEXT, 
+        roundOffApplied INTEGER DEFAULT 0
       );
+      
       CREATE TABLE IF NOT EXISTS invoice_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        invoiceId TEXT, 
+        productId TEXT, 
+        quantity REAL, 
+        price REAL, 
+        igst REAL, 
+        cgst REAL, 
+        sgst REAL, 
+        applyIgst INTEGER DEFAULT 0, 
+        applyCgst INTEGER DEFAULT 0, 
+        applySgst INTEGER DEFAULT 0, 
+        FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
+      
       CREATE TABLE IF NOT EXISTS shipment_details (
         invoiceId TEXT PRIMARY KEY,
         shipDate TEXT,
@@ -58,6 +88,7 @@ async function initDatabase() {
         placeOfSupply TEXT,
         FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
       );
+      
       CREATE TABLE IF NOT EXISTS company (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
@@ -71,12 +102,28 @@ async function initDatabase() {
         bank_account TEXT,
         bank_ifsc TEXT
       );
+      
       CREATE TABLE IF NOT EXISTS customers (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
+        id TEXT PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        email TEXT, 
+        phone TEXT, 
+        address TEXT, 
+        state TEXT, 
+        stateCode TEXT, 
+        gstin TEXT
       );
+      
       CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL
+        id TEXT PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        price REAL, 
+        hsn TEXT, 
+        igstRate REAL, 
+        cgstRate REAL, 
+        sgstRate REAL
       );
+      
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -88,16 +135,6 @@ async function initDatabase() {
         isSystemAdmin INTEGER DEFAULT 0
       );
     `);
-
-    const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
-    if (!adminExists) {
-      const hashedPassword = await hash('admin123', 10);
-      await db.run(
-        'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [`user_admin_${Date.now()}`, 'admin', hashedPassword, 'admin', 'System Administrator', 'admin@invoiceflow.com', 1, 1]
-      );
-      console.log('Default admin user created');
-    }
     
     console.log('Database initialized successfully');
     return db;
@@ -222,14 +259,33 @@ async function getInvoiceById(id) {
   const invoice = await currentDb.get('SELECT * FROM invoices WHERE id = ?', [id]);
   if (!invoice) return null;
 
-  const items = await currentDb.all('SELECT * FROM invoice_items WHERE invoiceId = ?', [id]);
+  // Fetch invoice items with product names
+  const items = await currentDb.all(`
+    SELECT i.*, p.name as productName
+    FROM invoice_items i
+    LEFT JOIN products p ON i.productId = p.id
+    WHERE i.invoiceId = ?
+  `, [id]);
+  
   const shipmentDetails = await currentDb.get('SELECT * FROM shipment_details WHERE invoiceId = ?', [id]);
   
   return {
     ...invoice,
     invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date(),
     dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
-    items: items || [],
+    items: items ? items.map(item => {
+      // Transform database fields to UI fields with our new structure
+      return {
+        ...item,
+        igstRate: item.igst || 0,
+        cgstRate: item.cgst || 0,
+        sgstRate: item.sgst || 0,
+        // Use the saved application flags, falling back to rate-based determination for backward compatibility
+        applyIgst: item.applyIgst !== undefined ? !!item.applyIgst : (item.igst || 0) > 0,
+        applyCgst: item.applyCgst !== undefined ? !!item.applyCgst : (item.cgst || 0) > 0,
+        applySgst: item.applySgst !== undefined ? !!item.applySgst : (item.sgst || 0) > 0
+      };
+    }) : [],
     shipmentDetails: shipmentDetails || {}
   };
 }
@@ -246,7 +302,16 @@ async function saveInvoice(invoice) {
     const invoiceDateISO = invoiceData.invoiceDate instanceof Date ? invoiceData.invoiceDate.toISOString() : invoiceData.invoiceDate;
     const dueDateISO = invoiceData.dueDate instanceof Date ? invoiceData.dueDate.toISOString() : invoiceData.dueDate;
     
-    const dbInvoiceData = {...invoiceData, invoiceDate: invoiceDateISO, dueDate: dueDateISO};
+    // Add roundOffApplied to the database record and ensure customer fields are included
+    const dbInvoiceData = {
+      ...invoiceData, 
+      invoiceDate: invoiceDateISO, 
+      dueDate: dueDateISO,
+      roundOffApplied: invoice.roundOffApplied || false,
+      customerGstin: invoice.customerGstin || '',
+      customerState: invoice.customerState || '',
+      customerStateCode: invoice.customerStateCode || ''
+    };
 
     if (exists) {
       const cols = Object.keys(dbInvoiceData).map(key => `${key} = ?`).join(', ');
@@ -264,14 +329,18 @@ async function saveInvoice(invoice) {
     
     if (items && items.length > 0) {
       for (const item of items) {
-        const { id: itemId, ...itemData } = item;
-        const itemCols = Object.keys({...itemData, invoiceId: id}).join(', ');
-        const itemValues = Object.values({...itemData, invoiceId: id});
-        const itemPlaceholders = itemValues.map(() => '?').join(', ');
+        // Extract the tax rates and application flags directly from the item
+        const igstRate = item.igstRate || 0;
+        const cgstRate = item.cgstRate || 0;
+        const sgstRate = item.sgstRate || 0;
+        const applyIgst = item.applyIgst ? 1 : 0;
+        const applyCgst = item.applyCgst ? 1 : 0;
+        const applySgst = item.applySgst ? 1 : 0;
         
+        // Insert with the updated structure including GST application flags
         await currentDb.run(
-          `INSERT INTO invoice_items (${itemCols}) VALUES (${itemPlaceholders})`,
-          itemValues
+          `INSERT INTO invoice_items (invoiceId, productId, quantity, price, igst, cgst, sgst, applyIgst, applyCgst, applySgst) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, item.productId, item.quantity, item.price, igstRate, cgstRate, sgstRate, applyIgst, applyCgst, applySgst]
         );
       }
     }
@@ -357,8 +426,12 @@ async function addCustomer(customer) {
 
 async function updateCustomer(customerId, customerData) {
   const currentDb = await initDatabase();
-  const updates = Object.keys(customerData).map(key => `${key} = ?`);
-  const params = [...Object.values(customerData), customerId];
+  
+  // Create a copy of customerData without the id field to ensure it's not changed
+  const { id, ...updateData } = customerData;
+  
+  const updates = Object.keys(updateData).map(key => `${key} = ?`);
+  const params = [...Object.values(updateData), customerId];
   const query = `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`;
   await currentDb.run(query, params);
   return true;
@@ -384,12 +457,16 @@ async function clearAllCustomers() {
 // Product Functions
 async function addProduct(product) {
   const currentDb = await initDatabase();
-  const cols = Object.keys(product).join(', ');
-  const placeholders = Object.values(product).map(() => '?').join(', ');
+  
+  // Filter out fields that don't exist in the database schema
+  const { description, gstCategory, gstType, gstRate, ...validProductData } = product;
+  
+  const cols = Object.keys(validProductData).join(', ');
+  const placeholders = Object.values(validProductData).map(() => '?').join(', ');
   
   await currentDb.run(
     `INSERT INTO products (${cols}) VALUES (${placeholders})`,
-    Object.values(product)
+    Object.values(validProductData)
   );
   
   return true;
@@ -397,8 +474,12 @@ async function addProduct(product) {
 
 async function updateProduct(productId, productData) {
   const currentDb = await initDatabase();
-  const updates = Object.keys(productData).map(key => `${key} = ?`);
-  const params = [...Object.values(productData), productId];
+  
+  // Filter out fields that don't exist in the database schema
+  const { description, gstCategory, gstType, gstRate, ...validProductData } = productData;
+  
+  const updates = Object.keys(validProductData).map(key => `${key} = ?`);
+  const params = [...Object.values(validProductData), productId];
   const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
   await currentDb.run(query, params);
   return true;

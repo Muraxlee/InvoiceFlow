@@ -1,4 +1,3 @@
-
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
@@ -63,15 +62,15 @@ async function seedDatabase() {
     // 3. Seed Products
     console.log('Seeding products...');
     const products = [
-      { id: 'PROD001', name: 'Quantum AI Processor', description: 'Next-gen AI processing unit for advanced analytics.', price: 75000.00, imageUrl: 'https://placehold.co/60x60.png?text=QAI', gstCategory: 'HSN 8471', igstRate: 18, cgstRate: 9, sgstRate: 9 },
-      { id: 'PROD002', name: 'Cloud Data Storage - 1TB Plan', description: 'Secure and scalable cloud storage solution.', price: 5000.00, imageUrl: 'https://placehold.co/60x60.png?text=CDS', gstCategory: 'SAC 9983', igstRate: 18, cgstRate: 9, sgstRate: 9 },
-      { id: 'PROD003', name: 'Cybersecurity Suite - Enterprise', description: 'Comprehensive security software for businesses.', price: 45000.00, imageUrl: 'https://placehold.co/60x60.png?text=CSS', gstCategory: 'HSN 8523', igstRate: 12, cgstRate: 6, sgstRate: 6 },
-      { id: 'PROD004', name: 'Consulting Services - AI Implementation', description: 'Expert consulting for AI strategy and deployment.', price: 150000.00, imageUrl: 'https://placehold.co/60x60.png?text=CS', gstCategory: 'SAC 998314', igstRate: 18, cgstRate: 9, sgstRate: 9 },
+      { id: 'PROD001', name: 'Quantum AI Processor', price: 75000.00, hsn: 'HSN 8471', igstRate: 18, cgstRate: 9, sgstRate: 9 },
+      { id: 'PROD002', name: 'Cloud Data Storage - 1TB Plan', price: 5000.00, hsn: 'SAC 9983', igstRate: 18, cgstRate: 9, sgstRate: 9 },
+      { id: 'PROD003', name: 'Cybersecurity Suite - Enterprise', price: 45000.00, hsn: 'HSN 8523', igstRate: 12, cgstRate: 6, sgstRate: 6 },
+      { id: 'PROD004', name: 'Consulting Services - AI Implementation', price: 150000.00, hsn: 'SAC 998314', igstRate: 18, cgstRate: 9, sgstRate: 9 },
     ];
     for (const prod of products) {
-      // For products, gstType would usually be based on rules, but for seeding, we assume IGST rates are primary
-      await db.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate, gstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-        [prod.id, prod.name, prod.description, prod.price, prod.imageUrl, prod.gstCategory, prod.igstRate, prod.cgstRate, prod.sgstRate, prod.igstRate] // Using igstRate as the main gstRate for simplicity
+      // Insert products with the simplified structure
+      await db.run('INSERT INTO products (id, name, price, hsn, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+        [prod.id, prod.name, prod.price, prod.hsn, prod.igstRate, prod.cgstRate, prod.sgstRate]
       );
     }
     console.log(`${products.length} products seeded.`);
@@ -138,9 +137,12 @@ async function seedDatabase() {
       for (const item of inv.items) {
         const productDetails = products.find(p => p.id === item.productId);
         await db.run(`
-          INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, gstRate, gstType) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
-          [inv.id, item.productId, item.description || productDetails?.description, item.quantity, item.price, item.gstCategory || productDetails?.gstCategory, item.igstRate || productDetails?.igstRate, 'IGST'] // Assuming IGST for seed
+          INSERT INTO invoice_items (invoiceId, productId, quantity, price, igst, cgst, sgst) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+          [inv.id, item.productId, item.quantity, item.price, 
+           item.igstRate || productDetails?.igstRate || 0, 
+           item.cgstRate || productDetails?.cgstRate || 0, 
+           item.sgstRate || productDetails?.sgstRate || 0]
         );
       }
 
@@ -192,7 +194,7 @@ async function ensureSchema() {
       id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
     );
     CREATE TABLE IF NOT EXISTS invoice_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
+      id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, quantity REAL, price REAL, igst REAL, cgst REAL, sgst REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS shipment_details (
       invoiceId TEXT PRIMARY KEY, shipDate TEXT, trackingNumber TEXT, carrierName TEXT, consigneeName TEXT, consigneeAddress TEXT, consigneeGstin TEXT, consigneeStateCode TEXT, transportationMode TEXT, lrNo TEXT, vehicleNo TEXT, dateOfSupply TEXT, placeOfSupply TEXT, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
@@ -204,7 +206,7 @@ async function ensureSchema() {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
     );
     CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, gstType TEXT, gstRate REAL, igstRate REAL, cgstRate REAL, sgstRate REAL
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, price REAL, hsn TEXT, igstRate REAL, cgstRate REAL, sgstRate REAL
     );
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL, name TEXT, email TEXT, isActive INTEGER DEFAULT 1, isSystemAdmin INTEGER DEFAULT 0

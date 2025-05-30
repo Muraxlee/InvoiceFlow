@@ -1,11 +1,12 @@
-
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Printer, FileText, Eye } from 'lucide-react';
 import { StoredInvoice } from '@/lib/database'; // Updated type
-import { formatDateFns } from 'date-fns';
+import { format } from 'date-fns';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface InvoicePrintProps {
   invoice: StoredInvoice;
@@ -15,69 +16,187 @@ interface InvoicePrintProps {
 
 export function InvoicePrint({ invoice, company, printType = 'Original' }: InvoicePrintProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  
+  // Document type options
+  const [isOriginal, setIsOriginal] = useState(true);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isTransportBill, setIsTransportBill] = useState(false);
+  
+  // Invoice type options
+  const [invoiceType, setInvoiceType] = useState<'tax' | 'proforma' | 'quotation'>('tax');
 
-  const handlePrint = () => {
-    const content = printRef.current;
-    if (!content) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const printDocument = printWindow.document;
-    // Added more comprehensive styling for better print output
-    printDocument.write(`
-      <html>
-        <head>
-          <title>Print Invoice - ${invoice.invoiceNumber}</title>
-          <style>
-            body { font-family: 'Arial', sans-serif; margin: 20px; color: #333; font-size: 10pt; }
-            .invoice-box { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
-            .header, .company-details, .customer-details, .invoice-details, .shipment-info { margin-bottom: 20px; }
-            .header h1 { text-align: center; color: #333; margin-bottom: 5px; font-size: 1.8em; text-transform: uppercase;}
-            .header h2 { text-align: center; color: #555; margin-bottom: 2px; font-size: 1.2em;}
-            .header p { text-align: center; color: #777; margin: 0; font-size: 0.9em; }
-            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom:20px; }
-            .details-section { padding:10px; border: 1px solid #f0f0f0; border-radius: 4px; }
-            .details-section h3 { margin-top: 0; font-size: 1em; color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
-            .details-section p { margin: 4px 0; font-size: 0.9em; }
-            .details-section p strong { color: #555; }
-            table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; }
-            table td, table th { padding: 8px; border: 1px solid #ddd; vertical-align: top; }
-            table th { background-color: #f8f8f8; font-weight: bold; text-align:center; }
-            table .description { width: 40%; }
-            table .number { text-align: right; }
-            .totals { margin-top: 20px; text-align: right; }
-            .totals table { width: auto; margin-left: auto; border: none; }
-            .totals table td, .totals table th { border: none; padding: 5px 8px; }
-            .totals table tr.heading td { background: #eee; border-bottom: 1px solid #ddd; font-weight: bold; }
-            .totals table tr.total td { border-top: 2px solid #eee; font-weight: bold; font-size: 1.1em; }
-            .notes-terms { margin-top: 30px; font-size: 0.85em; }
-            .notes-terms h4 { margin-bottom: 5px; }
-            .footer { text-align: center; font-size: 0.8em; color: #777; margin-top: 30px; padding-top:10px; border-top: 1px solid #eee; }
-            .print-type { text-align: right; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
-            @media print {
-              .no-print { display: none; }
-              body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              .invoice-box { box-shadow: none; border: none; margin: 0; max-width: 100%; padding: 10px 0; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="invoice-box">
-            ${content.innerHTML}
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printDocument.close();
+  // Get current document type label
+  const getCurrentDocumentType = () => {
+    if (isTransportBill) return "Transport Bill";
+    if (isOriginal) return "Original";
+    if (isDuplicate) return "Duplicate";
+    return "Original"; // Default
   };
 
-  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total } = useMemo(() => {
+  // Get current invoice type label
+  const getCurrentInvoiceTypeTitle = () => {
+    switch (invoiceType) {
+      case 'proforma': return "PROFORMA INVOICE";
+      case 'quotation': return "QUOTATION";
+      case 'tax':
+      default: return "TAX INVOICE";
+    }
+  };
+
+  // Handle document type change
+  const handleDocumentTypeChange = (type: 'original' | 'duplicate' | 'transport') => {
+    setIsOriginal(type === 'original');
+    setIsDuplicate(type === 'duplicate');
+    setIsTransportBill(type === 'transport');
+  };
+
+  // Effect to regenerate PDF when options change
+  useEffect(() => {
+    if (showPreview) {
+      generatePDF();
+    }
+  }, [isOriginal, isDuplicate, isTransportBill, invoiceType, showPreview]);
+
+  // Generate the HTML content for the invoice
+  const generateInvoiceHTML = () => {
+    return `
+    <html>
+      <head>
+        <title>Invoice - ${invoice.invoiceNumber}</title>
+        <style>
+          @page { size: A4; margin: 10mm; }
+          body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #000; font-size: 10pt; }
+          .invoice-box { max-width: 800px; margin: auto; padding: 10px 15px; }
+          .title { text-align: center; font-weight: bold; font-size: 16pt; margin-bottom: 5px; text-transform: uppercase; }
+          .subtitle { text-align: center; font-size: 14pt; margin-bottom: 5px; font-weight: bold; }
+          .company-address { text-align: center; margin-bottom: 5px; }
+          .company-contact { text-align: center; margin-bottom: 15px; }
+          .info-container { display: flex; width: 100%; margin-bottom: 10px; }
+          .info-box { border: 1px solid #000; flex: 1; margin: 0 1px; }
+          .info-box-title { font-weight: bold; padding: 3px; border-bottom: 1px solid #000; }
+          .info-content { padding: 5px; }
+          .info-row { margin-bottom: 3px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+          table, th, td { border: 1px solid #000; }
+          th { background-color: #f5f5f5; padding: 4px; text-align: center; font-weight: bold; font-size: 9pt; }
+          td { padding: 3px; vertical-align: top; font-size: 9pt; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .amount-word { margin: 10px 0; }
+          .summary-box { width: 100%; display: flex; }
+          .bank-details { flex: 1; border: 1px solid #000; margin-right: 5px; }
+          .notes-box { flex: 1; border: 1px solid #000; margin-right: 5px; }
+          .summary-totals { flex: 1; border: 1px solid #000; }
+          .box-title { font-weight: bold; padding: 3px; border-bottom: 1px solid #000; }
+          .box-content { padding: 5px; }
+          .summary-row { display: flex; margin-bottom: 5px; }
+          .summary-label { flex: 1; font-weight: bold; }
+          .summary-value { flex: 1.5; text-align: right; }
+          .summary-colon { padding: 0 5px; }
+          .bold { font-weight: bold; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 30px; }
+          .signature-box { width: 45%; text-align: center; }
+          .signature-line { border-top: 1px solid #000; margin-top: 40px; padding-top: 5px; }
+          .original-mark { text-align: right; margin-bottom: 5px; font-weight: bold; }
+          .empty-row td { height: 15px; }
+          @media print {
+            body { margin: 0; padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-box">
+          ${printRef.current?.innerHTML || ''}
+        </div>
+      </body>
+    </html>
+    `;
+  };
+
+  // Function to generate PDF from HTML
+  const generatePDF = () => {
+    if (!printRef.current) return;
+    
+    // Create a blob of the HTML content
+    const htmlContent = generateInvoiceHTML();
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    
+    // Save the blob for reuse
+    setPdfBlob(blob);
+    
+    // Create a URL for the blob
+    const url = URL.createObjectURL(blob);
+    setPdfUrl(url);
+    
+    return url;
+  };
+
+  // Clean up the blob URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
+
+  const handlePreview = () => {
+    // Reuse existing PDF blob if available
+    if (pdfBlob) {
+      const url = URL.createObjectURL(pdfBlob);
+      setPdfUrl(url);
+      setShowPreview(true);
+    } else {
+      const url = generatePDF();
+      if (url) {
+        setShowPreview(true);
+      }
+    }
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 2));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+  };
+
+  const handlePrint = () => {
+    if (pdfUrl) {
+      // Open the PDF in a new window for printing
+      const printWindow = window.open(pdfUrl);
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    } else {
+      const url = generatePDF();
+      if (url) {
+        const printWindow = window.open(url);
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print();
+          };
+        }
+      }
+    }
+  };
+
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, totalQuantity, totalRate, roundOff, finalTotal } = useMemo(() => {
     const currentItems = invoice.items || [];
-    const sub = currentItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
+    let totalQty = 0;
+    let totalRt = 0;
+    const sub = currentItems.reduce((acc, item) => {
+      totalQty += (item.quantity || 0);
+      totalRt += (item.price || 0);
+      return acc + (item.quantity || 0) * (item.price || 0);
+    }, 0);
     let cgst = 0; let sgst = 0; let igst = 0;
     currentItems.forEach(item => {
       const itemAmount = (item.quantity || 0) * (item.price || 0);
@@ -87,123 +206,336 @@ export function InvoicePrint({ invoice, company, printType = 'Original' }: Invoi
     });
     const tax = cgst + sgst + igst;
     const grandTotal = sub + tax;
-    return { subtotal: sub, igstAmount: igst, cgstAmount: cgst, sgstAmount: sgst, totalTax: tax, total: grandTotal };
-  }, [invoice.items]);
+    
+    // Calculate round off if it exists in the invoice
+    let roundOff = 0;
+    let finalTotal = grandTotal;
+    
+    // Check if the invoice has roundOffApplied property
+    if (invoice.roundOffApplied) {
+      finalTotal = Math.round(grandTotal);
+      roundOff = finalTotal - grandTotal;
+    }
+    
+    return { 
+      subtotal: sub, 
+      igstAmount: igst, 
+      cgstAmount: cgst, 
+      sgstAmount: sgst, 
+      totalTax: tax, 
+      total: grandTotal,
+      totalQuantity: totalQty,
+      totalRate: totalRt,
+      roundOff: roundOff,
+      finalTotal: finalTotal
+    };
+  }, [invoice.items, invoice.roundOffApplied]);
+
+  // Function to convert number to words for Indian currency
+  const numberToWords = (num: number) => {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    const numString = num.toFixed(2);
+    const parts = numString.split('.');
+    const wholePart = parseInt(parts[0]);
+    const decimalPart = parseInt(parts[1]);
+    
+    if (num === 0) return 'Zero Rupees Only';
+    
+    function convertLessThanOneThousand(n: number) {
+      if (n === 0) return '';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+      return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convertLessThanOneThousand(n % 100) : '');
+    }
+    
+    let result = '';
+    if (wholePart > 0) {
+      const crores = Math.floor(wholePart / 10000000);
+      const lakhs = Math.floor((wholePart % 10000000) / 100000);
+      const thousands = Math.floor((wholePart % 100000) / 1000);
+      const hundreds = wholePart % 1000;
+      
+      if (crores > 0) result += convertLessThanOneThousand(crores) + ' Crore ';
+      if (lakhs > 0) result += convertLessThanOneThousand(lakhs) + ' Lakh ';
+      if (thousands > 0) result += convertLessThanOneThousand(thousands) + ' Thousand ';
+      if (hundreds > 0) result += convertLessThanOneThousand(hundreds);
+      
+      result += ' Rupees';
+    }
+    
+    if (decimalPart > 0) {
+      result += ' and ' + convertLessThanOneThousand(decimalPart) + ' Paise';
+    }
+    
+    return result + ' Only';
+  };
 
   return (
-    <>
-      <Button onClick={handlePrint} className="mb-4 no-print">
-        <Printer className="mr-2 h-4 w-4" /> Print {printType}
-      </Button>
-      
-      <div ref={printRef} className="print-content">
-        <div className="print-type">{printType} Copy</div>
-        <div className="header">
-          <h1>TAX INVOICE</h1>
-          <h2>{company?.name || "Your Company Name"}</h2>
-          <p>{company?.address || "Your Company Address"}</p>
-          <p>Phone: {company?.phone || "N/A"} | Email: {company?.email || "N/A"}</p>
-          {company?.gstin && <p>GSTIN: {company.gstin}</p>}
+    <div className="flex flex-col space-y-4">
+      <div className="space-y-3">
+        <div className="flex space-x-2">
+          <Button onClick={handlePreview} className="mb-2 no-print bg-blue-500 hover:bg-blue-600 text-white">
+            <Eye className="mr-2 h-4 w-4" /> Preview
+          </Button>
+          <Button onClick={handlePrint} className="mb-2 no-print">
+            <Printer className="mr-2 h-4 w-4" /> Print {getCurrentDocumentType()}
+          </Button>
         </div>
-
-        <div className="details-grid">
-          <div className="details-section invoice-details">
-            <h3>Invoice Details</h3>
-            <p><strong>Invoice No:</strong> {invoice.invoiceNumber}</p>
-            <p><strong>Invoice Date:</strong> {formatDateFns(new Date(invoice.invoiceDate), "dd-MMM-yyyy")}</p>
-            <p><strong>Due Date:</strong> {formatDateFns(new Date(invoice.dueDate), "dd-MMM-yyyy")}</p>
-            <p><strong>Status:</strong> {invoice.paymentStatus}</p>
-            {invoice.paymentMethod && <p><strong>Payment Method:</strong> {invoice.paymentMethod}</p>}
-          </div>
-
-          <div className="details-section customer-details">
-            <h3>Billed To</h3>
-            <p><strong>{invoice.customerName}</strong></p>
-            {invoice.customerAddress && <p>{invoice.customerAddress}</p>}
-            {invoice.customerEmail && <p>Email: {invoice.customerEmail}</p>}
-            {/* Add customer GSTIN here if available from customer object */}
+        
+        <div className="flex flex-col space-y-3 p-3 border rounded-md">
+          <div className="text-sm font-medium mb-1">Document Type:</div>
+          <div className="flex space-x-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="original" 
+                checked={isOriginal} 
+                onCheckedChange={() => handleDocumentTypeChange('original')}
+              />
+              <Label htmlFor="original">Original</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="duplicate" 
+                checked={isDuplicate} 
+                onCheckedChange={() => handleDocumentTypeChange('duplicate')}
+              />
+              <Label htmlFor="duplicate">Duplicate</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="transport" 
+                checked={isTransportBill} 
+                onCheckedChange={() => handleDocumentTypeChange('transport')}
+              />
+              <Label htmlFor="transport">Transport Bill</Label>
+            </div>
           </div>
         </div>
         
-        {(invoice.shipmentDetails?.consigneeName || invoice.shipmentDetails?.transportationMode) && (
-          <div className="details-grid shipment-info">
-            <div className="details-section">
-              <h3>Shipped To (Consignee)</h3>
-              <p><strong>Name:</strong> {invoice.shipmentDetails?.consigneeName || invoice.customerName}</p>
-              <p><strong>Address:</strong> {invoice.shipmentDetails?.consigneeAddress || invoice.customerAddress || 'N/A'}</p>
-              {invoice.shipmentDetails?.consigneeGstin && <p><strong>GSTIN:</strong> {invoice.shipmentDetails.consigneeGstin}</p>}
-              {invoice.shipmentDetails?.consigneeStateCode && <p><strong>State/Code:</strong> {invoice.shipmentDetails.consigneeStateCode}</p>}
+        <div className="flex flex-col space-y-3 p-3 border rounded-md">
+          <div className="text-sm font-medium mb-1">Invoice Type:</div>
+          <div className="flex space-x-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="tax" 
+                checked={invoiceType === 'tax'} 
+                onCheckedChange={() => setInvoiceType('tax')}
+              />
+              <Label htmlFor="tax">Tax Invoice</Label>
             </div>
-            <div className="details-section">
-              <h3>Transport Information</h3>
-              <p><strong>Mode:</strong> {invoice.shipmentDetails?.transportationMode || 'N/A'}</p>
-              <p><strong>Date of Supply:</strong> {invoice.shipmentDetails?.dateOfSupply ? formatDateFns(new Date(invoice.shipmentDetails.dateOfSupply), "dd-MMM-yyyy") : 'N/A'}</p>
-              <p><strong>LR No.:</strong> {invoice.shipmentDetails?.lrNo || 'N/A'}</p>
-              <p><strong>Vehicle No.:</strong> {invoice.shipmentDetails?.vehicleNo || 'N/A'}</p>
-              <p><strong>Place of Supply:</strong> {invoice.shipmentDetails?.placeOfSupply || 'N/A'}</p>
-              {invoice.shipmentDetails?.carrierName && <p><strong>Carrier:</strong> {invoice.shipmentDetails.carrierName}</p>}
-              {invoice.shipmentDetails?.trackingNumber && <p><strong>Tracking #:</strong> {invoice.shipmentDetails.trackingNumber}</p>}
-              {invoice.shipmentDetails?.shipDate && <p><strong>Ship Date:</strong> {formatDateFns(new Date(invoice.shipmentDetails.shipDate), "dd-MMM-yyyy")}</p>}
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="proforma" 
+                checked={invoiceType === 'proforma'} 
+                onCheckedChange={() => setInvoiceType('proforma')}
+              />
+              <Label htmlFor="proforma">Proforma Invoice</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="quotation" 
+                checked={invoiceType === 'quotation'} 
+                onCheckedChange={() => setInvoiceType('quotation')}
+              />
+              <Label htmlFor="quotation">Quotation</Label>
             </div>
           </div>
-        )}
-
+        </div>
+      </div>
+      
+      {showPreview && pdfUrl && (
+        <div className="border border-gray-300 rounded-md overflow-hidden w-full h-[800px] mb-4 bg-white shadow-md">
+          <iframe 
+            src={pdfUrl} 
+            className="w-full h-full" 
+            title="Invoice Preview" 
+            style={{
+              backgroundColor: 'white',
+              border: 'none',
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: 'top center',
+              height: `${100/zoomLevel}%`,
+              width: `${100/zoomLevel}%`
+            }}
+          ></iframe>
+        </div>
+      )}
+      
+      <div ref={printRef} className="print-content hidden">
+        <div className="original-mark">{getCurrentDocumentType()}</div>
+        
+        <div className="title">{getCurrentInvoiceTypeTitle()}</div>
+        <div className="subtitle">Seafarer's Naval Tailors</div>
+        <div className="company-address">NEW NO 19, OLD NO 9, LINGI-II CHETTY ST, MANNAD, CHENNAI- 600001</div>
+        <div className="company-contact">+91 9841147133, +91 99400 56911 | smabdulrab@gmail.com</div>
+        
+        <div className="info-container">
+          <div className="info-box">
+            <div className="info-box-title">Invoice Information</div>
+            <div className="info-content">
+              <div className="info-row"><strong>Invoice No:</strong> {invoice.invoiceNumber}</div>
+              <div className="info-row"><strong>Invoice Date:</strong> {format(new Date(invoice.invoiceDate), "dd/MM/yyyy")}</div>
+              <div className="info-row"><strong>GSTIN:</strong> {company?.gstin || '33AHDPA2286J1ZM'}</div>
+              <div className="info-row"><strong>Reverse Charge:</strong> No</div>
+            </div>
+          </div>
+          
+          <div className="info-box">
+            <div className="info-box-title">Transport Information</div>
+            <div className="info-content">
+              <div className="info-row"><strong>Transportation Mode:</strong> {invoice.shipmentDetails?.transportationMode || '-'}</div>
+              <div className="info-row"><strong>LR No:</strong> {invoice.shipmentDetails?.lrNo || '-'}</div>
+              <div className="info-row"><strong>Vehicle No:</strong> {invoice.shipmentDetails?.vehicleNo || '-'}</div>
+              <div className="info-row"><strong>Date of Supply:</strong> {invoice.shipmentDetails?.dateOfSupply ? format(new Date(invoice.shipmentDetails.dateOfSupply), "dd/MM/yyyy") : format(new Date(invoice.invoiceDate), "dd/MM/yyyy")}</div>
+              <div className="info-row"><strong>Place of Supply:</strong> {invoice.shipmentDetails?.placeOfSupply || '-'}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="info-container">
+          <div className="info-box">
+            <div className="info-box-title">Details of Receiver (Billed to)</div>
+            <div className="info-content">
+              <div className="info-row"><strong>Name:</strong> {invoice.customerName}</div>
+              <div className="info-row"><strong>Address:</strong> {invoice.customerAddress || 'ameer chennai'}</div>
+              <div className="info-row"><strong>GSTIN:</strong> {invoice.customerGstin || ''}</div>
+              <div className="info-row"><strong>Mobile No:</strong> {invoice.customerPhone || '1234567890'}</div>
+              <div className="info-row"><strong>State / Code:</strong> {invoice.customerState && invoice.customerStateCode ? `${invoice.customerState} / ${invoice.customerStateCode}` : ''}</div>
+            </div>
+          </div>
+          
+          <div className="info-box">
+            <div className="info-box-title">Details of Consignee (Shipped To)</div>
+            <div className="info-content">
+              <div className="info-row"><strong>Name:</strong> {invoice.shipmentDetails?.consigneeName || invoice.customerName || 'SELF'}</div>
+              <div className="info-row"><strong>Address:</strong> {invoice.shipmentDetails?.consigneeAddress || invoice.customerAddress || 'ameer chennai'}</div>
+              <div className="info-row"><strong>GSTIN:</strong> {invoice.shipmentDetails?.consigneeGstin ? invoice.shipmentDetails.consigneeGstin : ''}</div>
+              <div className="info-row"><strong>State / Code:</strong> {invoice.shipmentDetails?.consigneeStateCode ? invoice.shipmentDetails.consigneeStateCode : (invoice.customerState && invoice.customerStateCode ? `${invoice.customerState} / ${invoice.customerStateCode}` : '')}</div>
+            </div>
+          </div>
+        </div>
+        
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th className="description">Item & Description</th>
-              <th>HSN/SAC</th>
-              <th>Qty</th>
-              <th className="number">Rate (₹)</th>
-              <th className="number">Amount (₹)</th>
+              <th style={{width: '5%'}}>Sr.</th>
+              <th style={{width: '38%'}}>Product Name</th>
+              <th style={{width: '10%'}}>HSN/SAC</th>
+              <th style={{width: '8%'}}>Qty</th>
+              <th style={{width: '9%'}}>Rate</th>
+              <th style={{width: '7%'}}>CGST %</th>
+              <th style={{width: '7%'}}>SGST %</th>
+              <th style={{width: '6%'}}>IGST %</th>
+              <th style={{width: '15%'}}>Total</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, index) => (
-              <tr key={index}>
-                <td>{index + 1}</td>
-                <td>
-                  <strong>{products.find(p => p.id === item.productId)?.name || 'N/A'}</strong><br />
-                  <small>{item.description}</small>
-                </td>
-                <td>{item.gstCategory || '-'}</td>
-                <td className="number">{item.quantity}</td>
-                <td className="number">{(item.price || 0).toFixed(2)}</td>
-                <td className="number">{((item.quantity || 0) * (item.price || 0)).toFixed(2)}</td>
+            {invoice.items && invoice.items.length > 0 ? (
+              invoice.items.map((item, index) => {
+                const itemAmount = (item.quantity || 0) * (item.price || 0);
+                const cgstAmount = item.applyCgst ? itemAmount * ((item.cgstRate || 0) / 100) : 0;
+                const sgstAmount = item.applySgst ? itemAmount * ((item.sgstRate || 0) / 100) : 0;
+                const igstAmount = item.applyIgst ? itemAmount * ((item.igstRate || 0) / 100) : 0;
+                const totalItemAmount = itemAmount + cgstAmount + sgstAmount + igstAmount;
+                
+                return (
+                  <tr key={index}>
+                    <td className="text-center">{index + 1}</td>
+                    <td>{item.productName || item.description || item.productId || ''}</td>
+                    <td className="text-center">{item.gstCategory || ''}</td>
+                    <td className="text-center">{item.quantity}</td>
+                    <td className="text-right">{item.price.toFixed(2)}</td>
+                    <td className="text-center">{item.applyCgst ? item.cgstRate : 0}</td>
+                    <td className="text-center">{item.applySgst ? item.sgstRate : 0}</td>
+                    <td className="text-center">{item.applyIgst ? item.igstRate : 0}</td>
+                    <td className="text-right">{totalItemAmount.toFixed(2)}</td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={9} className="text-center">No items</td>
+              </tr>
+            )}
+
+            {/* Add empty rows to match the image format */}
+            {Array.from({ length: Math.max(0, 10 - (invoice.items?.length || 0)) }).map((_, index) => (
+              <tr key={`empty-${index}`} className="empty-row">
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               </tr>
             ))}
+            
+            <tr>
+              <td colSpan={3} className="text-right"><strong>Total</strong></td>
+              <td className="text-center"><strong>{totalQuantity}</strong></td>
+              <td className="text-right"><strong>{totalRate.toFixed(2)}</strong></td>
+              <td className="text-center">{cgstAmount > 0 ? cgstAmount.toFixed(2) : '0.00'}</td>
+              <td className="text-center">{sgstAmount > 0 ? sgstAmount.toFixed(2) : '0.00'}</td>
+              <td className="text-center">{igstAmount > 0 ? igstAmount.toFixed(2) : '0.00'}</td>
+              <td className="text-right"><strong>{finalTotal.toFixed(2)}</strong></td>
+            </tr>
           </tbody>
         </table>
-
-        <div className="totals">
-          <table>
-            <tr><td>Subtotal:</td><td className="number">₹{subtotal.toFixed(2)}</td></tr>
-            {igstAmount > 0 && <tr><td>IGST Total:</td><td className="number">₹{igstAmount.toFixed(2)}</td></tr>}
-            {cgstAmount > 0 && <tr><td>CGST Total:</td><td className="number">₹{cgstAmount.toFixed(2)}</td></tr>}
-            {sgstAmount > 0 && <tr><td>SGST Total:</td><td className="number">₹{sgstAmount.toFixed(2)}</td></tr>}
-            <tr className="total"><td>Grand Total:</td><td className="number">₹{total.toFixed(2)}</td></tr>
-          </table>
+        
+        <div className="amount-word">
+          <strong>Amount in Words:</strong> {numberToWords(finalTotal)}
         </div>
-
-        {company?.bank_name && (
-          <div className="notes-terms">
-            <h4>Bank Details:</h4>
-            <p>Bank: {company.bank_name} | A/C: {company.bank_account} | IFSC: {company.bank_ifsc}</p>
+        
+        <div className="summary-box">
+          <div className="bank-details">
+            <div className="box-title">Bank Details</div>
+            <div className="box-content">
+              <div className="info-row"><strong>Account Name:</strong> {company?.bankAccountName || 'Seafarer Naval Tailor'}</div>
+              <div className="info-row"><strong>Bank A/C No:</strong> {company?.bankAccount || '01662560007135'}</div>
+              <div className="info-row"><strong>Bank Name:</strong> {company?.bankName || 'HDFC BANK'}</div>
+              <div className="info-row"><strong>Bank IFSC:</strong> {company?.bankIfsc || 'HDFC0001156'}</div>
+            </div>
           </div>
-        )}
-
-        <div className="notes-terms">
-          {invoice.notes && <><h4>Notes:</h4><p>{invoice.notes}</p></>}
-          {invoice.termsAndConditions && <><h4>Terms & Conditions:</h4><p>{invoice.termsAndConditions}</p></>}
+          
+          <div className="notes-box">
+            <div className="box-title">Notes</div>
+            <div className="box-content">{invoice.notes || 'Test invoice created automatically'}</div>
+          </div>
+          
+          <div className="summary-totals">
+            <div className="box-title">Summary</div>
+            <div className="box-content">
+              <div className="summary-row">
+                <div className="summary-label">Sub Total</div>
+                <div className="summary-colon">:</div>
+                <div className="summary-value">{subtotal.toFixed(2)}</div>
+              </div>
+              <div className="summary-row">
+                <div className="summary-label">Total Tax</div>
+                <div className="summary-colon">:</div>
+                <div className="summary-value">{totalTax.toFixed(2)}</div>
+              </div>
+              <div className="summary-row">
+                <div className="summary-label">Round Off</div>
+                <div className="summary-colon">:</div>
+                <div className="summary-value">{roundOff ? roundOff.toFixed(2) : "0.00"}</div>
+              </div>
+              <div className="summary-row">
+                <div className="summary-label">Grand Total</div>
+                <div className="summary-colon">:</div>
+                <div className="summary-value">{finalTotal.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <div className="footer">
-          <p>This is a computer-generated invoice.</p>
-          <p>For {company?.name || "Your Company Name"} | Authorized Signatory</p>
+        
+        <div className="signatures">
+          <div className="signature-box">
+            <div className="signature-line">Customer's Signature</div>
+          </div>
+          <div className="signature-box">
+            <div className="signature-line">For Seafarer's Naval Tailors<br/>Authorized Signatory</div>
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

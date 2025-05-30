@@ -1,4 +1,3 @@
-
 'use server';
 
 import sqlite3 from 'sqlite3';
@@ -13,6 +12,7 @@ export interface StoredInvoice extends InvoiceFormValues {
   status: "Paid" | "Pending" | "Overdue" | "Draft" | "Unpaid" | "Partially Paid";
   amount: number; // This will store the final (potentially rounded) amount
   dueDate: Date | null; // Ensure dueDate can be null
+  roundOffApplied?: boolean; // Flag to indicate if rounding was applied
 }
 
 export interface User {
@@ -60,7 +60,7 @@ export async function initDatabase(): Promise<Database> {
 
     await db.exec(`
       CREATE TABLE IF NOT EXISTS invoices (
-        id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT
+        id TEXT PRIMARY KEY, invoiceNumber TEXT UNIQUE, customerId TEXT, customerName TEXT, customerEmail TEXT, customerAddress TEXT, customerGstin TEXT, customerState TEXT, customerStateCode TEXT, invoiceDate TEXT, dueDate TEXT, notes TEXT, termsAndConditions TEXT, status TEXT, amount REAL, paymentStatus TEXT, paymentMethod TEXT, roundOffApplied INTEGER
       );
       CREATE TABLE IF NOT EXISTS invoice_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceId TEXT, productId TEXT, description TEXT, quantity REAL, price REAL, gstCategory TEXT, gstType TEXT, gstRate REAL, FOREIGN KEY (invoiceId) REFERENCES invoices (id) ON DELETE CASCADE
@@ -75,7 +75,7 @@ export async function initDatabase(): Promise<Database> {
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, address TEXT
       );
       CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, igstRate REAL, cgstRate REAL, sgstRate REAL
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL, imageUrl TEXT, gstCategory TEXT, igstRate REAL, cgstRate REAL, sgstRate REAL, hsn TEXT
       );
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL, name TEXT, email TEXT, isActive INTEGER DEFAULT 1, isSystemAdmin INTEGER DEFAULT 0
@@ -265,10 +265,13 @@ export async function saveInvoice(invoice: StoredInvoice): Promise<boolean> {
   await currentDb.run('BEGIN TRANSACTION');
   try {
     await currentDb.run(`
-      INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', invoice.invoiceDate.toISOString(), invoice.dueDate ? invoice.dueDate.toISOString() : null, // Handle null dueDate
-       invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '']
+      INSERT OR REPLACE INTO invoices (id, invoiceNumber, customerId, customerName, customerEmail, customerAddress, customerGstin, customerState, customerStateCode, invoiceDate, dueDate, notes, termsAndConditions, status, amount, paymentStatus, paymentMethod, roundOffApplied)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoice.id, invoice.invoiceNumber, invoice.customerId, invoice.customerName, invoice.customerEmail || '', invoice.customerAddress || '', 
+       invoice.customerGstin || '', invoice.customerState || '', invoice.customerStateCode || '',
+       invoice.invoiceDate.toISOString(), invoice.dueDate ? invoice.dueDate.toISOString() : null, // Handle null dueDate
+       invoice.notes || '', invoice.termsAndConditions || '', invoice.status, invoice.amount, invoice.paymentStatus, invoice.paymentMethod || '', 
+       invoice.roundOffApplied ? 1 : 0]
     );
     await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [invoice.id]);
     for (const item of invoice.items) {
@@ -388,15 +391,22 @@ export async function getCompanyInfo(): Promise<CompanyData | null> {
 
 // Customer Functions
 export interface Customer {
-  id: string; name: string; email: string; phone: string; address: string;
+  id: string; 
+  name: string; 
+  email: string; 
+  phone: string; 
+  address: string;
+  gstin?: string;
+  state?: string;
+  stateCode?: string;
 }
 export async function addCustomer(customer: Customer): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingCustomer = await currentDb.get('SELECT id FROM customers WHERE id = ?', [customer.id]);
     if (existingCustomer) throw new Error(`Customer with ID ${customer.id} already exists.`);
-    await currentDb.run('INSERT INTO customers (id, name, email, phone, address) VALUES (?, ?, ?, ?, ?)',
-      [customer.id, customer.name, customer.email, customer.phone, customer.address]);
+    await currentDb.run('INSERT INTO customers (id, name, email, phone, address, gstin, state, stateCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer.id, customer.name, customer.email, customer.phone, customer.address, customer.gstin || null, customer.state || null, customer.stateCode || null]);
     return true;
   } catch (error) { console.error('Error adding customer:', error); throw error; }
 }
@@ -430,16 +440,24 @@ export async function clearAllCustomers(): Promise<boolean> {
 
 // Product Functions
 export interface Product {
-  id: string; name: string; description: string; price: number; imageUrl?: string;
-  gstCategory: string; igstRate: number; cgstRate: number; sgstRate: number;
+  id: string; 
+  name: string; 
+  description: string; 
+  price: number; 
+  imageUrl?: string;
+  gstCategory: string; 
+  hsn?: string;
+  igstRate: number; 
+  cgstRate: number; 
+  sgstRate: number;
 }
 export async function addProduct(product: Product): Promise<boolean> {
   const currentDb = await initDatabase();
   try {
     const existingProduct = await currentDb.get('SELECT id FROM products WHERE id = ?', [product.id]);
     if (existingProduct) throw new Error(`Product with ID ${product.id} already exists.`);
-    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [product.id, product.name, product.description, product.price, product.imageUrl || null, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate]);
+    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, gstCategory, igstRate, cgstRate, sgstRate, hsn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [product.id, product.name, product.description, product.price, product.imageUrl || null, product.gstCategory, product.igstRate, product.cgstRate, product.sgstRate, product.hsn || null]);
     return true;
   } catch (error) { console.error('Error adding product:', error); throw error; }
 }

@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -8,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PackagePlus, MoreHorizontal, Edit, Trash2, Info, Loader2 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -34,7 +33,7 @@ export default function ProductsPage() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setIsDataLoading(true);
     if (window.electronAPI) {
       try {
@@ -48,11 +47,11 @@ export default function ProductsPage() {
       toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
     }
     setIsDataLoading(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchProducts();
-  }, [toast]);
+  }, [fetchProducts]);
 
   const handleDeleteProduct = async (productId: string) => {
     if (window.electronAPI) {
@@ -212,39 +211,12 @@ export default function ProductsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Image</TableHead>
                 <TableHead>Product ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>GST Category</TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    <span>GST Rates</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 ml-1 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="w-80">
-                          <div className="space-y-2 p-1">
-                            <div>
-                              <span className="font-medium">IGST (Inter-state GST):</span>
-                              <span className="text-xs ml-1">Applied for sales between different states</span>
-                            </div>
-                            <div>
-                              <span className="font-medium">CGST (Central GST):</span>
-                              <span className="text-xs ml-1">Central government's portion for intra-state sales</span>
-                            </div>
-                            <div>
-                              <span className="font-medium">SGST (State GST):</span>
-                              <span className="text-xs ml-1">State government's portion for intra-state sales</span>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableHead>
+                <TableHead>HSN/SAC</TableHead>
+                <TableHead className="text-center">CGST %</TableHead>
+                <TableHead className="text-center">SGST %</TableHead>
+                <TableHead className="text-center">IGST %</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -252,70 +224,12 @@ export default function ProductsPage() {
             <TableBody>
               {products.map((product) => (
                 <TableRow key={product.id}>
-                   <TableCell>
-                    <Image 
-                      src={product.imageUrl || "https://placehold.co/60x60.png"} 
-                      alt={product.name} 
-                      width={60} 
-                      height={60} 
-                      className="rounded-md object-cover aspect-square"
-                      data-ai-hint="product item"
-                      onError={(e) => (e.currentTarget.src = "https://placehold.co/60x60.png?text=Error")} 
-                    />
-                  </TableCell>
                   <TableCell className="font-medium">{product.id}</TableCell>
                   <TableCell>{product.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground truncate max-w-sm">{product.description}</TableCell>
-                  <TableCell>{product.gstCategory}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex gap-1">
-                        <Badge variant="default" className="flex items-center gap-1">
-                          IGST: {product.igstRate}%
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-3 w-3 text-white cursor-help opacity-80" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right">
-                                <p>Inter-state GST</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </Badge>
-                      </div>
-                      <div className="flex gap-1">
-                        <Badge variant="secondary" className="flex items-center gap-1">
-                          CGST: {product.cgstRate}%
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-3 w-3 text-muted-foreground cursor-help opacity-80" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right">
-                                <p>Central GST</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </Badge>
-                      </div>
-                      <div className="flex gap-1">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          SGST: {product.sgstRate}%
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-3 w-3 text-muted-foreground cursor-help opacity-80" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right">
-                                <p>State GST</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </Badge>
-                      </div>
-                    </div>
-                  </TableCell>
+                  <TableCell>{product.hsn || '-'}</TableCell>
+                  <TableCell className="text-center">{product.cgstRate}%</TableCell>
+                  <TableCell className="text-center">{product.sgstRate}%</TableCell>
+                  <TableCell className="text-center">{product.igstRate}%</TableCell>
                   <TableCell className="text-right">₹{(product.price || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -357,6 +271,9 @@ export default function ProductsPage() {
           )}
         </CardContent>
       </Card>
+
+      <p className="text-muted-foreground">Add product categories, tax settings, and track inventory for your business&apos;s product catalog.</p>
+      <p className="text-sm text-muted-foreground">Don&apos;t see what you need? Create a custom product.</p>
     </div>
   );
 }

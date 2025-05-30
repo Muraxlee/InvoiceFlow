@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,11 +11,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import type { Customer } from "@/app/customers/page"; // Assuming Customer type is exported
+import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 const customerSchema = z.object({
   id: z.string().min(1, "Customer ID is required"),
@@ -24,6 +26,9 @@ const customerSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits").optional().or(z.literal('')),
   address: z.string().min(1, "Address is required"),
+  gstin: z.string().optional().or(z.literal('')),
+  state: z.string().optional().or(z.literal('')),
+  stateCode: z.string().optional().or(z.literal('')),
 });
 
 export type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -44,8 +49,24 @@ export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: C
       email: "",
       phone: "",
       address: "",
+      gstin: "",
+      state: "",
+      stateCode: "",
     },
   });
+  
+  // Auto-generate customer ID for new customers
+  useEffect(() => {
+    if (!defaultValues?.id) {
+      // Create a unique customer ID format with timestamp and random component
+      const timestamp = Date.now().toString().slice(-6);
+      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const generatedId = `C${timestamp}${randomPart}`;
+      form.setValue("id", generatedId);
+    }
+  }, [defaultValues, form]);
+
+  const isEditMode = !!defaultValues?.id;
 
   return (
     <Form {...form}>
@@ -57,8 +78,16 @@ export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: C
             <FormItem>
               <FormLabel>Customer ID</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., CUST004" {...field} />
+                <Input 
+                  placeholder="Auto-generated" 
+                  {...field} 
+                  readOnly={true}
+                  className={cn("bg-muted cursor-not-allowed")}
+                />
               </FormControl>
+              <FormDescription>
+                Unique customer identifier (auto-generated and not changeable)
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -115,6 +144,47 @@ export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: C
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="gstin"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>GSTIN (Optional)</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., 22AAAAA0000A1Z5" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Tamil Nadu" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="stateCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State Code</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., 33" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-4">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
@@ -123,7 +193,7 @@ export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: C
           )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.id ? "Save Changes" : "Add Customer"}
+            {isEditMode ? "Save Changes" : "Add Customer"}
           </Button>
         </div>
       </form>

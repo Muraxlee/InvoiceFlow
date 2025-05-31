@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
@@ -24,14 +23,14 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
   
   const [isOriginal, setIsOriginal] = useState(initialPrintType === 'Original');
   const [isDuplicate, setIsDuplicate] = useState(initialPrintType === 'Duplicate');
-  const [isTransportBill, setIsTransportBill] = useState(initialPrintType === 'Triplicate'); // Assuming Triplicate is for Transport
+  const [isTransportBill, setIsTransportBill] = useState(initialPrintType === 'Triplicate'); 
   
   const [invoiceType, setInvoiceType] = useState<'tax' | 'proforma' | 'quotation'>('tax');
 
   const getCurrentDocumentType = () => {
-    if (isTransportBill) return "Transport Bill";
+    if (isTransportBill) return "Triplicate for Supplier"; // Changed this label
     if (isOriginal) return "Original for Recipient";
-    if (isDuplicate) return "Duplicate for Transporter"; // Or "Duplicate for Supplier"
+    if (isDuplicate) return "Duplicate for Transporter";
     return "Original for Recipient"; 
   };
 
@@ -54,7 +53,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     if (showPreview) {
       generatePDF();
     }
-  }, [isOriginal, isDuplicate, isTransportBill, invoiceType, showPreview, invoice, company]); // Added invoice & company to re-generate if they change
+  }, [isOriginal, isDuplicate, isTransportBill, invoiceType, showPreview, invoice, company]);
 
   const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, totalQuantity, totalRate, roundOff, finalTotal } = useMemo(() => {
     const currentItems = invoice.items || [];
@@ -160,9 +159,9 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           </tr>
         `;
       }).join('')
-    ) : `<tr><td colspan="9" class="text-center" style="height: 150px; vertical-align: middle;">No items</td></tr>`; // Make no items row taller
+    ) : `<tr><td colspan="9" class="text-center" style="height: 100px; vertical-align: middle;">No items</td></tr>`;
 
-    const targetItemRows = 12; // Adjusted for A4
+    const targetItemRows = 10; // Target 10 rows for items section (content + empty)
     const actualItemCount = invoice.items?.length || 0;
     const emptyRowCount = Math.max(0, targetItemRows - actualItemCount);
 
@@ -184,50 +183,49 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       </div>
     ` : '';
 
-
     return `
     <html>
       <head>
         <title>Invoice - ${invoice.invoiceNumber}</title>
         <style>
-          @page { size: A4; margin: 10mm; }
-          body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 9pt; line-height: 1.4; }
-          .invoice-box { width: 100%; margin: auto; padding: 0; } /* Changed padding to 0 */
-          .title { text-align: center; font-weight: bold; font-size: 16pt; margin-bottom: 2mm; text-transform: uppercase; color: #000; }
-          .subtitle { text-align: center; font-size: 10pt; margin-bottom: 2mm; font-weight: bold; color: #000; }
-          .company-address, .company-contact { text-align: center; font-size: 8pt; margin-bottom: 1mm; color: #000; }
-          .company-contact { margin-bottom: 5mm; }
-          .info-container { display: flex; width: 100%; margin-bottom: 3mm; }
+          @page { size: A4; margin: 8mm; } /* Reduced margin slightly */
+          body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; } /* Adjusted font and line-height */
+          .invoice-box { width: 100%; margin: auto; padding: 0; }
+          .title { text-align: center; font-weight: bold; font-size: 15pt; margin-bottom: 1.5mm; text-transform: uppercase; color: #000; }
+          .subtitle { text-align: center; font-size: 9.5pt; margin-bottom: 1.5mm; font-weight: bold; color: #000; }
+          .company-address, .company-contact { text-align: center; font-size: 7.5pt; margin-bottom: 0.8mm; color: #000; }
+          .company-contact { margin-bottom: 3mm; }
+          .info-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
           .info-box { border: 1px solid #000; flex: 1; margin: 0 0.5mm; display: flex; flex-direction: column; }
-          .info-box-title { font-weight: bold; padding: 1.5mm; border-bottom: 1px solid #000; background-color: #f0f0f0; text-align: center; font-size: 8pt;}
-          .info-content { padding: 2mm; font-size: 8pt; flex-grow: 1; }
-          .info-row { margin-bottom: 1mm; }
-          .info-row strong { display: inline-block; min-width: 80px; } /* Ensure labels align */
-          table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; table-layout: fixed; }
-          th, td { border: 1px solid #000; padding: 1.5mm; vertical-align: top; font-size: 8pt; word-wrap: break-word; }
+          .info-box-title { font-weight: bold; padding: 1mm; border-bottom: 1px solid #000; background-color: #f0f0f0; text-align: center; font-size: 7.5pt;}
+          .info-content { padding: 1.5mm; font-size: 7.5pt; flex-grow: 1; }
+          .info-row { margin-bottom: 0.8mm; }
+          .info-row strong { display: inline-block; min-width: 70px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 2.5mm; table-layout: fixed; }
+          th, td { border: 1px solid #000; padding: 1mm; vertical-align: top; font-size: 7.5pt; word-wrap: break-word; } /* Reduced padding */
           th { background-color: #f0f0f0; text-align: center; font-weight: bold;}
           .text-center { text-align: center; }
           .text-right { text-align: right; }
-          .amount-word { margin: 3mm 0; font-size: 8pt; }
-          .summary-box-container { display: flex; width: 100%; margin-bottom: 3mm; }
-          .bank-details, .notes-box, .summary-totals { border: 1px solid #000; display: flex; flex-direction: column; font-size: 8pt;}
+          .amount-word { margin: 2mm 0; font-size: 7.5pt; } /* Reduced margin */
+          .summary-box-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
+          .bank-details, .notes-box, .summary-totals { border: 1px solid #000; display: flex; flex-direction: column; font-size: 7.5pt;}
           .bank-details { flex: 1.2; margin-right: 1mm;}
           .notes-box { flex: 1.2; margin-right: 1mm;}
           .summary-totals { flex: 1; }
-          .box-title { font-weight: bold; padding: 1.5mm; border-bottom: 1px solid #000; background-color: #f0f0f0; text-align: center;}
-          .box-content { padding: 2mm; flex-grow: 1; }
-          .box-content .info-row { margin-bottom: 1.5mm; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 1mm; }
+          .box-title { font-weight: bold; padding: 1mm; border-bottom: 1px solid #000; background-color: #f0f0f0; text-align: center;}
+          .box-content { padding: 1.5mm; flex-grow: 1; }
+          .box-content .info-row { margin-bottom: 1mm; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 0.8mm; }
           .summary-label { font-weight: normal; }
           .summary-value { font-weight: bold; }
-          .grand-total .summary-label, .grand-total .summary-value { font-weight: bold; font-size: 9pt; }
-          .terms-box { margin-top: 3mm; border: 1px solid #000; font-size: 8pt; }
-          .terms-box .box-content { white-space: pre-wrap; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 8mm; padding-top: 5mm; border-top: 1px dashed #ccc;}
-          .signature-box { width: 48%; text-align: center; font-size: 8pt; }
-          .signature-line { margin-top: 15mm; border-top: 1px solid #000; padding-top: 1mm; }
-          .original-mark { text-align: right; margin-bottom: 2mm; font-weight: bold; font-size: 9pt; }
-          .empty-row td { height: 8mm; border-left: 1px solid #000; border-right: 1px solid #000; border-top: 1px dotted #eee; border-bottom: 1px dotted #eee; }
+          .grand-total .summary-label, .grand-total .summary-value { font-weight: bold; font-size: 8.5pt; }
+          .terms-box { margin-top: 2.5mm; border: 1px solid #000; font-size: 7.5pt; }
+          .terms-box .box-content { white-space: pre-wrap; padding: 1.5mm; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 5mm; padding-top: 3mm; border-top: 1px dashed #ccc;}
+          .signature-box { width: 48%; text-align: center; font-size: 7.5pt; }
+          .signature-line { margin-top: 12mm; border-top: 1px solid #000; padding-top: 1mm; }
+          .original-mark { text-align: right; margin-bottom: 1.5mm; font-weight: bold; font-size: 8.5pt; }
+          .empty-row td { height: 6mm; border-left: 1px solid #000; border-right: 1px solid #000; border-top: 1px dotted #eee; border-bottom: 1px dotted #eee; } /* Adjusted height */
           .empty-row td:first-child { border-left: 1px solid #000; }
           .empty-row td:last-child { border-right: 1px solid #000; }
           .item-table-footer td { font-weight: bold; }
@@ -371,7 +369,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
   };
 
   const generatePDF = () => {
-    if (!printRef.current && !invoice) return; // Check if invoice is also available
+    if (!printRef.current && !invoice) return;
     
     const htmlContent = generateInvoiceHTML();
     const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -410,10 +408,8 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       const printWindow = window.open(pdfUrl);
       if (printWindow) {
         printWindow.onload = () => {
-          printWindow.focus(); // Ensure window has focus before print
+          printWindow.focus(); 
           printWindow.print();
-          // Some browsers might close the window too soon, delay closing.
-          // printWindow.onafterprint = () => printWindow.close();
         };
       }
     } else {
@@ -424,7 +420,6 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           printWindow.onload = () => {
             printWindow.focus();
             printWindow.print();
-            // printWindow.onafterprint = () => printWindow.close();
           };
         }
       }
@@ -468,7 +463,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
                 checked={isTransportBill} 
                 onCheckedChange={() => handleDocumentTypeChange('transport')}
               />
-              <Label htmlFor="transport">Triplicate for Supplier</Label> {/* Changed to Triplicate */}
+              <Label htmlFor="transport">Triplicate for Supplier</Label>
             </div>
           </div>
         </div>
@@ -514,18 +509,14 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
               border: 'none',
               transform: `scale(${zoomLevel})`,
               transformOrigin: 'top center',
-              height: `calc(100% / ${zoomLevel})`, // Adjust height based on zoom
-              width: `calc(100% / ${zoomLevel})`   // Adjust width based on zoom
+              height: `calc(100% / ${zoomLevel})`, 
+              width: `calc(100% / ${zoomLevel})`  
             }}
           ></iframe>
         </div>
       )}
       
-      {/* The actual printable content, hidden by default from screen view but used for PDF generation */}
       <div ref={printRef} className="hidden print-this-area">
-        {/* Content generated by generateInvoiceHTML will be conceptually here for measurement, 
-            but directly injected into the iframe's blob for rendering. 
-            This div can be minimal or empty. */}
       </div>
     </div>
   );

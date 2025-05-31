@@ -156,13 +156,13 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             <td class="text-center">${item.applyCgst ? (item.cgstRate || 0).toFixed(1) : '-'}</td>
             <td class="text-center">${item.applySgst ? (item.sgstRate || 0).toFixed(1) : '-'}</td>
             <td class="text-center">${item.applyIgst ? (item.igstRate || 0).toFixed(1) : '-'}</td>
-            <td class="text-right">${totalItemAmount.toFixed(2)}</td>
+            <td class="text-right">₹${totalItemAmount.toFixed(2)}</td>
           </tr>
         `;
       }).join('')
     ) : `<tr><td colspan="9" class="text-center" style="height: 100px; vertical-align: middle;">No items</td></tr>`;
 
-    const targetItemRows = 10; 
+    const targetItemRows = 15; // Increased from 10 to 15
     const actualItemCount = invoice.items?.length || 0;
     const emptyRowCount = Math.max(0, targetItemRows - actualItemCount);
 
@@ -187,12 +187,13 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     return `
     <html>
       <head>
+        <meta charset="UTF-8">
         <title>Invoice - ${invoice.invoiceNumber}</title>
         <style>
           @page { size: A4; margin: 8mm; } 
           * { box-sizing: border-box; }
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
-          .invoice-box { width: 100%; margin: 0 auto; padding: 0; } /* Removed outer margin for invoice-box */
+          .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
           .title { text-align: center; font-weight: bold; font-size: 15pt; margin-bottom: 1.5mm; text-transform: uppercase; color: #000; }
           .subtitle { text-align: center; font-size: 9.5pt; margin-bottom: 1.5mm; font-weight: bold; color: #000; }
           .company-address, .company-contact { text-align: center; font-size: 7.5pt; margin-bottom: 0.8mm; color: #000; }
@@ -227,13 +228,13 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           .signature-box { width: 48%; text-align: center; font-size: 7.5pt; }
           .signature-line { margin-top: 12mm; border-top: 1px solid #000; padding-top: 1mm; }
           .original-mark { text-align: right; margin-bottom: 1.5mm; font-weight: bold; font-size: 8.5pt; }
-          .empty-row td { height: 6mm; border-left: 1px solid #000; border-right: 1px solid #000; border-top: 1px dotted #eee; border-bottom: 1px dotted #eee; } 
+          .empty-row td { height: 5mm; border-left: 1px solid #000; border-right: 1px solid #000; border-top: 1px dotted #eee; border-bottom: 1px dotted #eee; } 
           .empty-row td:first-child { border-left: 1px solid #000; }
           .empty-row td:last-child { border-right: 1px solid #000; }
           .item-table-footer td { font-weight: bold; }
           @media print {
             body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .invoice-box { width: 100%; margin: 0; padding: 0; } /* Ensure invoice-box uses full width */
+            .invoice-box { width: 100%; margin: 0; padding: 0; }
             .title, .subtitle, .company-address, .company-contact, .info-box-title, th, .box-title, .info-content, .info-row, .amount-word, .box-content, .summary-row, .terms-box .box-content, .signature-box, .original-mark, td { 
               color: #000 !important; 
             }
@@ -320,11 +321,11 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
               <tr class="item-table-footer">
                 <td colspan="3" class="text-right">Total</td>
                 <td class="text-center">${totalQuantity}</td>
-                <td class="text-right">${totalRate.toFixed(2)}</td>
+                <td class="text-right">₹${totalRate.toFixed(2)}</td>
                 <td class="text-center">${cgstAmount > 0 ? '' : '-'}</td>
                 <td class="text-center">${sgstAmount > 0 ? '' : '-'}</td>
                 <td class="text-center">${igstAmount > 0 ? '' : '-'}</td>
-                <td class="text-right">${subtotal.toFixed(2)}</td>
+                <td class="text-right">₹${subtotal.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>

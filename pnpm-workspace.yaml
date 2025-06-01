@@ -1,0 +1,12 @@
+ignoredBuiltDependencies:
+  - '@firebase/util'
+  - electron-winstaller
+  - esbuild
+  - protobufjs
+  - unrs-resolver
+onlyBuiltDependencies:
+  - bcrypt
+  - better-sqlite3
+  - electron
+  - sharp
+  - sqlite3

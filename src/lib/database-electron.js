@@ -1,8 +1,9 @@
+
 // CommonJS version of database.ts for use in Electron main process
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 const path = require('path');
-const { hash, compare } = require('bcrypt');
+const { hash, compare } = require('bcryptjs'); // Changed from bcrypt to bcryptjs
 const { app } = require('electron');
 const util = require('util');
 
@@ -28,7 +29,7 @@ async function initDatabase() {
 
   try {
     const dbPath = getDbPath();
-    console.log('Database path:', dbPath);
+    console.log('Database path (database-electron.js):', dbPath);
     
     db = await open({
       filename: dbPath,
@@ -61,8 +62,10 @@ async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         invoiceId TEXT, 
         productId TEXT, 
+        description TEXT, /* Added description to match StoredInvoice item structure */
         quantity REAL, 
         price REAL, 
+        gstCategory TEXT, /* Added gstCategory */
         igst REAL, 
         cgst REAL, 
         sgst REAL, 
@@ -117,11 +120,13 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY, 
         name TEXT NOT NULL, 
+        description TEXT, /* Added description to match ProductFormValues */
         price REAL, 
         hsn TEXT, 
         igstRate REAL, 
         cgstRate REAL, 
-        sgstRate REAL
+        sgstRate REAL,
+        imageUrl TEXT /* Added imageUrl to match ProductFormValues, though not in schema yet */
       );
       
       CREATE TABLE IF NOT EXISTS users (
@@ -136,10 +141,21 @@ async function initDatabase() {
       );
     `);
     
-    console.log('Database initialized successfully');
+    // Add default admin user if it doesn't exist
+    const adminExists = await db.get('SELECT * FROM users WHERE username = ?', ['admin']);
+    if (!adminExists) {
+      const hashedPassword = await hash('admin123', 10); // Use bcryptjs
+      await db.run(
+        'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [`user_admin_${Date.now()}`, 'admin', hashedPassword, 'admin', 'System Administrator', 'admin@invoiceflow.com', 1, 1]
+      );
+      console.log('Default admin user created by database-electron.js initDatabase.');
+    }
+    
+    console.log('Database initialized successfully (database-electron.js)');
     return db;
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('Database initialization error (database-electron.js):', error);
     db = null;
     throw error;
   }
@@ -150,7 +166,7 @@ async function closeDatabase() {
   if (db) {
     await db.close();
     db = null;
-    console.log('Database connection closed.');
+    console.log('Database connection closed (database-electron.js).');
   }
 }
 
@@ -180,7 +196,7 @@ async function createUser(userData) {
   const existingUser = await currentDb.get('SELECT id FROM users WHERE username = ?', [userData.username]);
   if (existingUser) throw new Error('Username already exists.');
   if (!userData.password) throw new Error('Password is required to create a user.');
-  const hashedPassword = await hash(userData.password, 10);
+  const hashedPassword = await hash(userData.password, 10); // Use bcryptjs
   const newUserId = `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   await currentDb.run(
     'INSERT INTO users (id, username, password, role, name, email, isActive, isSystemAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -203,7 +219,7 @@ async function updateUser(id, userData) {
     updates.push('username = ?'); params.push(userData.username);
   }
   if (userData.password) {
-    const hashedPassword = await hash(userData.password, 10);
+    const hashedPassword = await hash(userData.password, 10); // Use bcryptjs
     updates.push('password = ?'); params.push(hashedPassword);
   }
   if (userData.role && (!currentUser.isSystemAdmin || userData.role === 'admin')) {
@@ -237,7 +253,7 @@ async function deleteUser(id) {
 async function validateUserCredentials(username, passwordAttempt) {
   const user = await getUserByUsername(username); // This already calls initDatabase
   if (!user || !user.isActive || !user.password) return null;
-  const isMatch = await compare(passwordAttempt, user.password);
+  const isMatch = await compare(passwordAttempt, user.password); // Use bcryptjs
   if (!isMatch) return null;
   const { password, ...userWithoutPassword } = user;
   return userWithoutPassword;
@@ -250,7 +266,8 @@ async function getAllInvoices() {
   return invoicesRaw.map(inv => ({
     ...inv,
     invoiceDate: inv.invoiceDate ? new Date(inv.invoiceDate) : new Date(),
-    dueDate: inv.dueDate ? new Date(inv.dueDate) : new Date(),
+    dueDate: inv.dueDate ? new Date(inv.dueDate) : null, // Handle null dates
+    roundOffApplied: !!inv.roundOffApplied, // Ensure boolean
   }));
 }
 
@@ -259,7 +276,6 @@ async function getInvoiceById(id) {
   const invoice = await currentDb.get('SELECT * FROM invoices WHERE id = ?', [id]);
   if (!invoice) return null;
 
-  // Fetch invoice items with product names
   const items = await currentDb.all(`
     SELECT i.*, p.name as productName
     FROM invoice_items i
@@ -272,21 +288,24 @@ async function getInvoiceById(id) {
   return {
     ...invoice,
     invoiceDate: invoice.invoiceDate ? new Date(invoice.invoiceDate) : new Date(),
-    dueDate: invoice.dueDate ? new Date(invoice.dueDate) : new Date(),
+    dueDate: invoice.dueDate ? new Date(invoice.dueDate) : null, // Handle null dates
+    roundOffApplied: !!invoice.roundOffApplied, // Ensure boolean
     items: items ? items.map(item => {
-      // Transform database fields to UI fields with our new structure
       return {
         ...item,
         igstRate: item.igst || 0,
         cgstRate: item.cgst || 0,
         sgstRate: item.sgst || 0,
-        // Use the saved application flags, falling back to rate-based determination for backward compatibility
         applyIgst: item.applyIgst !== undefined ? !!item.applyIgst : (item.igst || 0) > 0,
         applyCgst: item.applyCgst !== undefined ? !!item.applyCgst : (item.cgst || 0) > 0,
         applySgst: item.applySgst !== undefined ? !!item.applySgst : (item.sgst || 0) > 0
       };
     }) : [],
-    shipmentDetails: shipmentDetails || {}
+    shipmentDetails: shipmentDetails ? {
+        ...shipmentDetails,
+        shipDate: shipmentDetails.shipDate ? new Date(shipmentDetails.shipDate) : null,
+        dateOfSupply: shipmentDetails.dateOfSupply ? new Date(shipmentDetails.dateOfSupply) : null,
+    } : null // Return null if no shipment details
   };
 }
 
@@ -299,15 +318,14 @@ async function saveInvoice(invoice) {
     
     const exists = await currentDb.get('SELECT id FROM invoices WHERE id = ?', [id]);
     
-    const invoiceDateISO = invoiceData.invoiceDate instanceof Date ? invoiceData.invoiceDate.toISOString() : invoiceData.invoiceDate;
-    const dueDateISO = invoiceData.dueDate instanceof Date ? invoiceData.dueDate.toISOString() : invoiceData.dueDate;
+    const invoiceDateISO = invoiceData.invoiceDate instanceof Date ? invoiceData.invoiceDate.toISOString() : (invoiceData.invoiceDate || new Date().toISOString());
+    const dueDateISO = invoiceData.dueDate ? (invoiceData.dueDate instanceof Date ? invoiceData.dueDate.toISOString() : invoiceData.dueDate) : null;
     
-    // Add roundOffApplied to the database record and ensure customer fields are included
     const dbInvoiceData = {
       ...invoiceData, 
       invoiceDate: invoiceDateISO, 
       dueDate: dueDateISO,
-      roundOffApplied: invoice.roundOffApplied || false,
+      roundOffApplied: invoice.roundOffApplied ? 1 : 0, // Store as integer
       customerGstin: invoice.customerGstin || '',
       customerState: invoice.customerState || '',
       customerStateCode: invoice.customerStateCode || ''
@@ -317,70 +335,58 @@ async function saveInvoice(invoice) {
       const cols = Object.keys(dbInvoiceData).map(key => `${key} = ?`).join(', ');
       const values = Object.values(dbInvoiceData);
       await currentDb.run(`UPDATE invoices SET ${cols} WHERE id = ?`, [...values, id]);
-      await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
     } else {
-      const cols = Object.keys(dbInvoiceData).join(', ');
-      const placeholders = Object.values(dbInvoiceData).map(() => '?').join(', ');
+      const cols = ['id', ...Object.keys(dbInvoiceData)].join(', ');
+      const placeholders = ['?', ...Object.values(dbInvoiceData).map(() => '?')].join(', ');
       await currentDb.run(
-        `INSERT INTO invoices (id, ${cols}) VALUES (?, ${placeholders})`,
+        `INSERT INTO invoices (${cols}) VALUES (${placeholders})`,
         [id, ...Object.values(dbInvoiceData)]
       );
     }
     
+    // Clear existing items before adding new ones to prevent duplicates on update
+    await currentDb.run('DELETE FROM invoice_items WHERE invoiceId = ?', [id]);
     if (items && items.length > 0) {
       for (const item of items) {
-        // Extract the tax rates and application flags directly from the item
-        const igstRate = item.igstRate || 0;
-        const cgstRate = item.cgstRate || 0;
-        const sgstRate = item.sgstRate || 0;
-        const applyIgst = item.applyIgst ? 1 : 0;
-        const applyCgst = item.applyCgst ? 1 : 0;
-        const applySgst = item.applySgst ? 1 : 0;
-        
-        // Insert with the updated structure including GST application flags
         await currentDb.run(
-          `INSERT INTO invoice_items (invoiceId, productId, quantity, price, igst, cgst, sgst, applyIgst, applyCgst, applySgst) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, item.productId, item.quantity, item.price, igstRate, cgstRate, sgstRate, applyIgst, applyCgst, applySgst]
+          `INSERT INTO invoice_items (invoiceId, productId, description, quantity, price, gstCategory, igst, cgst, sgst, applyIgst, applyCgst, applySgst) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, item.productId, item.description || '', item.quantity, item.price, item.gstCategory || '', 
+           item.igstRate || 0, item.cgstRate || 0, item.sgstRate || 0,
+           item.applyIgst ? 1 : 0, item.applyCgst ? 1 : 0, item.applySgst ? 1 : 0]
         );
       }
     }
     
-    if (shipmentDetails) {
-      const shipExists = await currentDb.get('SELECT invoiceId FROM shipment_details WHERE invoiceId = ?', [id]);
+    await currentDb.run('DELETE FROM shipment_details WHERE invoiceId = ?', [id]);
+    if (shipmentDetails && Object.values(shipmentDetails).some(v => v !== null && v !== "" && v !== undefined)) {
       const dbShipmentDetails = {
           ...shipmentDetails,
-          shipDate: shipmentDetails.shipDate instanceof Date ? shipmentDetails.shipDate.toISOString() : shipmentDetails.shipDate,
-          dateOfSupply: shipmentDetails.dateOfSupply instanceof Date ? shipmentDetails.dateOfSupply.toISOString() : shipmentDetails.dateOfSupply
+          shipDate: shipmentDetails.shipDate ? (shipmentDetails.shipDate instanceof Date ? shipmentDetails.shipDate.toISOString() : shipmentDetails.shipDate) : null,
+          dateOfSupply: shipmentDetails.dateOfSupply ? (shipmentDetails.dateOfSupply instanceof Date ? shipmentDetails.dateOfSupply.toISOString() : shipmentDetails.dateOfSupply) : null,
       };
+      const shipCols = ['invoiceId', ...Object.keys(dbShipmentDetails)].join(', ');
+      const shipValues = [id, ...Object.values(dbShipmentDetails)];
+      const shipPlaceholders = shipValues.map(() => '?').join(', ');
       
-      if (shipExists) {
-        const shipCols = Object.keys(dbShipmentDetails).map(key => `${key} = ?`).join(', ');
-        const shipValues = Object.values(dbShipmentDetails);
-        await currentDb.run(`UPDATE shipment_details SET ${shipCols} WHERE invoiceId = ?`, [...shipValues, id]);
-      } else if (Object.values(dbShipmentDetails).some(v => v !== null && v !== "" && v !== undefined)) { // Insert only if there's actual data
-        const shipCols = Object.keys({...dbShipmentDetails, invoiceId: id}).join(', ');
-        const shipValues = Object.values({...dbShipmentDetails, invoiceId: id});
-        const shipPlaceholders = shipValues.map(() => '?').join(', ');
-        
-        await currentDb.run(
-          `INSERT INTO shipment_details (${shipCols}) VALUES (${shipPlaceholders})`,
-          shipValues
-        );
-      }
+      await currentDb.run(
+        `INSERT INTO shipment_details (${shipCols}) VALUES (${shipPlaceholders})`,
+        shipValues
+      );
     }
     
     await currentDb.run('COMMIT');
     return true;
   } catch (error) {
     await currentDb.run('ROLLBACK');
-    console.error('Error saving invoice:', error);
+    console.error('Error saving invoice (database-electron.js):', error);
     throw error;
   }
 }
 
 async function deleteInvoice(id) {
   const currentDb = await initDatabase();
-  await currentDb.run('DELETE FROM invoices WHERE id = ?', [id]);
+  await currentDb.run('DELETE FROM invoices WHERE id = ?', [id]); // Cascading delete should handle items and shipment_details
   return true;
 }
 
@@ -389,16 +395,29 @@ async function saveCompanyInfo(company) {
   const currentDb = await initDatabase();
   const exists = await currentDb.get('SELECT id FROM company WHERE id = 1');
   
+  const companyDataToSave = {
+    name: company.name,
+    address: company.address || null,
+    phone: company.phone || null,
+    phone2: company.phone2 || null,
+    email: company.email || null,
+    gstin: company.gstin || null,
+    bank_account_name: company.bank_account_name || null,
+    bank_name: company.bank_name || null,
+    bank_account: company.bank_account || null,
+    bank_ifsc: company.bank_ifsc || null,
+  };
+
   if (exists) {
-    const cols = Object.keys(company).map(key => `${key} = ?`).join(', ');
-    const values = Object.values(company);
+    const cols = Object.keys(companyDataToSave).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(companyDataToSave);
     await currentDb.run(`UPDATE company SET ${cols} WHERE id = 1`, values);
   } else {
-    const cols = Object.keys(company).join(', ');
-    const placeholders = Object.values(company).map(() => '?').join(', ');
+    const cols = ['id', ...Object.keys(companyDataToSave)].join(', ');
+    const placeholders = ['?', ...Object.keys(companyDataToSave).map(() => '?')].join(', ');
     await currentDb.run(
-      `INSERT INTO company (id, ${cols}) VALUES (1, ${placeholders})`,
-      Object.values(company)
+      `INSERT INTO company (${cols}) VALUES (${placeholders})`,
+      [1, ...Object.values(companyDataToSave)]
     );
   }
   
@@ -413,28 +432,23 @@ async function getCompanyInfo() {
 // Customer Functions
 async function addCustomer(customer) {
   const currentDb = await initDatabase();
-  const cols = Object.keys(customer).join(', ');
-  const placeholders = Object.values(customer).map(() => '?').join(', ');
-  
-  await currentDb.run(
-    `INSERT INTO customers (${cols}) VALUES (${placeholders})`,
-    Object.values(customer)
-  );
-  
-  return true;
+  try {
+    const existingCustomer = await currentDb.get('SELECT id FROM customers WHERE id = ?', [customer.id]);
+    if (existingCustomer) throw new Error(`Customer with ID ${customer.id} already exists.`);
+    await currentDb.run('INSERT INTO customers (id, name, email, phone, address, gstin, state, stateCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer.id, customer.name, customer.email, customer.phone, customer.address, customer.gstin || null, customer.state || null, customer.stateCode || null]);
+    return true;
+  } catch (error) { console.error('Error adding customer:', error); throw error; }
 }
 
 async function updateCustomer(customerId, customerData) {
   const currentDb = await initDatabase();
-  
-  // Create a copy of customerData without the id field to ensure it's not changed
   const { id, ...updateData } = customerData;
-  
   const updates = Object.keys(updateData).map(key => `${key} = ?`);
   const params = [...Object.values(updateData), customerId];
   const query = `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`;
-  await currentDb.run(query, params);
-  return true;
+  try { await currentDb.run(query, params); return true; } 
+  catch (error) { console.error('Error updating customer:', error); throw error; }
 }
 
 async function getAllCustomers() {
@@ -457,32 +471,23 @@ async function clearAllCustomers() {
 // Product Functions
 async function addProduct(product) {
   const currentDb = await initDatabase();
-  
-  // Filter out fields that don't exist in the database schema
-  const { description, gstCategory, gstType, gstRate, ...validProductData } = product;
-  
-  const cols = Object.keys(validProductData).join(', ');
-  const placeholders = Object.values(validProductData).map(() => '?').join(', ');
-  
-  await currentDb.run(
-    `INSERT INTO products (${cols}) VALUES (${placeholders})`,
-    Object.values(validProductData)
-  );
-  
-  return true;
+  try {
+    const existingProduct = await currentDb.get('SELECT id FROM products WHERE id = ?', [product.id]);
+    if (existingProduct) throw new Error(`Product with ID ${product.id} already exists.`);
+    await currentDb.run('INSERT INTO products (id, name, description, price, imageUrl, hsn, igstRate, cgstRate, sgstRate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [product.id, product.name, product.description || '', product.price, product.imageUrl || null, product.hsn, product.igstRate, product.cgstRate, product.sgstRate]);
+    return true;
+  } catch (error) { console.error('Error adding product:', error); throw error; }
 }
 
 async function updateProduct(productId, productData) {
   const currentDb = await initDatabase();
-  
-  // Filter out fields that don't exist in the database schema
-  const { description, gstCategory, gstType, gstRate, ...validProductData } = productData;
-  
-  const updates = Object.keys(validProductData).map(key => `${key} = ?`);
-  const params = [...Object.values(validProductData), productId];
+  const { id, ...updateData } = productData;
+  const updates = Object.keys(updateData).map(key => `${key} = ?`);
+  const params = [...Object.values(updateData), productId];
   const query = `UPDATE products SET ${updates.join(', ')} WHERE id = ?`;
-  await currentDb.run(query, params);
-  return true;
+  try { await currentDb.run(query, params); return true; }
+  catch (error) { console.error('Error updating product:', error); throw error; }
 }
 
 async function getAllProducts() {
@@ -512,9 +517,9 @@ async function clearAllData() {
     await currentDb.run('DELETE FROM invoices');
     await currentDb.run('DELETE FROM customers');
     await currentDb.run('DELETE FROM products');
-    // Company data is not typically cleared in a "business data" clear,
-    // but if needed, add: await currentDb.run('DELETE FROM company WHERE id = 1');
-    // Users are also not cleared by this.
+    await currentDb.run('DELETE FROM company WHERE id = 1'); // Reset company info
+    // Keep users, but you could clear non-admin users if desired
+    // await currentDb.run('DELETE FROM users WHERE isSystemAdmin = 0'); 
     await currentDb.run('COMMIT');
     return true;
   } catch (error) {
@@ -531,8 +536,8 @@ module.exports = {
   closeDatabase,
   // User Management
   getAllUsers,
-  getUserById, // Added for completeness, though not directly used by current IPC
-  getUserByUsername, // Ensure this is exported
+  getUserById,
+  getUserByUsername,
   createUser,
   updateUser,
   deleteUser,
@@ -547,18 +552,16 @@ module.exports = {
   getCompanyInfo,
   // Customer
   addCustomer,
-  updateCustomer, // Added export
+  updateCustomer,
   getAllCustomers,
   deleteCustomer,
   clearAllCustomers,
   // Product
   addProduct,
-  updateProduct, // Added export
+  updateProduct,
   getAllProducts,
   deleteProduct,
   clearAllProducts,
   // Utility
   clearAllData
-}; 
-
-    
+};

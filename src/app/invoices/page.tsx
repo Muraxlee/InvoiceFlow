@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -6,11 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2 } from "lucide-react";
+import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { loadFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
-import type { InvoiceFormValues } from "@/components/invoice-form";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StoredInvoice } from "@/lib/database";
@@ -65,10 +64,12 @@ export default function InvoicesPage() {
     }
   };
 
-  const statusVariant = (status: string) => {
+  const statusVariant = (status: string | undefined) => {
+    if (!status) return "outline";
     switch (status.toLowerCase()) {
-      case "paid": return "default"; 
-      case "pending": return "secondary"; 
+      case "paid": return "success"; 
+      case "pending": return "warning"; 
+      case "unpaid": return "warning";
       case "overdue": return "destructive";
       case "draft": return "outline";
       default: return "outline";
@@ -97,7 +98,7 @@ export default function InvoicesPage() {
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
           ) : (
             <Table>
@@ -117,11 +118,19 @@ export default function InvoicesPage() {
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.customerName}</TableCell>
-                    <TableCell>{invoice.invoiceDate.toLocaleDateString()}</TableCell>
-                    <TableCell>{invoice.dueDate.toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {invoice.invoiceDate instanceof Date && !isNaN(invoice.invoiceDate.getTime())
+                        ? invoice.invoiceDate.toLocaleDateString()
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {invoice.dueDate instanceof Date && !isNaN(invoice.dueDate.getTime())
+                        ? invoice.dueDate.toLocaleDateString()
+                        : 'N/A'}
+                    </TableCell>
                     <TableCell className="text-right">₹{(invoice.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>
+                      <Badge variant={statusVariant(invoice.status) as any}>{invoice.status || 'Unknown'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

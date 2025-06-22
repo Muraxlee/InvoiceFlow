@@ -1,8 +1,16 @@
+
 'use client';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
+
+// Extend the Window interface to include our custom flag
+declare global {
+  interface Window {
+    _firebaseEmulatorConnected?: boolean;
+  }
+}
 
 // Use environment variables, but provide mock values for emulator-first development.
 // This allows the app to run without a .env file when using emulators.
@@ -23,13 +31,18 @@ const auth = getAuth(app);
 
 // Connect to Firebase Emulators in development
 if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-  console.log("Connecting to Firebase Emulators...");
-  try {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    connectAuthEmulator(auth, 'http://localhost:9099');
-    console.log("Successfully connected to Firestore and Auth Emulators.");
-  } catch (error) {
-    console.error("Error connecting to Firebase Emulators:", error);
+  // Check if we've already connected to the emulator
+  if (!window._firebaseEmulatorConnected) {
+    console.log("Connecting to Firebase Emulators...");
+    try {
+      connectFirestoreEmulator(db, 'localhost', 8080);
+      connectAuthEmulator(auth, 'http://localhost:9099');
+      console.log("Successfully connected to Firestore and Auth Emulators.");
+      // Set a flag to prevent re-connecting on hot reloads
+      window._firebaseEmulatorConnected = true;
+    } catch (error) {
+      console.error("Error connecting to Firebase Emulators:", error);
+    }
   }
 }
 

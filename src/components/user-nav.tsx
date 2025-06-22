@@ -11,28 +11,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, ChevronDown } from "lucide-react";
+import { LogOut, User, ChevronDown, Settings } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers";
+import { useRouter } from "next/navigation";
 
 export function UserNav() {
   const { appUser, logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await logout();
-      // The auth provider will handle redirecting to /login via the layout logic
+      router.push('/login');
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
-  const displayName = appUser?.name || appUser?.email?.split('@')[0] || "User";
-  const avatarInitial = (displayName).substring(0, 2).toUpperCase();
-
   if (!appUser) {
     return null;
   }
+  
+  const displayName = appUser.name || appUser.email?.split('@')[0] || "User";
+  const avatarInitial = (displayName).substring(0, 2).toUpperCase();
 
   return (
     <DropdownMenu>
@@ -56,6 +58,13 @@ export function UserNav() {
             )}
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+         <DropdownMenuItem asChild className="cursor-pointer">
+           <Link href="/settings">
+             <Settings className="mr-2 h-4 w-4" />
+             <span>Settings</span>
+           </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />

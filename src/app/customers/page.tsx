@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -7,90 +8,66 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CustomerForm, type CustomerFormValues } from "@/components/customer-form";
-
-export interface Customer extends CustomerFormValues {
-  // id is already in CustomerFormValues
-}
+import type { Customer } from "@/types/database";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore-actions";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const queryClient = useQueryClient();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [isEditCustomerDialogOpen, setIsEditCustomerDialogOpen] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchCustomers = useCallback(async () => {
-    setIsDataLoading(true);
-    if (window.electronAPI) {
-      try {
-        const fetchedCustomers = await window.electronAPI.getAllCustomers();
-        setCustomers(fetchedCustomers);
-      } catch (error) {
-        console.error("Error fetching customers:", error);
-        toast({ title: "Error", description: "Could not load customers.", variant: "destructive" });
-      }
-    } else {
-      toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
-    }
-    setIsDataLoading(false);
-  }, [toast]);
+  const { data: customers, isLoading: isDataLoading } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: getCustomers,
+    initialData: []
+  });
 
-  useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
+  const addMutation = useMutation({
+    mutationFn: addCustomer,
+    onSuccess: () => {
+      toast({ title: "Customer Added", description: "The new customer has been added." });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setIsAddCustomerDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
-  const handleDeleteCustomer = async (customerId: string) => {
-    if (window.electronAPI) {
-      try {
-        const success = await window.electronAPI.deleteCustomer(customerId);
-        if (success) {
-          setCustomers(prev => prev.filter(c => c.id !== customerId));
-          toast({
-            title: "Customer Deleted",
-            description: `Customer ${customerId} has been successfully deleted.`,
-          });
-        } else {
-          throw new Error("Failed to delete customer via Electron API");
-        }
-      } catch (error) {
-        console.error("Error deleting customer:", error);
-        toast({ title: "Error", description: "Could not delete customer.", variant: "destructive" });
-      }
-    }
-  };
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string, values: CustomerFormValues }) => updateCustomer(data.id, data.values),
+    onSuccess: () => {
+      toast({ title: "Customer Updated", description: "Customer details have been updated." });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setIsEditCustomerDialogOpen(false);
+      setCurrentCustomer(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCustomer,
+    onSuccess: () => {
+      toast({ title: "Customer Deleted", description: "The customer has been deleted." });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const handleAddCustomer = async (data: CustomerFormValues) => {
-    setIsLoading(true);
-    if (window.electronAPI) {
-      try {
-        const success = await window.electronAPI.addCustomer(data);
-        if (success) {
-          await fetchCustomers(); // Re-fetch to get the latest list including the new one
-          setIsLoading(false);
-          setIsAddCustomerDialogOpen(false);
-          toast({
-            title: "Customer Added",
-            description: `Customer ${data.name} has been successfully added.`,
-          });
-        } else {
-          throw new Error("Failed to add customer via Electron API");
-        }
-      } catch (error) {
-        console.error("Error adding customer:", error);
-        const errorMessage = error instanceof Error ? error.message : "Could not add customer.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
-    }
+    addMutation.mutate(data);
   };
   
   const handleEditCustomerClick = (customer: Customer) => {
@@ -99,39 +76,10 @@ export default function CustomersPage() {
   };
 
   const handleSaveEditedCustomer = async (data: CustomerFormValues) => {
-    setIsLoading(true);
-    if (window.electronAPI && currentCustomer) {
-      try {
-        // Ensure the ID is not changed from the original customer
-        const updateData = { 
-          ...data,
-          id: currentCustomer.id // Preserve the original ID
-        };
-        
-        const success = await window.electronAPI.updateCustomer(currentCustomer.id, updateData);
-        if (success) {
-          await fetchCustomers(); // Re-fetch to get the updated list
-          setIsLoading(false);
-          setIsEditCustomerDialogOpen(false);
-          setCurrentCustomer(null);
-          toast({
-            title: "Customer Updated",
-            description: `Customer ${data.name} has been successfully updated.`,
-          });
-        } else {
-          throw new Error("Failed to update customer via Electron API");
-        }
-      } catch (error) {
-        console.error("Error updating customer:", error);
-        const errorMessage = error instanceof Error ? error.message : "Could not update customer.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
+    if (currentCustomer) {
+      updateMutation.mutate({ id: currentCustomer.id, values: data });
     }
   };
-
 
   return (
     <div className="space-y-6">
@@ -154,7 +102,7 @@ export default function CustomersPage() {
               </DialogHeader>
               <CustomerForm 
                 onSubmit={handleAddCustomer} 
-                isLoading={isLoading}
+                isLoading={addMutation.isPending}
                 onCancel={() => setIsAddCustomerDialogOpen(false)}
               />
             </DialogContent>
@@ -162,10 +110,9 @@ export default function CustomersPage() {
         }
       />
 
-      {/* Edit Customer Dialog */}
       <Dialog open={isEditCustomerDialogOpen} onOpenChange={(isOpen) => {
         setIsEditCustomerDialogOpen(isOpen);
-        if (!isOpen) setCurrentCustomer(null); // Reset current customer when dialog closes
+        if (!isOpen) setCurrentCustomer(null);
       }}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -178,7 +125,7 @@ export default function CustomersPage() {
             <CustomerForm 
               onSubmit={handleSaveEditedCustomer}
               defaultValues={currentCustomer}
-              isLoading={isLoading}
+              isLoading={updateMutation.isPending}
               onCancel={() => {
                 setIsEditCustomerDialogOpen(false);
                 setCurrentCustomer(null);
@@ -211,7 +158,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers.map((customer) => (
+                {customers?.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.id}</TableCell>
                     <TableCell>{customer.name}</TableCell>
@@ -241,7 +188,7 @@ export default function CustomersPage() {
                             }
                             title={`Delete Customer ${customer.name}`}
                             description="Are you sure you want to delete this customer? This action cannot be undone."
-                            onConfirm={() => handleDeleteCustomer(customer.id)}
+                            onConfirm={() => deleteMutation.mutate(customer.id)}
                             confirmText="Yes, Delete"
                             confirmVariant="destructive"
                           />
@@ -253,7 +200,7 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           )}
-           {!isDataLoading && customers.length === 0 && (
+           {!isDataLoading && (!customers || customers.length === 0) && (
             <p className="py-4 text-center text-muted-foreground">No customers found. Add a new customer to get started.</p>
           )}
         </CardContent>
@@ -261,5 +208,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

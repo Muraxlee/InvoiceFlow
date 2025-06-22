@@ -1,26 +1,21 @@
 
 'use client';
 
-import { useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { saveCompanyInfo } from '@/lib/firestore-actions';
+import { COMPANY_NAME_STORAGE_KEY, saveToLocalStorage } from '@/lib/localStorage';
+import { type CompanyInfo } from '@/types/database';
+
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { saveCompanyInfo } from '@/lib/database-wrapper';
 
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
@@ -37,63 +32,47 @@ const companySchema = z.object({
 
 type CompanyFormValues = z.infer<typeof companySchema>;
 
-export interface CompanyInfo extends CompanyFormValues {
-  // Potentially add id if it's ever used, though for company it's usually a single record
-}
-
 interface CompanySettingsFormProps {
-  defaultValues?: Partial<CompanyInfo>;
+  defaultValues: Partial<CompanyInfo>;
   onSuccess?: () => void;
 }
 
 export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySettingsFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: {
-      name: defaultValues?.name || '',
-      address: defaultValues?.address || '',
-      phone: defaultValues?.phone || '',
-      phone2: defaultValues?.phone2 || '',
-      email: defaultValues?.email || '',
-      gstin: defaultValues?.gstin || '',
-      bank_account_name: defaultValues?.bank_account_name || '',
-      bank_name: defaultValues?.bank_name || '',
-      bank_account: defaultValues?.bank_account || '',
-      bank_ifsc: defaultValues?.bank_ifsc || '',
-    },
+    defaultValues: defaultValues || {},
   });
 
-  async function onSubmit(data: CompanyFormValues) {
-    setIsLoading(true);
-    
-    try {
-      const success = await saveCompanyInfo(data); // Pass the whole data object
-      
-      if (success) {
-        toast({
-          title: 'Settings Saved',
-          description: 'Company information has been updated successfully.',
-        });
-        
-        if (onSuccess) {
-          onSuccess();
-        }
-      } else {
-        throw new Error('Failed to save company information');
-      }
-    } catch (error) {
-      console.error('Error saving company information:', error);
+  const mutation = useMutation({
+    mutationFn: saveCompanyInfo,
+    onSuccess: (_, variables) => {
       toast({
+        title: 'Settings Saved',
+        description: 'Company information has been updated successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['companyInfo'] });
+
+      // Also update the company name in local storage for the app title
+      if (variables.name) {
+        saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, variables.name);
+        window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(variables.name) }));
+      }
+      onSuccess?.();
+    },
+    onError: (error) => {
+       toast({
         title: 'Error',
         description: 'Failed to save company information. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
+  });
+
+  async function onSubmit(data: CompanyFormValues) {
+    mutation.mutate(data);
   }
 
   return (
@@ -256,9 +235,9 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
             <div className="flex justify-end gap-2">
               <Button 
                 type="submit" 
-                disabled={isLoading || !form.formState.isDirty}
+                disabled={mutation.isPending || !form.formState.isDirty}
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </div>

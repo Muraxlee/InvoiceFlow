@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -5,108 +6,67 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PackagePlus, MoreHorizontal, Edit, Trash2, Info, Loader2 } from "lucide-react";
-import Image from "next/image";
-import { useEffect, useState, useCallback } from "react";
+import { PackagePlus, MoreHorizontal, Edit, Trash2, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { ProductForm, type ProductFormValues } from "@/components/product-form";
-import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-export interface Product extends ProductFormValues {
-  // id is already in ProductFormValues
-}
+import type { Product } from "@/types/database";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const queryClient = useQueryClient();
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const { toast } = useToast();
+  
+  const { data: products, isLoading: isDataLoading } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: getProducts,
+    initialData: [],
+  });
 
-  const fetchProducts = useCallback(async () => {
-    setIsDataLoading(true);
-    if (window.electronAPI) {
-      try {
-        const fetchedProducts = await window.electronAPI.getAllProducts();
-        setProducts(fetchedProducts);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        toast({ title: "Error", description: "Could not load products.", variant: "destructive" });
-      }
-    } else {
-      toast({ title: "Error", description: "Desktop features not available in web mode.", variant: "destructive" });
-    }
-    setIsDataLoading(false);
-  }, [toast]);
+  const addMutation = useMutation({
+    mutationFn: addProduct,
+    onSuccess: () => {
+      toast({ title: "Product Added", description: "The new product has been added." });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setIsAddProductDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string, values: ProductFormValues }) => updateProduct(data.id, data.values),
+    onSuccess: () => {
+      toast({ title: "Product Updated", description: "Product details have been updated." });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setIsEditProductDialogOpen(false);
+      setCurrentProduct(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (window.electronAPI) {
-      try {
-        const success = await window.electronAPI.deleteProduct(productId);
-        if (success) {
-          setProducts(prev => prev.filter(p => p.id !== productId));
-          toast({
-            title: "Product Deleted",
-            description: `Product ${productId} has been successfully deleted.`,
-          });
-        } else {
-          throw new Error("Failed to delete product via Electron API");
-        }
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        toast({ title: "Error", description: "Could not delete product.", variant: "destructive" });
-      }
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onSuccess: () => {
+      toast({ title: "Product Deleted", description: "The product has been deleted." });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const handleAddProduct = async (data: ProductFormValues) => {
-    setIsLoading(true);
-    if (window.electronAPI) {
-      try {
-        if (products.some(p => p.id === data.id)) {
-          toast({
-            title: "Error: Product ID Exists",
-            description: `A product with ID ${data.id} already exists. Please use a unique ID.`,
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
-        const success = await window.electronAPI.addProduct(data);
-        if (success) {
-          await fetchProducts(); // Re-fetch to get the latest list
-          setIsLoading(false);
-          setIsAddProductDialogOpen(false);
-          toast({
-            title: "Product Added",
-            description: `Product ${data.name} has been successfully added.`,
-          });
-        } else {
-          throw new Error("Failed to add product via Electron API");
-        }
-      } catch (error) {
-        console.error("Error adding product:", error);
-        const errorMessage = error instanceof Error ? error.message : "Could not add product.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
-    }
+    addMutation.mutate(data);
   };
 
   const handleEditProductClick = (product: Product) => {
@@ -115,30 +75,8 @@ export default function ProductsPage() {
   };
 
   const handleSaveEditedProduct = async (data: ProductFormValues) => {
-    setIsLoading(true);
-     if (window.electronAPI && currentProduct) {
-      try {
-        const success = await window.electronAPI.updateProduct(currentProduct.id, data);
-        if (success) {
-          await fetchProducts(); // Re-fetch to get the updated list
-          setIsLoading(false);
-          setIsEditProductDialogOpen(false);
-          setCurrentProduct(null);
-          toast({
-            title: "Product Updated",
-            description: `Product ${data.name} has been successfully updated.`,
-          });
-        } else {
-          throw new Error("Failed to update product via Electron API");
-        }
-      } catch (error) {
-        console.error("Error updating product:", error);
-        const errorMessage = error instanceof Error ? error.message : "Could not update product.";
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
-        setIsLoading(false);
-      }
-    } else {
-      setIsLoading(false);
+    if (currentProduct) {
+      updateMutation.mutate({ id: currentProduct.id, values: data });
     }
   };
 
@@ -163,7 +101,7 @@ export default function ProductsPage() {
               </DialogHeader>
               <ProductForm 
                 onSubmit={handleAddProduct} 
-                isLoading={isLoading}
+                isLoading={addMutation.isPending}
                 onCancel={() => setIsAddProductDialogOpen(false)}
               />
             </DialogContent>
@@ -171,10 +109,9 @@ export default function ProductsPage() {
         }
       />
 
-      {/* Edit Product Dialog */}
       <Dialog open={isEditProductDialogOpen} onOpenChange={(isOpen) => {
         setIsEditProductDialogOpen(isOpen);
-        if (!isOpen) setCurrentProduct(null); // Reset current product when dialog closes
+        if (!isOpen) setCurrentProduct(null);
       }}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -187,7 +124,7 @@ export default function ProductsPage() {
             <ProductForm 
               onSubmit={handleSaveEditedProduct}
               defaultValues={currentProduct}
-              isLoading={isLoading}
+              isLoading={updateMutation.isPending}
               onCancel={() => {
                 setIsEditProductDialogOpen(false);
                 setCurrentProduct(null);
@@ -222,7 +159,7 @@ export default function ProductsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {products?.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.id}</TableCell>
                   <TableCell>{product.name}</TableCell>
@@ -254,7 +191,7 @@ export default function ProductsPage() {
                           }
                           title={`Delete Product ${product.name}`}
                           description="Are you sure you want to delete this product? This action cannot be undone."
-                          onConfirm={() => handleDeleteProduct(product.id)}
+                          onConfirm={() => deleteMutation.mutate(product.id)}
                           confirmText="Yes, Delete"
                           confirmVariant="destructive"
                         />
@@ -266,16 +203,11 @@ export default function ProductsPage() {
             </TableBody>
           </Table>
           )}
-           {!isDataLoading && products.length === 0 && (
+           {!isDataLoading && (!products || products.length === 0) && (
             <p className="py-4 text-center text-muted-foreground">No products found. Add a new product to get started.</p>
           )}
         </CardContent>
       </Card>
-
-      <p className="text-muted-foreground">Add product categories, tax settings, and track inventory for your business&apos;s product catalog.</p>
-      <p className="text-sm text-muted-foreground">Don&apos;t see what you need? Create a custom product.</p>
     </div>
   );
 }
-
-    

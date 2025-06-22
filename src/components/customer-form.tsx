@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,12 +17,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import type { Customer } from "@/app/customers/page"; // Assuming Customer type is exported
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const customerSchema = z.object({
-  id: z.string().min(1, "Customer ID is required"),
+  id: z.string(), // ID is handled by Firestore, but kept in form for edit mode
   name: z.string().min(1, "Customer name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits").optional().or(z.literal('')),
@@ -43,27 +43,21 @@ interface CustomerFormProps {
 export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: CustomerFormProps) {
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
-    defaultValues: defaultValues || {
-      id: "",
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      gstin: "",
-      state: "",
-      stateCode: "",
+    defaultValues: {
+      id: defaultValues?.id || "",
+      name: defaultValues?.name || "",
+      email: defaultValues?.email || "",
+      phone: defaultValues?.phone || "",
+      address: defaultValues?.address || "",
+      gstin: defaultValues?.gstin || "",
+      state: defaultValues?.state || "",
+      stateCode: defaultValues?.stateCode || "",
     },
   });
   
-  // Auto-generate customer ID for new customers
   useEffect(() => {
-    if (!defaultValues?.id) {
-      // Create a unique customer ID format with timestamp and random component
-      const timestamp = Date.now().toString().slice(-6);
-      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      const generatedId = `C${timestamp}${randomPart}`;
-      form.setValue("id", generatedId);
-    }
+    // This allows resetting the form when the defaultValues prop changes (e.g., when opening a dialog)
+    form.reset(defaultValues);
   }, [defaultValues, form]);
 
   const isEditMode = !!defaultValues?.id;
@@ -71,27 +65,28 @@ export function CustomerForm({ onSubmit, defaultValues, isLoading, onCancel }: C
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Customer ID</FormLabel>
-              <FormControl>
-                <Input 
-                  placeholder="Auto-generated" 
-                  {...field} 
-                  readOnly={true}
-                  className={cn("bg-muted cursor-not-allowed")}
-                />
-              </FormControl>
-              <FormDescription>
-                Unique customer identifier (auto-generated and not changeable)
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {isEditMode && (
+           <FormField
+            control={form.control}
+            name="id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Customer ID</FormLabel>
+                <FormControl>
+                  <Input 
+                    {...field} 
+                    readOnly
+                    className={cn("bg-muted cursor-not-allowed")}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Unique customer identifier (cannot be changed).
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="name"

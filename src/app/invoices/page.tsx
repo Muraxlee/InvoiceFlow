@@ -9,59 +9,44 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { StoredInvoice } from "@/lib/database";
-import { getAllInvoices, deleteInvoice } from "@/lib/database-wrapper";
+import { type StoredInvoice } from "@/types/database";
+import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from 'date-fns';
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  useEffect(() => {
-    async function loadInvoices() {
-      try {
-        setIsLoading(true);
-        const fetchedInvoices = await getAllInvoices();
-        setInvoices(fetchedInvoices);
-      } catch (error) {
-        console.error("Failed to load invoices:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load invoices from the database",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  const { data: invoices, isLoading } = useQuery<StoredInvoice[]>({
+    queryKey: ['invoices'],
+    queryFn: getInvoices,
+    initialData: [],
+  });
 
-    loadInvoices();
-  }, [toast]);
-
-  const handleDeleteInvoice = async (invoiceId: string) => {
-    try {
-      const success = await deleteInvoice(invoiceId);
-      
-      if (success) {
-        setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-        toast({
-          title: "Invoice Deleted",
-          description: `Invoice has been successfully deleted.`,
-        });
-      } else {
-        throw new Error("Failed to delete invoice");
-      }
-    } catch (error) {
+  const deleteMutation = useMutation({
+    mutationFn: deleteInvoice,
+    onSuccess: (_, invoiceId) => {
+      toast({
+        title: "Invoice Deleted",
+        description: `Invoice has been successfully deleted.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+    onError: (error) => {
       console.error("Failed to delete invoice:", error);
       toast({
         title: "Error",
         description: "Failed to delete the invoice",
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const handleDeleteInvoice = (invoiceId: string) => {
+    deleteMutation.mutate(invoiceId);
   };
 
   const statusVariant = (status: string | undefined) => {
@@ -114,19 +99,15 @@ export default function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice) => (
+                {invoices?.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.customerName}</TableCell>
                     <TableCell>
-                      {invoice.invoiceDate instanceof Date && !isNaN(invoice.invoiceDate.getTime())
-                        ? invoice.invoiceDate.toLocaleDateString()
-                        : 'N/A'}
+                      {invoice.invoiceDate && format(new Date(invoice.invoiceDate), 'dd MMM yyyy')}
                     </TableCell>
                     <TableCell>
-                      {invoice.dueDate instanceof Date && !isNaN(invoice.dueDate.getTime())
-                        ? invoice.dueDate.toLocaleDateString()
-                        : 'N/A'}
+                      {invoice.dueDate ? format(new Date(invoice.dueDate), 'dd MMM yyyy') : 'N/A'}
                     </TableCell>
                     <TableCell className="text-right">₹{(invoice.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>
@@ -174,7 +155,7 @@ export default function InvoicesPage() {
               </TableBody>
             </Table>
           )}
-          {!isLoading && invoices.length === 0 && (
+          {!isLoading && (!invoices || invoices.length === 0) && (
             <p className="py-4 text-center text-muted-foreground">No invoices found. Create a new invoice to get started.</p>
           )}
         </CardContent>

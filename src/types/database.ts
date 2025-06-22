@@ -1,3 +1,4 @@
+
 // This file serves as the single source of truth for our data models.
 // It is safe to import from any component, client-side or server-side.
 
@@ -17,8 +18,8 @@ export interface StoredInvoice extends InvoiceFormValues {
   amount: number;
   dueDate: Date | null;
   roundOffApplied?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: any; // Firestore ServerTimestamp
+  updatedAt: any; // Firestore ServerTimestamp
 }
 
 export interface Customer {
@@ -30,7 +31,7 @@ export interface Customer {
   gstin?: string;
   state?: string;
   stateCode?: string;
-  createdAt: Date;
+  createdAt: any; // Firestore ServerTimestamp
 }
 
 export interface Product {
@@ -42,7 +43,7 @@ export interface Product {
   igstRate: number;
   cgstRate: number;
   sgstRate: number;
-  createdAt: Date;
+  createdAt: any; // Firestore ServerTimestamp
 }
 
 export interface CompanyData {

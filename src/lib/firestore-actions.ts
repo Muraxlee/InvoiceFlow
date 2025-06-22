@@ -155,3 +155,38 @@ export async function setUserRoleOnRegister(uid: string, email: string): Promise
     };
     await setDoc(userDocRef, newUser);
 }
+
+
+// Batch delete helper
+async function deleteCollection(collectionPath: string) {
+    const q = query(collection(db, collectionPath));
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return;
+    const batch = writeBatch(db);
+    querySnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
+
+export async function clearAllCustomers(): Promise<void> {
+    await deleteCollection(CUSTOMERS);
+}
+
+export async function clearAllProducts(): Promise<void> {
+    await deleteCollection(PRODUCTS);
+}
+
+export async function clearAllInvoices(): Promise<void> {
+    await deleteCollection(INVOICES);
+}
+
+export async function clearAllData(): Promise<void> {
+    await Promise.all([
+        clearAllCustomers(),
+        clearAllProducts(),
+        clearAllInvoices(),
+        // Company info is a single doc, so we delete it separately
+        deleteDoc(doc(db, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
+    ]);
+}

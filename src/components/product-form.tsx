@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Loader2, HelpCircle } from "lucide-react";
-import type { Product } from "@/app/products/page"; // Assuming Product type is exported
 import { 
   Select,
   SelectContent,
@@ -32,7 +32,7 @@ import {
 import { useEffect } from "react";
 
 const productSchema = z.object({
-  id: z.string().min(1, "Product ID is required"),
+  id: z.string(), // ID is handled by Firestore, but kept in form for edit mode
   name: z.string().min(1, "Product name is required"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
   hsn: z.string().min(1, "HSN/SAC code is required"),
@@ -53,51 +53,48 @@ interface ProductFormProps {
 export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: ProductFormProps) {
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: defaultValues || {
-      id: `PROD${Date.now().toString().slice(-6)}`,
-      name: "",
-      price: 0,
-      hsn: "",
-      igstRate: 18,
-      cgstRate: 9,
-      sgstRate: 9,
+    defaultValues: {
+      id: defaultValues?.id || "",
+      name: defaultValues?.name || "",
+      price: defaultValues?.price || 0,
+      hsn: defaultValues?.hsn || "",
+      igstRate: defaultValues?.igstRate || 18,
+      cgstRate: defaultValues?.cgstRate || 9,
+      sgstRate: defaultValues?.sgstRate || 9,
     },
   });
-  
-  // Auto-generate product ID for new products
+
   useEffect(() => {
-    if (!defaultValues?.id) {
-      // Create a more unique product ID format with a random component
-      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      const timestamp = Date.now().toString().slice(-6);
-      const generatedId = `P${timestamp}${randomPart}`;
-      form.setValue("id", generatedId);
-    }
+    form.reset(defaultValues);
   }, [defaultValues, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
     await onSubmit(data);
   };
 
+  const isEditMode = !!defaultValues?.id;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product ID</FormLabel>
-              <FormControl>
-                <Input placeholder="Auto-generated" {...field} readOnly className="bg-muted" />
-              </FormControl>
-              <FormDescription>
-                Auto-generated unique product code
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {isEditMode && (
+          <FormField
+            control={form.control}
+            name="id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Product ID</FormLabel>
+                <FormControl>
+                  <Input placeholder="Product ID" {...field} readOnly className="bg-muted" />
+                </FormControl>
+                <FormDescription>
+                  Unique product identifier (cannot be changed).
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="name"
@@ -275,7 +272,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
           )}
           <Button type="submit" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {defaultValues?.id ? "Save Changes" : "Add Product"}
+            {isEditMode ? "Save Changes" : "Add Product"}
           </Button>
         </div>
       </form>

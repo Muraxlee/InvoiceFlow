@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,115 +9,87 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/invoice-form';
 import { InvoicePrint } from '@/components/invoice-print';
-import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2Icon } from 'lucide-react';
+import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { type StoredInvoice } from '@/lib/database';
-import { getInvoiceById, saveInvoice, getCompanyInfo } from '@/lib/database-wrapper';
+import { type StoredInvoice, type CompanyData } from '@/types/database';
+import { getInvoice, saveInvoice, getCompanyInfo } from '@/lib/firestore-actions';
 import { format as formatDateFns, isValid } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [invoice, setInvoice] = useState<StoredInvoice | null>(null);
-  const [companyInfo, setCompanyInfo] = useState<any>(null);
+  
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("view");
 
+  const { data: invoice, isLoading: isInvoiceLoading, error: invoiceError } = useQuery<StoredInvoice | null>({
+    queryKey: ['invoice', params.id],
+    queryFn: () => getInvoice(params.id),
+    enabled: !!params.id,
+  });
+
+  const { data: companyInfo, isLoading: isCompanyLoading } = useQuery<CompanyData | null>({
+    queryKey: ['companyInfo'],
+    queryFn: getCompanyInfo,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (data: { id: string; values: InvoiceFormValues }) => saveInvoice(data.values, data.id),
+    onSuccess: (savedId) => {
+      toast({
+        title: 'Invoice Updated',
+        description: `Invoice has been updated successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['invoice', savedId] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] }); // Invalidate the list
+      setIsEditing(false);
+    },
+    onError: (error) => {
+      console.error('Error saving invoice:', error);
+      toast({ title: 'Error', description: 'Failed to save invoice changes', variant: 'destructive' });
+    }
+  });
+  
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const tab = queryParams.get('tab');
     if (tab === 'print') {
       setActiveTab('print');
     }
+  }, []);
 
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const invoiceData = await getInvoiceById(params.id);
-        if (!invoiceData) {
-          toast({
+  useEffect(() => {
+    if (!isInvoiceLoading && !invoice) {
+        toast({
             title: 'Invoice Not Found',
             description: `Could not find invoice with ID ${params.id}`,
             variant: 'destructive',
-          });
-          router.push('/invoices');
-          return;
-        }
-        setInvoice(invoiceData);
-        
-        const company = await getCompanyInfo();
-        setCompanyInfo(company);
-      } catch (error) {
-        console.error('Error loading invoice:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load invoice data',
-          variant: 'destructive',
         });
-      } finally {
-        setIsLoading(false);
-      }
+        router.push('/invoices');
     }
-    
-    if (params.id) {
-      loadData();
-    }
-  }, [params.id, router, toast]);
+  }, [isInvoiceLoading, invoice, params.id, router, toast]);
+
 
   const handleSave = async (data: InvoiceFormValues) => {
-    if (!invoice) return;
-    setIsLoading(true);
-    try {
-      // Recalculate total amount before saving
-      const subtotal = data.items.reduce((acc, item) => acc + (item.quantity || 0) * (item.price || 0), 0);
-      let totalTaxAmount = 0;
-      data.items.forEach(item => {
-        const itemAmount = (item.quantity || 0) * (item.price || 0);
-        if (item.applyIgst) {
-          totalTaxAmount += itemAmount * ((item.igstRate || 0) / 100);
-        } else {
-          totalTaxAmount += itemAmount * ((item.cgstRate || 0) / 100);
-          totalTaxAmount += itemAmount * ((item.sgstRate || 0) / 100);
-        }
-      });
-      const totalAmount = subtotal + totalTaxAmount;
-      
-      // Apply rounding if roundOffApplied is true
-      const finalAmount = data.roundOffApplied ? Math.round(totalAmount) : totalAmount;
+    if (!invoice?.id) return;
 
-      const updatedInvoice: StoredInvoice = {
-        ...invoice, // Spread existing invoice to keep ID and other non-form fields
-        ...data,    // Spread form data
-        amount: finalAmount, // Set the recalculated amount
-        roundOffApplied: data.roundOffApplied // Make sure roundOffApplied is preserved
-      };
-      
-      const success = await saveInvoice(updatedInvoice);
-      if (success) {
-        setInvoice(updatedInvoice);
-        setIsEditing(false);
-        toast({
-          title: 'Invoice Updated',
-          description: `Invoice ${updatedInvoice.invoiceNumber} has been updated successfully.`,
-        });
-      } else {
-        throw new Error('Failed to save invoice');
-      }
-    } catch (error) {
-      console.error('Error saving invoice:', error);
-      toast({ title: 'Error', description: 'Failed to save invoice changes', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
+    const updatedInvoiceData = {
+        ...data,
+        amount: finalTotal, // Use the calculated final total
+        roundOffApplied: applyRoundOff
+    };
+    
+    saveMutation.mutate({ id: invoice.id, values: updatedInvoiceData });
   };
-
+  
   const statusVariant = (status: string | undefined) => {
     switch (status?.toLowerCase()) {
       case "paid": return "success";
@@ -139,11 +112,8 @@ export default function InvoiceDetailPage() {
     );
   };
   
-  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, finalTotal, roundOffDifference } = (() => {
-    if (!invoice) return { 
-      subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, 
-      totalTax: 0, total: 0, finalTotal: 0, roundOffDifference: 0 
-    };
+  const { applyRoundOff, subtotal, igstAmount, cgstAmount, sgstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
+    if (!invoice) return { applyRoundOff: false, subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, total: 0, roundOffDifference: 0, finalTotal: 0 };
     
     const currentItems = invoice.items || [];
     const sub = currentItems.reduce((acc: number, item: any) => acc + (item.quantity || 0) * (item.price || 0), 0);
@@ -156,33 +126,28 @@ export default function InvoiceDetailPage() {
       if (item.applySgst) sgst += itemAmount * ((item.sgstRate || 0) / 100);
     });
     
-    const tax = igst + cgst + sgst;
-    const totalBeforeRound = sub + tax;
-    let roundOff = 0;
-    let finalAmount = totalBeforeRound;
+    const grandTotal = sub + igst + cgst + sgst;
     
-    // Apply rounding if roundOffApplied is true
-    if (invoice.roundOffApplied) {
-      finalAmount = Math.round(totalBeforeRound);
-      roundOff = finalAmount - totalBeforeRound;
-    }
+    const useRounding = invoice.roundOffApplied ?? false;
+    const finalAmount = useRounding ? Math.round(grandTotal) : grandTotal;
+    const diff = finalAmount - grandTotal;
     
     return {
+      applyRoundOff: useRounding,
       subtotal: sub,
       igstAmount: igst,
       cgstAmount: cgst, 
       sgstAmount: sgst,
-      totalTax: tax,
-      total: totalBeforeRound,
-      finalTotal: finalAmount,
-      roundOffDifference: roundOff
+      total: grandTotal,
+      roundOffDifference: diff,
+      finalTotal: finalAmount
     };
-  })();
+  }, [invoice]);
 
-  if (isLoading && !invoice) {
+  if (isInvoiceLoading || isCompanyLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -217,7 +182,7 @@ export default function InvoiceDetailPage() {
               <Button onClick={() => setIsEditing(true)}><Pencil className="mr-2 h-4 w-4" /> Edit Invoice</Button>
             )}
             {isEditing && (
-              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isLoading}>
+              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saveMutation.isPending}>
                 Cancel
               </Button>
             )}
@@ -229,8 +194,8 @@ export default function InvoiceDetailPage() {
         <Card className="p-4 md:p-6">
            <InvoiceForm 
             onSubmit={handleSave} 
-            defaultValues={invoice} // Pass the full StoredInvoice; InvoiceForm will pick what it needs
-            isLoading={isLoading} 
+            defaultValues={invoice}
+            isLoading={saveMutation.isPending} 
             onCancel={() => setIsEditing(false)}
           />
         </Card>
@@ -248,7 +213,7 @@ export default function InvoiceDetailPage() {
                 <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-6">
                   <DetailItem label="Invoice #" value={invoice.invoiceNumber} icon={FileText} />
                   <DetailItem label="Invoice Date" value={isValid(new Date(invoice.invoiceDate)) ? formatDateFns(new Date(invoice.invoiceDate), 'PP') : 'N/A'} icon={CalendarDays} />
-                  <DetailItem label="Due Date" value={isValid(new Date(invoice.dueDate)) ? formatDateFns(new Date(invoice.dueDate), 'PP') : 'N/A'} icon={CalendarDays} />
+                  <DetailItem label="Due Date" value={invoice.dueDate && isValid(new Date(invoice.dueDate)) ? formatDateFns(new Date(invoice.dueDate), 'PP') : 'N/A'} icon={CalendarDays} />
                   <DetailItem label="Status" value={<Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>} icon={Info}/>
                   <DetailItem label="Payment Method" value={invoice.paymentMethod || 'N/A'} icon={Banknote} />
                 </dl>
@@ -381,5 +346,3 @@ export default function InvoiceDetailPage() {
     </div>
   );
 }
-
-    

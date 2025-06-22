@@ -58,7 +58,7 @@ export function AppNav() {
 
     return (
       <SidebarMenuItem key={item.href} className="relative">
-        <Link href={item.href} legacyBehavior passHref>
+        <Link href={item.href}>
           <SidebarMenuButton
             isActive={isActive}
             tooltip={{ children: item.tooltip, className: "group-[[data-state=expanded]]:hidden" }}

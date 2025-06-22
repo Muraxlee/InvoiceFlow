@@ -4,9 +4,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ReactNode, useState, createContext, useContext, useEffect } from "react";
-import { onAuthStateChanged, type User, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, type User, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { getUserRole, setUserRoleOnRegister, type User as AppUser } from "@/lib/firestore-actions";
+import { getUserRole, type User as AppUser } from "@/lib/firestore-actions";
 import { Loader2 } from "lucide-react";
 
 interface AuthContextType {
@@ -14,7 +14,6 @@ interface AuthContextType {
   appUser: AppUser | null;
   loading: boolean;
   login: (email: string, pass: string) => Promise<any>;
-  register: (email: string, pass: string) => Promise<any>;
   logout: () => Promise<any>;
 }
 
@@ -23,7 +22,6 @@ const AuthContext = createContext<AuthContextType>({
   appUser: null,
   loading: true,
   login: async () => {},
-  register: async () => {},
   logout: async () => {},
 });
 
@@ -56,12 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const register = async (email: string, pass: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    await setUserRoleOnRegister(userCredential.user.uid, email);
-    return userCredential;
-  };
-
   const logout = () => {
     return signOut(auth);
   };
@@ -75,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, appUser, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, appUser, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -97,7 +89,6 @@ export default function Providers({ children }: { children: ReactNode }) {
       <AuthProvider>
         {children}
       </AuthProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }

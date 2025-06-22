@@ -50,7 +50,7 @@ export const GOOGLE_AI_API_KEY_STORAGE_KEY = "app_google_ai_api_key";
 
 // Key for storing Company Name
 export const COMPANY_NAME_STORAGE_KEY = "app_company_name";
-export const DEFAULT_COMPANY_NAME = "Quanti Analytics";
+export const DEFAULT_COMPANY_NAME = "Tailor";
 
 // Key for storing Custom Theme values
 export const CUSTOM_THEME_STORAGE_KEY = "app_custom_theme";

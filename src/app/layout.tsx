@@ -47,6 +47,7 @@ export default function RootLayout({
   const [isMounted, setIsMounted] = useState(false);
   const [currentFontKey, setCurrentFontKey] = useState<string>(DEFAULT_FONT_KEY);
   const pathname = usePathname();
+  const isLoginPage = pathname === '/login';
 
   const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
     const root = document.documentElement;
@@ -170,41 +171,45 @@ export default function RootLayout({
         }}
       >
         <Providers>
-          <SidebarProvider defaultOpen>
-            <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
-              <SidebarHeader className="p-3 border-b border-sidebar-border">
-                <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
-                  <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
-                </div>
-                <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
-                   <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
-                     {companyInitial}
-                   </span>
-                </div>
-              </SidebarHeader>
-              <SidebarContent className="flex-1 mt-2">
-                <AppNav />
-              </SidebarContent>
-            </Sidebar>
+          {isLoginPage ? (
+            children
+          ) : (
+            <SidebarProvider defaultOpen>
+              <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
+                <SidebarHeader className="p-3 border-b border-sidebar-border">
+                  <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
+                    <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
+                  </div>
+                  <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
+                    <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
+                      {companyInitial}
+                    </span>
+                  </div>
+                </SidebarHeader>
+                <SidebarContent className="flex-1 mt-2">
+                  <AppNav />
+                </SidebarContent>
+              </Sidebar>
 
-            <div className="flex flex-col flex-1">
-              <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
-                <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
-                <div className="flex-1 flex justify-center px-4">
-                  {/* Search input removed */}
-                </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  <UserNav />
-                </div>
-              </header>
+              <div className="flex flex-col flex-1">
+                <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
+                  <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
+                  <div className="flex-1 flex justify-center px-4">
+                    {/* Search input removed */}
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <UserNav />
+                  </div>
+                </header>
 
-              <SidebarInset className="bg-background">
-                <main className="flex-1 p-4 sm:p-6 md:p-8">
-                  {children}
-                </main>
-              </SidebarInset>
-            </div>
-          </SidebarProvider>
+                <SidebarInset className="bg-background">
+                  <main className="flex-1 p-4 sm:p-6 md:p-8">
+                    {children}
+                  </main>
+                </SidebarInset>
+              </div>
+            </SidebarProvider>
+          )}
           <Toaster />
         </Providers>
       </body>

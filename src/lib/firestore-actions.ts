@@ -137,25 +137,18 @@ export async function getUserRole(uid: string): Promise<User | null> {
     if (userDocSnap.exists()) {
         return userDocSnap.data() as User;
     }
-    return null;
-}
-
-export async function setUserRoleOnRegister(uid: string, email: string): Promise<void> {
-    const userDocRef = doc(db, USERS, uid);
-    
-    const querySnapshot = await getDocs(collection(db, USERS));
-    const isFirstUser = querySnapshot.empty;
-
-    const newUser: User = {
+    // If user doesn't exist in 'users' collection, create them with 'user' role.
+    // This is a fallback for users created directly in Firebase Auth console.
+    const fallbackUser: User = {
         uid,
-        email,
-        name: email.split('@')[0], // Simple name generation
-        role: isFirstUser ? 'admin' : 'user',
+        email: 'N/A',
+        name: 'New User',
+        role: 'user',
         isActive: true
     };
-    await setDoc(userDocRef, newUser);
+    await setDoc(userDocRef, fallbackUser);
+    return fallbackUser;
 }
-
 
 // Batch delete helper
 async function deleteCollection(collectionPath: string) {

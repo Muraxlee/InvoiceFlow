@@ -3,21 +3,15 @@
 
 import type { Metadata } from 'next';
 import './globals.css';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarInset,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
 import { useEffect, useState, useCallback } from 'react';
 import { loadFromLocalStorage, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES } from '@/lib/localStorage';
 import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings';
-import { usePathname } from 'next/navigation'; // Import usePathname
+import { usePathname } from 'next/navigation';
+import Providers from '@/components/providers';
 
 // Static metadata as a base
 export const metadataBase: Metadata = {
@@ -52,7 +46,7 @@ export default function RootLayout({
   const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
   const [isMounted, setIsMounted] = useState(false);
   const [currentFontKey, setCurrentFontKey] = useState<string>(DEFAULT_FONT_KEY);
-  const pathname = usePathname(); // Get the current path
+  const pathname = usePathname();
 
   const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
     const root = document.documentElement;
@@ -98,7 +92,6 @@ export default function RootLayout({
     setCurrentFontKey(fontKey);
   }, []);
 
-
   useEffect(() => {
     setIsMounted(true);
 
@@ -116,12 +109,10 @@ export default function RootLayout({
       applyFont(DEFAULT_FONT_KEY);
     }
 
-
     const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
     setCompanyName(storedCompanyName);
     setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
     document.title = storedCompanyName || String(metadataBase.title);
-
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY && event.newValue) {
@@ -159,18 +150,16 @@ export default function RootLayout({
           <meta name="description" content={String(metadataBase.description)} />
         </head>
         <body className="antialiased bg-background text-foreground">
-          {/* You can put a global loader here */}
+          {/* Global loader */}
         </body>
       </html>
     );
   }
 
-  const isLoginPage = pathname === '/login';
-
   return (
     <html lang="en" suppressHydrationWarning data-theme={currentThemeKey} className={currentFontKey !== "system" ? `font-${currentFontKey}` : ''}>
       <head>
-        {/* Title is now set dynamically in useEffect */}
+        <title>{companyName}</title>
         <meta name="description" content={String(metadataBase.description)} />
       </head>
       <body
@@ -180,9 +169,7 @@ export default function RootLayout({
             : `var(--font-${currentFontKey})`
         }}
       >
-        {isLoginPage ? (
-          <main>{children}</main> // Render only children for login page
-        ) : (
+        <Providers>
           <SidebarProvider defaultOpen>
             <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
               <SidebarHeader className="p-3 border-b border-sidebar-border">
@@ -204,7 +191,7 @@ export default function RootLayout({
               <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
                 <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
                 <div className="flex-1 flex justify-center px-4">
-                  {/* Main header search input removed */}
+                  {/* Search input removed */}
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <UserNav />
@@ -218,8 +205,8 @@ export default function RootLayout({
               </SidebarInset>
             </div>
           </SidebarProvider>
-        )}
-        <Toaster />
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

@@ -8,113 +8,130 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogIn } from 'lucide-react';
-// import { useAuth } from '@/contexts/auth-context'; // Will be used when AuthContext is implemented
+import { Loader2, LogIn, UserPlus } from 'lucide-react';
+import { useAuth } from '@/components/providers';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const registerSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  // const { login } = useAuth(); // Placeholder for actual login function
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const { login, register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
-    if (window.electronAPI && window.electronAPI.validateUserCredentials) {
-      try {
-        const user = await window.electronAPI.validateUserCredentials({ username, password_NOT_Hashed_Yet: password });
-        if (user) {
-          // TODO: Implement actual session management (e.g., using AuthContext)
-          // For now, just show a success toast and redirect
-          toast({
-            title: "Login Successful",
-            description: `Welcome back, ${user.name || user.username}!`,
-          });
-          router.push('/dashboard'); // Redirect to dashboard or intended page
-        } else {
-          toast({
-            title: "Login Failed",
-            description: "Invalid username or password. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Login error:", error);
-        toast({
-          title: "Login Error",
-          description: "An unexpected error occurred during login.",
-          variant: "destructive",
-        });
-      }
-    } else {
-      // Fallback for non-Electron environment or if API is missing
-      // This demo fallback should ideally be removed in a production Electron app
-      if (username === 'admin' && password === 'admin123') {
-        toast({
-          title: "Login Successful (Demo)",
-          description: "Welcome back, Admin!",
-        });
-        router.push('/dashboard');
-      } else {
-        toast({
-          title: "Login Failed (Demo)",
-          description: "Invalid username or password.",
-          variant: "destructive",
-        });
-      }
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { email: "", password: "", confirmPassword: "" },
+  });
+
+  const handleLogin = async (values: z.infer<typeof loginSchema>) => {
+    setIsLoading(true);
+    try {
+      await login(values.email, values.password);
+      toast({ title: "Login Successful", description: "Welcome back!" });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
+  };
+
+  const handleRegister = async (values: z.infer<typeof registerSchema>) => {
+    setIsLoading(true);
+    try {
+      await register(values.email, values.password);
+      toast({ title: "Registration Successful", description: "Welcome! Please log in." });
+      // You could also redirect to dashboard and log them in automatically
+      router.push('/login'); 
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">InvoiceFlow Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="e.g., admin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <LogIn className="mr-2 h-4 w-4" />
-              )}
-              Sign In
-            </Button>
-          </form>
-        </CardContent>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Register</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+              <CardDescription>Enter your credentials to access your account</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...loginForm}>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6">
+                  <FormField control={loginForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="you@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={loginForm.control} name="password" render={({ field }) => (
+                    <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                    Sign In
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </TabsContent>
+          <TabsContent value="register">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
+              <CardDescription>Sign up to start managing your invoices.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...registerForm}>
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-6">
+                  <FormField control={registerForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="you@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={registerForm.control} name="password" render={({ field }) => (
+                    <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={registerForm.control} name="confirmPassword" render={({ field }) => (
+                    <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                    Register
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </TabsContent>
+        </Tabs>
       </Card>
-      <p className="mt-8 text-center text-sm text-muted-foreground">
-        Default credentials for initial admin: admin / admin123
-      </p>
     </div>
   );
 }

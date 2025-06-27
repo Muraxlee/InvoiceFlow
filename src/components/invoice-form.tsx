@@ -151,7 +151,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [showDueDate, setShowDueDate] = useState(false);
   const [applyRoundOff, setApplyRoundOff] = useState(defaultValuesProp?.roundOffApplied || false);
   const [sameAsBilling, setSameAsBilling] = useState(true);
-  const [recalculationKey, setRecalculationKey] = useState(0);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -206,7 +205,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     } else {
       setIsCustomerSelected(false);
     }
-  }, [defaultValuesProp]);
+  }, [defaultValuesProp, form.reset]);
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products?.find(p => p.id === productId);
@@ -222,9 +221,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       form.setValue(`items.${index}.applyIgst`, true); 
       form.setValue(`items.${index}.applyCgst`, false);
       form.setValue(`items.${index}.applySgst`, false);
-      
-      setRecalculationKey(prev => prev + 1);
-      
+            
       setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
     }
   };
@@ -253,8 +250,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     if (!applyIgst && !applyCgst && !applySgst) {
       form.setValue(`items.${index}.applyIgst`, true);
     }
-    
-    setRecalculationKey(prev => prev + 1);
   };
 
   const handleSelectCustomer = (customerId: string) => {
@@ -285,12 +280,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const watchItems = form.watch("items");
   const watchInvoiceDate = form.watch("invoiceDate");
 
-  useEffect(() => {
-    setRecalculationKey(prev => prev + 1);
-  }, [JSON.stringify(watchItems)]);
-
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
-    const currentItems = form.getValues("items") || [];
+    const currentItems = watchItems || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
     let cgst = 0; let sgst = 0; let igst = 0;
     currentItems.forEach(item => {
@@ -310,7 +301,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [recalculationKey, applyRoundOff, form]);
+  }, [watchItems, applyRoundOff]);
 
   const handleCancel = () => {
     if (onCancel) onCancel();
@@ -341,7 +332,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     } else if (!showDueDate) {
       form.setValue("dueDate", null);
     }
-  }, [showDueDate, watchInvoiceDate, form.getValues, form.setValue]);
+  }, [showDueDate, watchInvoiceDate, form]);
 
   useEffect(() => {
     if (sameAsBilling && form.getValues("customerId")) {
@@ -353,7 +344,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
       }
     }
-  }, [sameAsBilling, customers, form.getValues, form.setValue]);
+  }, [sameAsBilling, customers, form]);
 
   if (isLoadingCustomers || isLoadingProducts) { 
     return (

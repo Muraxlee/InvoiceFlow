@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import {z} from 'genkit/zod';
 
 const SalesEnhancementInputSchema = z.object({
   businessContext: z

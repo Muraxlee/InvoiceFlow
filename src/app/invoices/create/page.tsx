@@ -8,6 +8,40 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { saveInvoice } from "@/lib/firestore-actions";
 
+// Moved outside the component to prevent recreation on every render
+const defaultNewInvoiceValues: Partial<InvoiceFormValues> = {
+  invoiceDate: new Date(), 
+  dueDate: null, 
+  items: [{
+    productId: "",
+    description: "",
+    quantity: 1,
+    price: 0,
+    gstCategory: "",
+    applyIgst: true,
+    applyCgst: false,
+    applySgst: false,
+    igstRate: 18,
+    cgstRate: 9,
+    sgstRate: 9
+  }],
+  customerId: "",
+  customerName: "",
+  customerEmail: "",
+  customerAddress: "",
+  invoiceNumber: "", // Will be generated in InvoiceForm
+  notes: "",
+  termsAndConditions: "Payment due within 30 days. All goods remain property of the seller until paid in full.",
+  paymentStatus: "Unpaid",
+  paymentMethod: "",
+  shipmentDetails: {
+    shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
+    consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
+    dateOfSupply: null, placeOfSupply: ""
+  }
+};
+
+
 export default function CreateInvoicePage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -42,39 +76,6 @@ export default function CreateInvoicePage() {
 
   const handleCancel = () => {
     router.push("/invoices");
-  };
-
-  // Default values for a new invoice
-  const defaultNewInvoiceValues: Partial<InvoiceFormValues> = {
-    invoiceDate: new Date(), 
-    dueDate: null, 
-    items: [{
-      productId: "",
-      description: "",
-      quantity: 1,
-      price: 0,
-      gstCategory: "",
-      applyIgst: true,
-      applyCgst: false,
-      applySgst: false,
-      igstRate: 18,
-      cgstRate: 9,
-      sgstRate: 9
-    }],
-    customerId: "",
-    customerName: "",
-    customerEmail: "",
-    customerAddress: "",
-    invoiceNumber: "", // Will be generated in InvoiceForm
-    notes: "",
-    termsAndConditions: "Payment due within 30 days. All goods remain property of the seller until paid in full.",
-    paymentStatus: "Unpaid",
-    paymentMethod: "",
-    shipmentDetails: {
-      shipDate: null, trackingNumber: "", carrierName: "", consigneeName: "", consigneeAddress: "",
-      consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
-      dateOfSupply: null, placeOfSupply: ""
-    }
   };
 
   return (

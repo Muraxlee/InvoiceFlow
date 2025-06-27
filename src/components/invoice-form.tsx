@@ -24,7 +24,7 @@ import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCir
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
-import { suggestGstCategory, type GstSuggestionOutput } from "@/ai/placeholder";
+import { suggestGstCategory, type GstSuggestionOutput } from '@/ai/flows/gst-suggestion';
 import { useToast } from "@/hooks/use-toast";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig } from "@/lib/localStorage";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -76,7 +76,7 @@ const invoiceSchema = z.object({
   items: z.array(invoiceItemSchema).min(1, "At least one item is required."),
   notes: z.string().optional(),
   termsAndConditions: z.string().optional(),
-  paymentStatus: z.enum(["Paid", "Unpaid", "Partially Paid"]).default("Unpaid"),
+  paymentStatus: z.enum(["Paid", "Unpaid", "Partially Paid", "Draft", "Pending", "Overdue"]).default("Unpaid"),
   paymentMethod: z.string().optional(),
   shipmentDetails: z.object({
     shipDate: z.date().optional().nullable(),
@@ -162,11 +162,17 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       ...defaultValuesProp
     }, 
   });
+  
+  const { getValues, setValue, watch, reset } = form;
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
   });
+  
+  const watchItems = watch("items");
+  const watchInvoiceDate = watch("invoiceDate");
+  const customerId = watch("customerId");
 
   useEffect(() => {
     setProductPopoversOpen(fields.map(() => false));
@@ -193,7 +199,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         ? generateInvoiceNumber(initialInvoiceDate, false) 
         : defaultValuesProp?.invoiceNumber || '';
 
-    form.reset({
+    reset({
       ...defaultValuesProp,
       invoiceNumber: initialInvoiceNumber,
       invoiceDate: initialInvoiceDate || new Date(),
@@ -205,7 +211,27 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     } else {
       setIsCustomerSelected(false);
     }
-  }, [defaultValuesProp, form.reset]);
+  }, [defaultValuesProp, reset]);
+
+  useEffect(() => {
+    if (showDueDate && !getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
+      setValue("dueDate", addDays(new Date(watchInvoiceDate), 30));
+    } else if (!showDueDate) {
+      setValue("dueDate", null);
+    }
+  }, [showDueDate, watchInvoiceDate, getValues, setValue]);
+
+  useEffect(() => {
+    if (sameAsBilling && customerId) {
+      const customer = customers?.find(c => c.id === customerId);
+      if (customer) {
+        setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
+        setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
+        setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
+        setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
+      }
+    }
+  }, [sameAsBilling, customerId, customers, setValue]);
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products?.find(p => p.id === productId);
@@ -277,9 +303,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   };
 
-  const watchItems = form.watch("items");
-  const watchInvoiceDate = form.watch("invoiceDate");
-
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
     const currentItems = watchItems || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
@@ -325,26 +348,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
     onSubmit(submissionData);
   };
-
-  useEffect(() => {
-    if (showDueDate && !form.getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
-      form.setValue("dueDate", addDays(new Date(watchInvoiceDate), 30));
-    } else if (!showDueDate) {
-      form.setValue("dueDate", null);
-    }
-  }, [showDueDate, watchInvoiceDate, form]);
-
-  useEffect(() => {
-    if (sameAsBilling && form.getValues("customerId")) {
-      const customer = customers?.find(c => c.id === form.getValues("customerId"));
-      if (customer) {
-        form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
-      }
-    }
-  }, [sameAsBilling, customers, form]);
 
   if (isLoadingCustomers || isLoadingProducts) { 
     return (

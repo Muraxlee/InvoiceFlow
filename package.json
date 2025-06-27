@@ -1,10 +1,9 @@
-
 {
   "name": "invoiceflow-web",
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "npm run emulators:start & wait-on tcp:127.0.0.1:8085 tcp:127.0.0.1:9095 && next dev",
+    "dev": "npm run emulators:start & wait-on tcp:127.0.0.1:8088 tcp:127.0.0.1:9099 && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

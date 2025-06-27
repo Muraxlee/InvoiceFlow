@@ -32,10 +32,10 @@ const auth = getAuth(app);
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   // Check if we've already connected to the emulator
   if (!window._firebaseEmulatorConnected) {
-    console.log("Connecting to Firebase Emulators...");
+    console.log("Connecting to Firebase Emulators on new ports...");
     try {
-      connectFirestoreEmulator(db, '127.0.0.1', 8085);
-      connectAuthEmulator(auth, 'http://127.0.0.1:9095');
+      connectFirestoreEmulator(db, '127.0.0.1', 8088);
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099');
       console.log("Successfully connected to Firestore and Auth Emulators.");
       // Set a flag to prevent re-connecting on hot reloads
       window._firebaseEmulatorConnected = true;

@@ -3,7 +3,8 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "npm run emulators:start & wait-on tcp:127.0.0.1:8158 tcp:127.0.0.1:9159 && next dev",
+    "dev": "concurrently \"npm:emulators:start\" \"npm:start-app\"",
+    "start-app": "wait-on tcp:127.0.0.1:8158 tcp:127.0.0.1:9159 && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -56,6 +57,7 @@
     "@types/node": "^20",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.1",
+    "concurrently": "^8.2.2",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.3",
     "firebase-tools": "^14.5.1",

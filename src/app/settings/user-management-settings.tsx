@@ -5,17 +5,29 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 
 export default function UserManagementSettings() {
-  const { appUser } = useAuth();
-  const { toast } = useToast();
+  const { appUser, loading } = useAuth();
+
+  if (loading) {
+     return (
+      <Card>
+        <CardHeader>
+          <CardTitle>User Profile</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-24">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!appUser) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>User Profile</CardTitle>
-          <CardDescription>Your user information.</CardDescription>
         </CardHeader>
         <CardContent>
           <p>No user is currently logged in.</p>

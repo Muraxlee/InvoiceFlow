@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY} from "@/lib/localStorage";
+import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData } from "@/lib/localStorage";
 
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -19,8 +19,9 @@ import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
-import { CompanySettingsForm, type CompanyInfo } from "@/components/company-settings-form";
-import { getCompanyInfo as getDbCompanyInfo } from "@/lib/database-wrapper"; 
+import { CompanySettingsForm } from "@/components/company-settings-form";
+import type { CompanyInfo } from "@/types/database";
+import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 
 const initialCompanyInfo: CompanyInfo = {
@@ -47,9 +48,6 @@ export default function SettingsPage() {
   const [lastSettingsBackupTimestamp, setLastSettingsBackupTimestamp] = useState<number | null>(null);
   const importSettingsFileRef = useRef<HTMLInputElement>(null);
 
-  const [currentDbPath, setCurrentDbPath] = useState<string | null>(null);
-  const [isDbOperationLoading, setIsDbOperationLoading] = useState(false);
-  
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
       prefix: DEFAULT_INVOICE_PREFIX, 
@@ -91,19 +89,6 @@ export default function SettingsPage() {
     };
     loadCompanyInfoFromDb();
 
-    async function fetchDbPath() {
-      if (window.electronAPI?.getDatabasePath) {
-        try {
-          const path = await window.electronAPI.getDatabasePath();
-          setCurrentDbPath(path);
-        } catch (error) {
-          console.error("Error fetching DB path:", error);
-          setCurrentDbPath("Could not fetch database path.");
-        }
-      }
-    }
-    fetchDbPath();
-
   }, []);
 
 
@@ -111,44 +96,42 @@ export default function SettingsPage() {
     console.log(`${actionName} for ${dataType} initiated`);
     let success = false;
     let requiresReload = false;
+    
+    try {
+      if (dataType === 'customers') {
+          await clearAllCustomers(); success = true;
+      } else if (dataType === 'products') {
+          await clearAllProducts(); success = true;
+      } else if (dataType === 'allData') { 
+          await clearAllData(); success = true; 
+          setCompanyInfo(initialCompanyInfo);
+      }
 
-    if (window.electronAPI) {
-        try {
-            if (dataType === 'customers' && window.electronAPI.clearAllCustomers) {
-                await window.electronAPI.clearAllCustomers(); success = true;
-            } else if (dataType === 'products' && window.electronAPI.clearAllProducts) {
-                await window.electronAPI.clearAllProducts(); success = true;
-            } else if (dataType === 'allData' && window.electronAPI.clearAllData) { 
-                await window.electronAPI.clearAllData(); success = true; 
-                setCompanyInfo(initialCompanyInfo);
-            }
-        } catch (error) {
-            console.error(`Error clearing DB for ${dataType}:`, error);
-            toast({ title: "Database Error", description: `Failed to clear ${dataType} from database.`, variant: "destructive" });
-            return;
-        }
-    }
-
-    if (dataType === 'allData' || dataType === 'settings') {
-        const keysToClearFromLocalStorage = [
-            COMPANY_NAME_STORAGE_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, INVOICE_CONFIG_KEY, 
-            THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
-            CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY 
-        ];
-        keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
-        
-        setCompanyNameInput(DEFAULT_COMPANY_NAME);
-        setCurrentCompanyName(DEFAULT_COMPANY_NAME);
-        if (document) document.title = DEFAULT_COMPANY_NAME;
-        setGoogleApiKey(""); setOriginalGoogleApiKey("");
-        const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
-        saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
-        setInvoicePrefix(defaultConfig.prefix); setOriginalInvoicePrefix(defaultConfig.prefix);
-        handleThemeChange(DEFAULT_THEME_KEY); 
-        setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES); setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
-        saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
-        setLastSettingsBackupTimestamp(null); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null);
-        success = true; requiresReload = true;
+      if (dataType === 'allData' || dataType === 'settings') {
+          // This part handles localStorage clearing which is client-side.
+          const keysToClearFromLocalStorage = [
+              COMPANY_NAME_STORAGE_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, INVOICE_CONFIG_KEY, 
+              THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
+          ];
+          keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
+          
+          setCompanyNameInput(DEFAULT_COMPANY_NAME);
+          setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+          if (document) document.title = DEFAULT_COMPANY_NAME;
+          setGoogleApiKey(""); setOriginalGoogleApiKey("");
+          const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
+          saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
+          setInvoicePrefix(defaultConfig.prefix); setOriginalInvoicePrefix(defaultConfig.prefix);
+          handleThemeChange(DEFAULT_THEME_KEY); 
+          setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES); setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
+          saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
+          setLastSettingsBackupTimestamp(null); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null);
+          success = true; requiresReload = true;
+      }
+    } catch (error) {
+      console.error(`Error during ${actionName}:`, error);
+      toast({ title: "Error", description: `Failed to perform ${actionName.toLowerCase()}.`, variant: "destructive" });
+      return;
     }
     
     if (success) {
@@ -231,116 +214,6 @@ export default function SettingsPage() {
     { id: "factoryReset", label: "Factory Reset Application", description: "Reset all database data and clear local storage settings. Requires app restart.", dataType: 'allData' as const },
   ];
 
-  const handleExportSettings = () => {
-    const settingsData: Partial<AllApplicationData> = {
-      appThemeKey: loadFromLocalStorage(THEME_STORAGE_KEY, DEFAULT_THEME_KEY),
-      [COMPANY_NAME_STORAGE_KEY]: loadFromLocalStorage(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME),
-      [GOOGLE_AI_API_KEY_STORAGE_KEY]: loadFromLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""),
-      [INVOICE_CONFIG_KEY]: loadFromLocalStorage(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} }),
-      [CUSTOM_THEME_STORAGE_KEY]: loadFromLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES),
-      [LAST_BACKUP_TIMESTAMP_KEY]: loadFromLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null),
-      appVersion: "1.0.0" 
-    };
-    const jsonString = JSON.stringify(settingsData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = href;
-    link.download = `invoiceflow_app_settings_backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.json`;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(href);
-    setLastSettingsBackupTimestamp(Date.now()); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, Date.now());
-    toast({ title: "Application Settings Exported", description: "Settings from local storage have been exported." });
-  };
-
-  const handleImportSettingsFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const json = e.target?.result as string; const importedData = JSON.parse(json) as Partial<AllApplicationData>;
-        if (importedData.appThemeKey && AVAILABLE_THEMES[importedData.appThemeKey as keyof typeof AVAILABLE_THEMES]) handleThemeChange(importedData.appThemeKey);
-        if (importedData[COMPANY_NAME_STORAGE_KEY]) { saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, importedData[COMPANY_NAME_STORAGE_KEY]); setCompanyNameInput(importedData[COMPANY_NAME_STORAGE_KEY]!);}
-        if (importedData[GOOGLE_AI_API_KEY_STORAGE_KEY] !== undefined) { saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]); setGoogleApiKey(importedData[GOOGLE_AI_API_KEY_STORAGE_KEY]!);}
-        if (importedData[INVOICE_CONFIG_KEY]) { saveToLocalStorage(INVOICE_CONFIG_KEY, importedData[INVOICE_CONFIG_KEY]); setInvoicePrefix(importedData[INVOICE_CONFIG_KEY]!.prefix);}
-        if (importedData[CUSTOM_THEME_STORAGE_KEY]) { saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, importedData[CUSTOM_THEME_STORAGE_KEY]); setCustomThemeValues(importedData[CUSTOM_THEME_STORAGE_KEY]!);}
-        if (importedData[LAST_BACKUP_TIMESTAMP_KEY]) { setLastSettingsBackupTimestamp(importedData[LAST_BACKUP_TIMESTAMP_KEY]!); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, importedData[LAST_BACKUP_TIMESTAMP_KEY]!);}
-        toast({ title: "Settings Imported", description: "Application settings imported. Page will reload." });
-        setTimeout(() => window.location.reload(), 1000);
-      } catch (error) {
-        console.error("Error importing settings:", error);
-        toast({ title: "Import Error", description: "Failed to import settings. File might be corrupted or invalid.", variant: "destructive" });
-      }
-    };
-    reader.readAsText(file);
-    if(importSettingsFileRef.current) importSettingsFileRef.current.value = ""; 
-  };
-
-  const handleBackupDatabase = async () => {
-    if (!window.electronAPI?.backupDatabase) {
-      toast({ title: "Feature Not Available", description: "Database backup is only available in the Electron app.", variant: "warning" });
-      return;
-    }
-    setIsDbOperationLoading(true);
-    try {
-      const result = await window.electronAPI.backupDatabase();
-      if (result.success) {
-        toast({ title: "Database Backup Successful", description: `Database backed up to: ${result.path}` });
-      } else {
-        toast({ title: "Database Backup Cancelled or Failed", description: result.message || "Could not complete backup.", variant: result.message ? "info" : "destructive" });
-      }
-    } catch (error) {
-      console.error("Database backup error:", error);
-      toast({ title: "Database Backup Error", description: "An error occurred during backup.", variant: "destructive" });
-    } finally {
-      setIsDbOperationLoading(false);
-    }
-  };
-  
-  const triggerAndExecuteRestore = async () => {
-    if (!window.electronAPI?.initiateDatabaseRestore) {
-      toast({ title: "Feature Not Available", description: "Database restore is only available in the Electron app.", variant: "warning" });
-      return;
-    }
-    setIsDbOperationLoading(true);
-    try {
-      const result = await window.electronAPI.initiateDatabaseRestore();
-      if (result.success) {
-        toast({ title: "Database Restore Successful", description: "Database restored. Please restart the application." });
-      } else {
-        toast({ title: "Database Restore Cancelled or Failed", description: result.message || "Could not complete restore.", variant: result.message ? "info" : "destructive" });
-      }
-    } catch (error: any) {
-      console.error("Database restore error:", error);
-      toast({ title: "Database Restore Error", description: error.message || "An error occurred during restore.", variant: "destructive" });
-    } finally {
-      setIsDbOperationLoading(false);
-    }
-  };
-
-  const handleRestoreWithMandatoryBackup = async () => {
-     if (!window.electronAPI?.backupDatabase || !window.electronAPI?.initiateDatabaseRestore) {
-      toast({ title: "Feature Not Available", description: "Database backup/restore is only available in the Electron app.", variant: "warning" });
-      return;
-    }
-    setIsDbOperationLoading(true);
-    try {
-      const backupResult = await window.electronAPI.backupDatabase();
-      if (backupResult.success) {
-        toast({ title: "Pre-Restore Backup Successful", description: `Current database backed up to ${backupResult.path}. Proceeding with restore.`});
-        await triggerAndExecuteRestore(); 
-      } else {
-        toast({ title: "Pre-Restore Backup Failed", description: "Could not back up current database. Restore cancelled.", variant: "destructive" });
-      }
-    } catch (err) {
-      toast({ title: "Pre-Restore Backup Error", description: "An error occurred during pre-restore backup.", variant: "destructive" });
-      console.error("Pre-restore backup error", err);
-    } finally {
-      setIsDbOperationLoading(false);
-    }
-  };
-
-
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -349,28 +222,31 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="company" className="space-y-4">
-        <TabsList className="w-full grid grid-cols-2 md:grid-cols-5">
+        <TabsList className="w-full grid grid-cols-2 md:grid-cols-4">
           <TabsTrigger value="company" className="flex items-center gap-2"><Building className="h-4 w-4" /><span className="hidden sm:inline">Company</span></TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2"><Palette className="h-4 w-4" /><span className="hidden sm:inline">Appearance</span></TabsTrigger>
           <TabsTrigger value="modules" className="flex items-center gap-2"><FileCog className="h-4 w-4" /><span className="hidden sm:inline">Modules</span></TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2"><UsersRound className="h-4 w-4" /><span className="hidden sm:inline">Users</span></TabsTrigger>
           <TabsTrigger value="data" className="flex items-center gap-2"><DatabaseZap className="h-4 w-4" /><span className="hidden sm:inline">Data</span></TabsTrigger>
         </TabsList>
         
         <TabsContent value="company" className="space-y-6">
-         <CompanySettingsForm 
-            defaultValues={companyInfo || initialCompanyInfo} 
-            onSuccess={async () => {
-              const info = await getDbCompanyInfo();
-              setCompanyInfo(info || initialCompanyInfo); 
-              if (info?.name) {
-                  saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, info.name);
-                  setCurrentCompanyName(info.name); setCompanyNameInput(info.name);
-                  if (document) document.title = info.name;
-                  window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(info.name) }));
-              }
-            }} 
-          />
+         {companyInfo ? (
+            <CompanySettingsForm 
+              defaultValues={companyInfo} 
+              onSuccess={async () => {
+                const info = await getDbCompanyInfo();
+                setCompanyInfo(info || initialCompanyInfo); 
+                if (info?.name) {
+                    saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, info.name);
+                    setCurrentCompanyName(info.name); setCompanyNameInput(info.name);
+                    if (document) document.title = info.name;
+                    window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(info.name) }));
+                }
+              }} 
+            />
+         ) : (
+            <Card><CardContent className="pt-6"><div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin"/></div></CardContent></Card>
+         )}
           <Card>
             <CardHeader><CardTitle>Application Title</CardTitle><CardDescription>Set the title displayed in the browser tab/application window (stored locally).</CardDescription></CardHeader>
             <CardContent className="space-y-4">
@@ -470,61 +346,6 @@ export default function SettingsPage() {
         </TabsContent>
         
         <TabsContent value="data" className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle>Database Management (Electron Database)</CardTitle><CardDescription>Backup or restore your main application database (invoices, customers, products, users, company info).</CardDescription></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <Label>Active Database Path</Label>
-                <p className="text-xs text-muted-foreground break-all">{currentDbPath || "Loading path..."}</p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button onClick={handleBackupDatabase} disabled={isDbOperationLoading || !window.electronAPI?.backupDatabase} className="w-full sm:w-auto">
-                  {isDbOperationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <Database className="mr-2 h-4 w-4" /> Backup Database
-                </Button>
-                
-                <ConfirmDialog
-                  triggerButton={
-                    <Button variant="outline" disabled={isDbOperationLoading || !window.electronAPI?.initiateDatabaseRestore} className="w-full sm:w-auto">
-                      {isDbOperationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      <FolderInput className="mr-2 h-4 w-4" /> Restore Database
-                    </Button>
-                  }
-                  title="Confirm Database Restore"
-                  description={
-                    <>
-                      <span className="block mb-2 text-destructive font-semibold flex items-center gap-1">
-                        <AlertTriangle className="h-4 w-4 inline-block mr-1"/>
-                        Restoring will overwrite your current database. This action cannot be undone.
-                      </span>
-                      <br />
-                      <span className="block">
-                        It is <strong className="text-primary">STRONGLY RECOMMENDED</strong> to back up your current database before proceeding.
-                      </span>
-                    </>
-                  }
-                  confirmText="Backup Now & Select Restore File"
-                  onConfirm={handleRestoreWithMandatoryBackup}
-                  cancelText="Cancel"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Restoring a database requires an application restart to apply changes reliably.</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Application Settings Backup (Local Storage)</CardTitle><CardDescription>Export or import application settings (theme, API key, etc.). Does NOT include database data.</CardDescription></CardHeader>
-            <CardContent className="space-y-4">
-                <Button onClick={handleExportSettings} className="w-full sm:w-auto"><Download className="mr-2 h-4 w-4" /> Export Settings (JSON)</Button>
-                <p className="text-xs text-muted-foreground">Last settings export: {lastSettingsBackupTimestamp ? format(new Date(lastSettingsBackupTimestamp), "PPP p") : "Never"}</p>
-              <div className="space-y-2">
-                <Label htmlFor="importSettingsFile">Import Settings from JSON</Label>
-                <Input id="importSettingsFile" type="file" accept=".json" ref={importSettingsFileRef} onChange={handleImportSettingsFileChange} className="max-w-md"/>
-                <p className="text-xs text-muted-foreground">Importing settings will overwrite current settings and reload the page.</p>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card className="border-destructive">
             <CardHeader><CardTitle>Data Clearing Options</CardTitle><CardDescription className="text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible.</CardDescription></CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -548,4 +369,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

@@ -4,16 +4,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogIn } from 'lucide-react';
+import { Loader2, LogIn, Info } from 'lucide-react';
 import { useAuth } from '@/components/providers';
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -39,7 +40,13 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login error:", error);
-      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-password') {
+        errorMessage = "Invalid credentials. Please check your email and password.";
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = "This user does not exist. Please check the email address.";
+      }
+      toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +87,14 @@ export default function LoginPage() {
             </form>
           </Form>
         </CardContent>
+        <CardFooter>
+           <Alert variant="default" className="w-full text-center text-sm p-3">
+             <Info className="h-4 w-4" />
+             <AlertDescription>
+                Running in emulator mode. Use: <br/> <strong>admin@example.com</strong> / <strong>admin123</strong>
+             </AlertDescription>
+           </Alert>
+        </CardFooter>
       </Card>
     </div>
   );

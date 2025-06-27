@@ -34,8 +34,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   if (!window._firebaseEmulatorConnected) {
     console.log("Connecting to Firebase Emulators on new ports...");
     try {
-      connectFirestoreEmulator(db, '127.0.0.1', 8188);
-      connectAuthEmulator(auth, 'http://127.0.0.1:9199');
+      connectFirestoreEmulator(db, '127.0.0.1', 8158);
+      connectAuthEmulator(auth, 'http://127.0.0.1:9159');
       console.log("Successfully connected to Firestore and Auth Emulators.");
       // Set a flag to prevent re-connecting on hot reloads
       window._firebaseEmulatorConnected = true;

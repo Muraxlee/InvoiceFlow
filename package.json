@@ -1,14 +1,16 @@
+
 {
   "name": "invoiceflow-web",
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently \"npm:emulators:start\" \"npm:start-app\"",
+    "start-app": "wait-on tcp:127.0.0.1:8258 tcp:127.0.0.1:9259 && next dev",
+    "emulators:start": "firebase emulators:start --project demo-invoiceflow --import ./.firebase-data --export-on-exit",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "emulators:start": "firebase emulators:start --project demo-invoiceflow --import ./.firebase-data --export-on-exit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
@@ -36,6 +38,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "concurrently": "^8.2.2",
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "firebase": "^11.8.1",
@@ -49,6 +52,7 @@
     "sharp": "^0.33.5",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
+    "wait-on": "^7.2.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

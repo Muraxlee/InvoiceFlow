@@ -1,4 +1,3 @@
-
 'use client';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -35,8 +34,8 @@ if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
   if (!window._firebaseEmulatorConnected) {
     console.log("Connecting to Firebase Emulators...");
     try {
-      connectFirestoreEmulator(db, 'localhost', 8080);
-      connectAuthEmulator(auth, 'http://localhost:9099');
+      connectFirestoreEmulator(db, '127.0.0.1', 8080);
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099');
       console.log("Successfully connected to Firestore and Auth Emulators.");
       // Set a flag to prevent re-connecting on hot reloads
       window._firebaseEmulatorConnected = true;

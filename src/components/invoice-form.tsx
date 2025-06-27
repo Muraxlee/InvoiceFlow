@@ -206,7 +206,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     } else {
       setIsCustomerSelected(false);
     }
-  }, [defaultValuesProp, form, toast]);
+  }, [defaultValuesProp]);
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products?.find(p => p.id === productId);
@@ -286,9 +286,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const watchInvoiceDate = form.watch("invoiceDate");
 
   useEffect(() => {
-    form.trigger();
     setRecalculationKey(prev => prev + 1);
-  }, [watchItems, form]);
+  }, [JSON.stringify(watchItems)]);
 
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
     const currentItems = form.getValues("items") || [];
@@ -311,7 +310,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchItems, form, applyRoundOff, recalculationKey]);
+  }, [recalculationKey, applyRoundOff, form]);
 
   const handleCancel = () => {
     if (onCancel) onCancel();
@@ -342,7 +341,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     } else if (!showDueDate) {
       form.setValue("dueDate", null);
     }
-  }, [showDueDate, watchInvoiceDate, form]);
+  }, [showDueDate, watchInvoiceDate, form.getValues, form.setValue]);
 
   useEffect(() => {
     if (sameAsBilling && form.getValues("customerId")) {
@@ -354,7 +353,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
       }
     }
-  }, [sameAsBilling, form, customers]);
+  }, [sameAsBilling, customers, form.getValues, form.setValue]);
 
   if (isLoadingCustomers || isLoadingProducts) { 
     return (

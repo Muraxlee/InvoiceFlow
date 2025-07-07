@@ -530,4 +530,3 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     </div>
   );
 }
-

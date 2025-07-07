@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/invoice-form';
 import { InvoicePrint } from '@/components/invoice-print';
-import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2, AlertCircle, RefreshCw, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { type StoredInvoice, type CompanyData } from '@/types/database';
@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 
 export default function InvoiceDetailPage() {
@@ -95,10 +96,10 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  const DetailItem = ({ label, value, icon }: { label: string; value: string | React.ReactNode; icon?: React.ElementType }) => {
+  const DetailItem = ({ label, value, icon, className }: { label: string; value: string | React.ReactNode; icon?: React.ElementType; className?: string }) => {
     const Icon = icon;
     return (
-      <div className="flex flex-col">
+      <div className={cn("flex flex-col", className)}>
         <dt className="text-xs font-medium text-muted-foreground flex items-center gap-1">
           {Icon && <Icon className="h-3.5 w-3.5" />} {label}
         </dt>
@@ -231,12 +232,13 @@ export default function InvoiceDetailPage() {
             <Card>
               <CardHeader><CardTitle className="text-lg">Customer Information</CardTitle></CardHeader>
               <CardContent>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
+                <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
                   <DetailItem label="Name" value={invoice.customerName} icon={UserCircle} />
                   <DetailItem label="Email" value={invoice.customerEmail} />
+                  <DetailItem label="Phone" value={invoice.customerPhone || 'N/A'} icon={Phone} />
                   <DetailItem label="GSTIN" value={invoice.customerGstin || 'N/A'} />
-                  <DetailItem label="Billing Address" value={invoice.customerAddress} />
                   <DetailItem label="State/Code" value={invoice.customerState && invoice.customerStateCode ? `${invoice.customerState} / ${invoice.customerStateCode}` : 'N/A'} />
+                  <DetailItem className="md:col-span-2 lg:col-span-3" label="Billing Address" value={invoice.customerAddress} />
                 </dl>
               </CardContent>
             </Card>

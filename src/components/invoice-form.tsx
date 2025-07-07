@@ -67,6 +67,7 @@ const invoiceSchema = z.object({
   customerId: z.string().min(1, "Customer selection is required."),
   customerName: z.string().min(1, "Customer name is required (auto-filled on selection)."),
   customerEmail: z.string().email("Invalid email address (auto-filled on selection).").optional().or(z.literal('')),
+  customerPhone: z.string().optional().or(z.literal('')),
   customerAddress: z.string().optional(),
   customerGstin: z.string().optional().or(z.literal('')),
   customerState: z.string().optional().or(z.literal('')),
@@ -158,7 +159,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         productId: "", description: "", quantity: 1, price: 0,
         applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9
       }],
-      ...defaultValuesProp
+      ...defaultValuesProp,
+      customerPhone: defaultValuesProp?.customerPhone || '',
     }, 
   });
   
@@ -385,6 +387,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                       setValue("customerName", selectedCustomer.name);
                                       setValue("customerEmail", selectedCustomer.email || "");
                                       setValue("customerAddress", selectedCustomer.address || "");
+                                      setValue("customerPhone", selectedCustomer.phone || "");
                                       setValue("customerGstin", selectedCustomer.gstin || "");
                                       setValue("customerState", selectedCustomer.state || "");
                                       setValue("customerStateCode", selectedCustomer.stateCode || "");

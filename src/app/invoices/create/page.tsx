@@ -29,6 +29,7 @@ const defaultNewInvoiceValues: Partial<InvoiceFormValues> = {
   customerName: "",
   customerEmail: "",
   customerAddress: "",
+  customerPhone: "",
   invoiceNumber: "", // Will be generated in InvoiceForm
   notes: "",
   termsAndConditions: "Payment due within 30 days. All goods remain property of the seller until paid in full.",

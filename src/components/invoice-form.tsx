@@ -378,9 +378,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             </CommandEmpty>
                             <CommandGroup>
                               {customers?.map((customer) => (
-                                <CommandItem value={customer.name} key={customer.id} onSelect={() => {
-                                  field.onChange(customer.id);
-                                  const selectedCustomer = customers?.find(c => c.id === customer.id);
+                                <CommandItem value={customer.id} key={customer.id} onSelect={(currentValue) => {
+                                  field.onChange(currentValue);
+                                  const selectedCustomer = customers?.find(c => c.id === currentValue);
                                   if (selectedCustomer) {
                                       setValue("customerName", selectedCustomer.name);
                                       setValue("customerEmail", selectedCustomer.email || "");
@@ -488,9 +488,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               <CommandInput placeholder="Search products..." />
                               <CommandList><CommandEmpty>No products found.</CommandEmpty>
                                 <CommandGroup>{products?.map(p => (
-                                  <CommandItem value={p.name} key={p.id} onSelect={() => {
-                                      productField.onChange(p.id);
-                                      const product = products?.find(prod => prod.id === p.id);
+                                  <CommandItem value={p.id} key={p.id} onSelect={(currentValue) => {
+                                      productField.onChange(currentValue);
+                                      const product = products?.find(prod => prod.id === currentValue);
                                       if (product) {
                                           setValue(`items.${index}.description`, product.description || product.name);
                                           setValue(`items.${index}.price`, product.price);

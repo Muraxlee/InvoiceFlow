@@ -45,6 +45,8 @@ export default function LoginPage() {
         errorMessage = "Invalid credentials. Please check your email and password.";
       } else if (error.code === 'auth/user-not-found') {
         errorMessage = "This user does not exist. Please check the email address.";
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = "Email/Password sign-in is not enabled. Please enable it in the Firebase console (Authentication > Sign-in method).";
       }
       toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
     } finally {

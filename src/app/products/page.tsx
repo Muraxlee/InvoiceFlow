@@ -30,7 +30,7 @@ export default function ProductsPage() {
   });
 
   const addMutation = useMutation({
-    mutationFn: addProduct,
+    mutationFn: (data: Omit<Product, 'id' | 'createdAt'>) => addProduct(data),
     onSuccess: () => {
       toast({ title: "Product Added", description: "The new product has been added." });
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -42,7 +42,7 @@ export default function ProductsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string, values: ProductFormValues }) => updateProduct(data.id, data.values),
+    mutationFn: (data: { id: string, values: Partial<Omit<Product, 'id'>> }) => updateProduct(data.id, data.values),
     onSuccess: () => {
       toast({ title: "Product Updated", description: "Product details have been updated." });
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -66,7 +66,8 @@ export default function ProductsPage() {
   });
 
   const handleAddProduct = async (data: ProductFormValues) => {
-    addMutation.mutate(data);
+    const { id, ...productData } = data;
+    addMutation.mutate(productData);
   };
 
   const handleEditProductClick = (product: Product) => {
@@ -76,31 +77,37 @@ export default function ProductsPage() {
 
   const handleSaveEditedProduct = async (data: ProductFormValues) => {
     if (currentProduct) {
-      updateMutation.mutate({ id: currentProduct.id, values: data });
+      const { id, ...productData } = data;
+      updateMutation.mutate({ id: currentProduct.id, values: productData });
     }
   };
 
   const pageActions = (
-     <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Add New Product</DialogTitle>
-          <DialogDescription>
-            Fill in the details below to add a new product to your catalog.
-          </DialogDescription>
-        </DialogHeader>
-        <ProductForm 
-          onSubmit={handleAddProduct} 
-          isLoading={addMutation.isPending}
-          onCancel={() => setIsAddProductDialogOpen(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center gap-2">
+      <Button onClick={() => refetch()} variant="outline" size="sm" className="hidden sm:flex">
+        <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+      </Button>
+      <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Product</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to add a new product to your catalog.
+            </DialogDescription>
+          </DialogHeader>
+          <ProductForm 
+            onSubmit={handleAddProduct} 
+            isLoading={addMutation.isPending}
+            onCancel={() => setIsAddProductDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 
   if (error) {

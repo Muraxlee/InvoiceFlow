@@ -63,11 +63,16 @@ export default function InvoicesPage() {
   };
   
   const pageActions = (
-    <Link href="/invoices/create" passHref>
-      <Button>
-        <FilePlus2 className="mr-2 h-4 w-4" /> Create New Invoice
+    <div className="flex items-center gap-2">
+      <Button onClick={() => refetch()} variant="outline" size="sm" className="hidden sm:flex">
+        <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
       </Button>
-    </Link>
+      <Link href="/invoices/create" passHref>
+        <Button>
+          <FilePlus2 className="mr-2 h-4 w-4" /> Create New Invoice
+        </Button>
+      </Link>
+    </div>
   );
 
   if (error) {

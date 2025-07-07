@@ -31,7 +31,7 @@ export default function CustomersPage() {
   });
 
   const addMutation = useMutation({
-    mutationFn: addCustomer,
+    mutationFn: (data: Omit<Customer, 'id' | 'createdAt'>) => addCustomer(data),
     onSuccess: () => {
       toast({ title: "Customer Added", description: "The new customer has been added." });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -43,7 +43,7 @@ export default function CustomersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string, values: CustomerFormValues }) => updateCustomer(data.id, data.values),
+    mutationFn: (data: { id: string, values: Partial<Omit<Customer, 'id'>> }) => updateCustomer(data.id, data.values),
     onSuccess: () => {
       toast({ title: "Customer Updated", description: "Customer details have been updated." });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -67,7 +67,8 @@ export default function CustomersPage() {
   });
 
   const handleAddCustomer = async (data: CustomerFormValues) => {
-    addMutation.mutate(data);
+    const { id, ...customerData } = data;
+    addMutation.mutate(customerData);
   };
   
   const handleEditCustomerClick = (customer: Customer) => {
@@ -77,31 +78,37 @@ export default function CustomersPage() {
 
   const handleSaveEditedCustomer = async (data: CustomerFormValues) => {
     if (currentCustomer) {
-      updateMutation.mutate({ id: currentCustomer.id, values: data });
+      const { id, ...customerData } = data;
+      updateMutation.mutate({ id: currentCustomer.id, values: customerData });
     }
   };
   
   const pageActions = (
-     <Dialog open={isAddCustomerDialogOpen} onOpenChange={setIsAddCustomerDialogOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[525px]">
-        <DialogHeader>
-          <DialogTitle>Add New Customer</DialogTitle>
-          <DialogDescription>
-            Fill in the details below to add a new customer.
-          </DialogDescription>
-        </DialogHeader>
-        <CustomerForm 
-          onSubmit={handleAddCustomer} 
-          isLoading={addMutation.isPending}
-          onCancel={() => setIsAddCustomerDialogOpen(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center gap-2">
+      <Button onClick={() => refetch()} variant="outline" size="sm" className="hidden sm:flex">
+        <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+      </Button>
+      <Dialog open={isAddCustomerDialogOpen} onOpenChange={setIsAddCustomerDialogOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Add New Customer</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to add a new customer.
+            </DialogDescription>
+          </DialogHeader>
+          <CustomerForm 
+            onSubmit={handleAddCustomer} 
+            isLoading={addMutation.isPending}
+            onCancel={() => setIsAddCustomerDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 
   if (error) {

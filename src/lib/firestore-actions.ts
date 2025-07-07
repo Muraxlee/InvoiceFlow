@@ -27,16 +27,27 @@ const checkDb = () => {
     }
 }
 
-// Helper to convert Firestore Timestamps to Dates
-const fromFirestore = <T extends { [key: string]: any }>(docData: T): T => {
-    const data = { ...docData };
-    for (const key in data) {
-        if (data[key]?.toDate && typeof data[key].toDate === 'function') {
-            data[key] = data[key].toDate();
-        }
+// Helper to convert Firestore Timestamps to Dates, now recursive
+const fromFirestore = <T extends { [key: string]: any }>(data: T): T => {
+  if (!data || typeof data !== 'object') return data;
+
+  const newData: { [key: string]: any } = Array.isArray(data) ? [] : {};
+
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      const value = data[key];
+      if (value && typeof value.toDate === 'function') {
+        newData[key] = value.toDate();
+      } else if (value && typeof value === 'object') {
+        newData[key] = fromFirestore(value); // Recursively call for nested objects and arrays
+      } else {
+        newData[key] = value;
+      }
     }
-    return data;
+  }
+  return newData as T;
 };
+
 
 // Invoice Actions
 export async function getInvoices(): Promise<StoredInvoice[]> {

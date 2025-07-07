@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData } from "@/lib/localStorage";
 
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
 import type { CompanyInfo } from "@/types/database";
-import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData } from "@/lib/firestore-actions"; 
+import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 
 const initialCompanyInfo: CompanyInfo = {
@@ -31,6 +32,7 @@ const initialCompanyInfo: CompanyInfo = {
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [googleApiKey, setGoogleApiKey] = useState("");
@@ -91,6 +93,31 @@ export default function SettingsPage() {
 
   }, []);
 
+  const seedMutation = useMutation({
+    mutationFn: seedSampleData,
+    onSuccess: () => {
+        toast({
+            title: "Sample Data Seeded",
+            description: "Sample customers, products, and an invoice have been added."
+        });
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+        queryClient.invalidateQueries({ queryKey: ['reportData'] });
+    },
+    onError: (error: any) => {
+        toast({
+            title: "Error Seeding Data",
+            description: error.message || "An unknown error occurred.",
+            variant: "destructive"
+        });
+    }
+  });
+
+  const handleSeedData = () => {
+      seedMutation.mutate();
+  };
 
   const handleDataAction = async (actionName: string, dataType?: 'customers' | 'products' | 'allData' | 'settings') => {
     console.log(`${actionName} for ${dataType} initiated`);
@@ -346,6 +373,20 @@ export default function SettingsPage() {
         </TabsContent>
         
         <TabsContent value="data" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Seed Sample Data</CardTitle>
+              <CardDescription>
+                Populate your database with sample customers, products, and invoices to explore the app's features. This is safe to run multiple times.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={handleSeedData} disabled={seedMutation.isPending}>
+                {seedMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                Load Sample Data
+              </Button>
+            </CardContent>
+          </Card>
           <Card className="border-destructive">
             <CardHeader><CardTitle>Data Clearing Options</CardTitle><CardDescription className="text-destructive flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Warning: These actions are irreversible.</CardDescription></CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">

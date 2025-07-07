@@ -1,3 +1,4 @@
+
 # InvoiceFlow by Firebase Studio
 
 This is a Next.js web application for managing invoices, customers, and products, built with Firebase.
@@ -26,7 +27,34 @@ This project is configured to connect to a live Firebase project on the cloud.
     NEXT_PUBLIC_FIREBASE_APP_ID=...
     ```
 
-### Step 2: Configure Google AI (Optional)
+### Step 2: Deploy Security Rules
+
+To ensure your application can read and write data from Firestore, you must deploy the security rules included in this project.
+
+**Option A: Using the Firebase CLI (Recommended)**
+
+1.  **Install the Firebase CLI** if you haven't already:
+    ```bash
+    npm install -g firebase-tools
+    ```
+2.  **Log in to Firebase**:
+    ```bash
+    firebase login
+    ```
+3.  **Deploy the Rules**: From your project's root directory, run the following command:
+    ```bash
+    firebase deploy --only firestore:rules
+    ```
+
+**Option B: Using the Firebase Console**
+
+1.  Open the `firestore.rules` file in this project.
+2.  Copy its entire contents.
+3.  Go to the [Firebase Console](https://console.firebase.google.com/), select your project.
+4.  Navigate to **Build > Firestore Database > Rules** tab.
+5.  Paste the contents into the rules editor and click **Publish**.
+
+### Step 3: Configure Google AI (Optional)
 
 For AI-powered features like suggestions, you need a Google AI API Key.
 
@@ -37,13 +65,18 @@ For AI-powered features like suggestions, you need a Google AI API Key.
     GOOGLE_API_KEY=...
     ```
 
-### Step 3: Run the Application
+### Step 4: Create a User and Run the App
 
-Once your `.env` file is configured, you can start the development server:
-
-```bash
-pnpm install
-pnpm run dev
-```
+1.  In the Firebase Console, go to **Build > Authentication > Users** and click **Add user**. Create your first user account.
+2.  Once your `.env` file is configured and security rules are deployed, you can start the development server:
+    ```bash
+    pnpm install
+    pnpm run dev
+    ```
+3.  Log in with the user account you just created.
 
 The application will now be running at [http://localhost:3000](http://localhost:3000) and connected to your live Firebase project.
+
+### Step 5: Load Sample Data (Optional)
+
+To get started with some sample data, navigate to **Settings > Data** in the application and click the "Load Sample Data" button.

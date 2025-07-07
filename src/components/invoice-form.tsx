@@ -98,12 +98,13 @@ const invoiceSchema = z.object({
     consigneeGstin: "", consigneeStateCode: "", transportationMode: "", lrNo: "", vehicleNo: "",
     dateOfSupply: null, placeOfSupply: ""
   }),
+  amount: z.number().optional(), // To hold final calculated amount
 });
 
 export type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 interface InvoiceFormProps {
-  onSubmit: (data: InvoiceFormValues & { amount: number }) => void;
+  onSubmit: (data: InvoiceFormValues) => void;
   defaultValues?: Partial<InvoiceFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
@@ -175,6 +176,32 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const watchInvoiceDate = watch("invoiceDate");
   const customerId = watch("customerId");
 
+  const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
+    if (type === 'igst') {
+      form.setValue(`items.${index}.applyIgst`, value);
+      if (value) { 
+        form.setValue(`items.${index}.applyCgst`, false);
+        form.setValue(`items.${index}.applySgst`, false);
+      } else if (!form.getValues(`items.${index}.applyCgst`)) {
+        form.setValue(`items.${index}.applyCgst`, true);
+        form.setValue(`items.${index}.applySgst`, true);
+      }
+    } else if (type === 'cgstSgst') { 
+      form.setValue(`items.${index}.applyCgst`, value);
+      form.setValue(`items.${index}.applySgst`, value);
+      if (value) { 
+        form.setValue(`items.${index}.applyIgst`, false);
+      } else if (!form.getValues(`items.${index}.applyIgst`)) {
+        form.setValue(`items.${index}.applyIgst`, true);
+      }
+    }
+  
+    const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
+    if (!applyIgst && !applyCgst && !applySgst) {
+      form.setValue(`items.${index}.applyIgst`, true);
+    }
+  };
+
   useEffect(() => {
     setProductPopoversOpen(fields.map(() => false));
   }, [fields.length]);
@@ -229,32 +256,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   }, [sameAsBilling, customerId, customers, setValue]);
 
-  const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
-    if (type === 'igst') {
-      form.setValue(`items.${index}.applyIgst`, value);
-      if (value) { 
-        form.setValue(`items.${index}.applyCgst`, false);
-        form.setValue(`items.${index}.applySgst`, false);
-      } else if (!form.getValues(`items.${index}.applyCgst`)) {
-        form.setValue(`items.${index}.applyCgst`, true);
-        form.setValue(`items.${index}.applySgst`, true);
-      }
-    } else if (type === 'cgstSgst') { 
-      form.setValue(`items.${index}.applyCgst`, value);
-      form.setValue(`items.${index}.applySgst`, value);
-      if (value) { 
-        form.setValue(`items.${index}.applyIgst`, false);
-      } else if (!form.getValues(`items.${index}.applyIgst`)) {
-        form.setValue(`items.${index}.applyIgst`, true);
-      }
-    }
-  
-    const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
-    if (!applyIgst && !applyCgst && !applySgst) {
-      form.setValue(`items.${index}.applyIgst`, true);
-    }
-  };
-
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
     const currentItems = watchItems || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
@@ -277,6 +278,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       total: grandTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
   }, [watchItems, applyRoundOff]);
+
+  useEffect(() => {
+    setValue('amount', finalTotal);
+  }, [finalTotal, setValue]);
 
   const handleCancel = () => {
     if (onCancel) onCancel();
@@ -500,8 +505,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 <FormField control={form.control} name="shipmentDetails.carrierName" render={({ field }) => (<FormItem><FormLabel>Carrier Name</FormLabel><FormControl><Input placeholder="e.g., VRL Logistics" {...field} /></FormControl><FormMessage /></FormItem>)}/>
                 <FormField control={form.control} name="shipmentDetails.trackingNumber" render={({ field }) => (<FormItem><FormLabel>Tracking No.</FormLabel><FormControl><Input placeholder="Tracking ID" {...field} /></FormControl><FormMessage /></FormItem>)}/>
                 <FormField control={form.control} name="shipmentDetails.placeOfSupply" render={({ field }) => (<FormItem><FormLabel>Place of Supply</FormLabel><FormControl><Input placeholder="e.g., Bangalore" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                <FormField control={form.control} name="shipmentDetails.shipDate" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Ship Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
-                <FormField control={form.control} name="shipmentDetails.dateOfSupply" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.shipDate" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Ship Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.dateOfSupply" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? new Date(field.value) : undefined} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
               </div>
             </div>
           </CardContent>
@@ -513,60 +518,107 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
           <CardContent>
             <div className="space-y-4">
               {fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-12 gap-x-4 gap-y-2 p-3 border rounded-md relative hover:bg-muted/30">
-                  <div className="col-span-12 md:col-span-4">
-                    <FormField control={form.control} name={`items.${index}.productId`} render={({ field: productField }) => (
-                      <FormItem><FormLabel>Product/Service</FormLabel>
-                        <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(p => { const n = [...p]; n[index] = isOpen; return n; })}>
-                          <PopoverTrigger asChild><FormControl>
-                              <Button variant="outline" role="combobox" className="w-full justify-between">
-                                {productField.value ? products?.find(p => p.id === productField.value)?.name : "Select product"}
-                                <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
-                              </Button>
-                          </FormControl></PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
-                              <CommandInput placeholder="Search products..." />
-                              <CommandList><CommandEmpty>No products found.</CommandEmpty>
-                                <CommandGroup>{products?.map(p => (
-                                  <CommandItem value={p.id} key={p.id} onSelect={(currentValue) => {
-                                      productField.onChange(currentValue);
-                                      const product = products?.find(prod => prod.id === currentValue);
-                                      if (product) {
-                                          setValue(`items.${index}.description`, product.description || product.name);
-                                          setValue(`items.${index}.price`, product.price);
-                                          setValue(`items.${index}.productName`, product.name);
-                                          setValue(`items.${index}.gstCategory`, product.hsn || "");
-                                          setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
-                                          setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
-                                          setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
-                                          setValue(`items.${index}.applyIgst`, true);
-                                          setValue(`items.${index}.applyCgst`, false);
-                                          setValue(`items.${index}.applySgst`, false);
-                                      }
-                                      setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
-                                  }}>
-                                    <Check className={cn("mr-2 h-4 w-4", p.id === productField.value ? "opacity-100" : "opacity-0")} />
-                                    {p.name}
-                                  </CommandItem>
-                                ))}</CommandGroup>
-                              </CommandList>
-                          </Command></PopoverContent>
-                        </Popover><FormMessage />
-                      </FormItem>
-                    )}/>
+                <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-lg relative hover:bg-muted/30">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-4">
+                      <FormField control={form.control} name={`items.${index}.productId`} render={({ field: productField }) => (
+                        <FormItem><FormLabel>Product/Service</FormLabel>
+                          <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(p => { const n = [...p]; n[index] = isOpen; return n; })}>
+                            <PopoverTrigger asChild><FormControl>
+                                <Button variant="outline" role="combobox" className="w-full justify-between">
+                                  {productField.value ? products?.find(p => p.id === productField.value)?.name : "Select product"}
+                                  <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
+                                </Button>
+                            </FormControl></PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
+                                <CommandInput placeholder="Search products..." />
+                                <CommandList><CommandEmpty>No products found.</CommandEmpty>
+                                  <CommandGroup>{products?.map(p => (
+                                    <CommandItem value={p.id} key={p.id} onSelect={(currentValue) => {
+                                        productField.onChange(currentValue);
+                                        const product = products?.find(prod => prod.id === currentValue);
+                                        if (product) {
+                                            setValue(`items.${index}.description`, product.description || product.name);
+                                            setValue(`items.${index}.price`, product.price);
+                                            setValue(`items.${index}.productName`, product.name);
+                                            setValue(`items.${index}.gstCategory`, product.hsn || "");
+                                            setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+                                            setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+                                            setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+                                            setValue(`items.${index}.applyIgst`, true);
+                                            setValue(`items.${index}.applyCgst`, false);
+                                            setValue(`items.${index}.applySgst`, false);
+                                        }
+                                        setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
+                                    }}>
+                                      <Check className={cn("mr-2 h-4 w-4", p.id === productField.value ? "opacity-100" : "opacity-0")} />
+                                      {p.name}
+                                    </CommandItem>
+                                  ))}</CommandGroup>
+                                </CommandList>
+                            </Command></PopoverContent>
+                          </Popover><FormMessage />
+                        </FormItem>
+                      )}/>
+                    </div>
+                    <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field: qtyField }) => (
+                      <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...qtyField} /></FormControl><FormMessage /></FormItem>
+                    )}/></div>
+                    <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.price`} render={({ field: priceField }) => (
+                      <FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" {...priceField} /></FormControl><FormMessage /></FormItem>
+                    )}/></div>
+                    <div className="md:col-span-4"><FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: gstField }) => (
+                      <FormItem><FormLabel>HSN/SAC</FormLabel><FormControl><Input {...gstField} /></FormControl><FormMessage /></FormItem>
+                    )}/></div>
                   </div>
-                  <div className="col-span-6 md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field: qtyField }) => (
-                    <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...qtyField} /></FormControl><FormMessage /></FormItem>
-                  )}/></div>
-                  <div className="col-span-6 md:col-span-2"><FormField control={form.control} name={`items.${index}.price`} render={({ field: priceField }) => (
-                    <FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" {...priceField} /></FormControl><FormMessage /></FormItem>
-                  )}/></div>
-                  <div className="col-span-12 md:col-span-4"><FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: gstField }) => (
-                    <FormItem><FormLabel>HSN/SAC</FormLabel><FormControl><Input {...gstField} /></FormControl><FormMessage /></FormItem>
-                  )}/></div>
 
-                  <div className="col-span-12 flex justify-end">
-                    <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                  <div className="border-t pt-4 mt-2 flex flex-col md:flex-row gap-4 items-start">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id={`igst-toggle-${index}`} checked={watch(`items.${index}.applyIgst`)} onCheckedChange={(checked) => handleToggleGstType(index, 'igst', !!checked)} />
+                        <Label htmlFor={`igst-toggle-${index}`}>Apply IGST</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id={`cgst-toggle-${index}`} checked={watch(`items.${index}.applyCgst`)} onCheckedChange={(checked) => handleToggleGstType(index, 'cgstSgst', !!checked)} />
+                        <Label htmlFor={`cgst-toggle-${index}`}>Apply CGST & SGST</Label>
+                      </div>
+                    </div>
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {watch(`items.${index}.applyIgst`) && (
+                        <FormField control={form.control} name={`items.${index}.igstRate`} render={({ field }) => (
+                          <FormItem><FormLabel>IGST Rate</FormLabel>
+                             <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value.toString()}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="%" /></SelectTrigger></FormControl>
+                                <SelectContent><SelectItem value="0">0%</SelectItem><SelectItem value="5">5%</SelectItem><SelectItem value="12">12%</SelectItem><SelectItem value="18">18%</SelectItem><SelectItem value="28">28%</SelectItem></SelectContent>
+                              </Select><FormMessage />
+                          </FormItem>
+                        )}/>
+                      )}
+                      {watch(`items.${index}.applyCgst`) && (
+                        <FormField control={form.control} name={`items.${index}.cgstRate`} render={({ field }) => (
+                          <FormItem><FormLabel>CGST Rate</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value.toString()}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="%" /></SelectTrigger></FormControl>
+                              <SelectContent><SelectItem value="0">0%</SelectItem><SelectItem value="2.5">2.5%</SelectItem><SelectItem value="6">6%</SelectItem><SelectItem value="9">9%</SelectItem><SelectItem value="14">14%</SelectItem></SelectContent>
+                            </Select><FormMessage />
+                          </FormItem>
+                        )}/>
+                      )}
+                      {watch(`items.${index}.applySgst`) && (
+                         <FormField control={form.control} name={`items.${index}.sgstRate`} render={({ field }) => (
+                          <FormItem><FormLabel>SGST Rate</FormLabel>
+                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value.toString()}>
+                               <FormControl><SelectTrigger><SelectValue placeholder="%" /></SelectTrigger></FormControl>
+                              <SelectContent><SelectItem value="0">0%</SelectItem><SelectItem value="2.5">2.5%</SelectItem><SelectItem value="6">6%</SelectItem><SelectItem value="9">9%</SelectItem><SelectItem value="14">14%</SelectItem></SelectContent>
+                            </Select><FormMessage />
+                          </FormItem>
+                        )}/>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="absolute top-1 right-1">
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 h-8 w-8" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
               ))}

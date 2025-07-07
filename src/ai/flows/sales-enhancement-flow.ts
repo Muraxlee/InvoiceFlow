@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit/zod';
+import {z} from 'zod';
 
 const SalesEnhancementInputSchema = z.object({
   businessContext: z
@@ -82,7 +82,7 @@ Based on the provided data, analyze potential areas for improvement.
 
 Please provide a list of 3-5 concrete, actionable suggestions. For each suggestion, briefly explain the reasoning or potential impact. Focus on strategies that can be implemented relatively easily.
 Examples of areas to consider (but not limited to):
-- Improving customer engagement based on count and revenue.
+- Improving customer engagement based on customer count and revenue.
 - Optimizing pricing or offers, considering product summary.
 - Enhancing marketing efforts (digital or offline) targeted by customer/product data.
 - Leveraging customer feedback (if patterns emerge from data).

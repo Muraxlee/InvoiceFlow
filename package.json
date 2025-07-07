@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm:emulators:start\" \"npm:start-app\"",
+    "dev": "concurrently \"pnpm:emulators:start\" \"pnpm:start-app\"",
     "start-app": "wait-on tcp:127.0.0.1:8288 tcp:127.0.0.1:9299 && next dev",
     "emulators:start": "firebase emulators:start --project demo-invoiceflow --import ./.firebase-data --export-on-exit",
     "build": "next build",

@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { DEFAULT_COMPANY_NAME } from '@/lib/localStorage';

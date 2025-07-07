@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "admin@example.com", password: "admin123" },
+    defaultValues: { email: "", password: "" },
   });
 
   const handleLogin = async (values: z.infer<typeof loginSchema>) => {
@@ -88,12 +88,7 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter>
-           <Alert variant="default" className="w-full text-center text-sm p-3">
-             <Info className="h-4 w-4" />
-             <AlertDescription>
-                Running in emulator mode. Use: <br/> <strong>admin@example.com</strong> / <strong>admin123</strong>
-             </AlertDescription>
-           </Alert>
+            {/* The hint for emulator credentials has been removed as we are connecting to the cloud. */}
         </CardFooter>
       </Card>
     </div>

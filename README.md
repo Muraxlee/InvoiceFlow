@@ -4,31 +4,32 @@ This is a Next.js web application for managing invoices, customers, and products
 
 ## Getting Started
 
-This project uses a local Firebase Emulator Suite for development. The emulators and the web application must be run in separate terminals.
+This project is configured to connect to a live Firebase project on the cloud.
 
-### Step 1: Start the Firebase Emulators
+### Step 1: Configure Firebase
 
-In your terminal, run the following command to start the local database and authentication services:
+1.  Create a new Firebase project at [https://console.firebase.google.com/](https://console.firebase.google.com/).
+2.  Enable the **Firestore Database** and **Authentication** (with Email/Password provider) services.
+3.  In your Firebase project settings, go to the **General** tab.
+4.  Under "Your apps", create a new **Web app**.
+5.  Copy the `firebaseConfig` object values.
+6.  Create a file named `.env` in the root of this project.
+7.  Paste the configuration values into the `.env` file, matching the keys provided in this file.
+
+### Step 2: Configure Google AI (Optional)
+
+For AI-powered features like suggestions, you need a Google AI API Key.
+
+1.  Visit [Google AI Studio](https://aistudio.google.com/app/apikey) to get your API key.
+2.  Add the key to your `.env` file under `GOOGLE_API_KEY`.
+
+### Step 3: Run the Application
+
+Once your `.env` file is configured, you can start the development server:
 
 ```bash
-pnpm run emulators:start
-```
-
-**For Windows users:** You can simply double-click the `start-emulators.bat` file in the project root.
-
-Leave this terminal window running. It will handle all the local Firebase services.
-
-### Step 2: Start the Web Application
-
-Open a **new, separate terminal window** and run the development server:
-
-```bash
+pnpm install
 pnpm run dev
 ```
 
-The application will now be running and connected to your local emulators.
-
-### Accessing the App & Emulators
-
-- **Web Application**: [http://localhost:3000](http://localhost:3000)
-- **Firebase Emulator UI**: [http://127.0.0.1:4154](http://127.0.0.1:4154) (You can view your local database contents here)
+The application will now be running at [http://localhost:3000](http://localhost:3000) and connected to your live Firebase project.

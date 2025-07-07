@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Sparkles, Loader2, DollarSign, FileText, TrendingUp, AlertTriangle, Users, Package, BarChartHorizontalBig, Activity } from "lucide-react";
+import { Download, Sparkles, Loader2, DollarSign, FileText, TrendingUp, AlertTriangle, Users, Package, BarChartHorizontalBig, Activity, RefreshCw, AlertCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ import PageHeader from "@/components/page-header";
 import Link from "next/link";
 import { useQuery } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ReportData {
   totalRevenue: number;
@@ -32,7 +33,7 @@ export default function ReportsPage() {
   const [salesSuggestions, setSalesSuggestions] = useState<string[]>([]);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reportData'],
     queryFn: async () => {
       const [invoices, customers, products] = await Promise.all([
@@ -180,10 +181,21 @@ export default function ReportsPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)]">
-        <AlertTriangle className="h-12 w-12 text-destructive" />
-        <p className="mt-4 text-destructive">Failed to load report data. Please try again later.</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">Retry</Button>
+      <div className="space-y-6">
+        <PageHeader title="Business Reports & Analytics" description="Comprehensive insights into your business performance and finances."/>
+         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access the data needed for reports. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => refetch()} className="flex items-center gap-2">
+          <RefreshCw className="h-4 w-4" /> Try Again
+        </Button>
       </div>
     );
   }

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2 } from "lucide-react";
+import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -15,12 +15,13 @@ import { type StoredInvoice } from "@/types/database";
 import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: invoices, isLoading } = useQuery<StoredInvoice[]>({
+  const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
     initialData: [],
@@ -60,19 +61,42 @@ export default function InvoicesPage() {
       default: return "outline";
     }
   };
+  
+  const pageActions = (
+    <Link href="/invoices/create" passHref>
+      <Button>
+        <FilePlus2 className="mr-2 h-4 w-4" /> Create New Invoice
+      </Button>
+    </Link>
+  );
+
+  if (error) {
+     return (
+      <div className="space-y-6">
+        <PageHeader title="Manage Invoices" description="View, edit, and manage all your invoices." actions={pageActions} />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access invoice data. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => refetch()} className="flex items-center gap-2">
+          <RefreshCw className="h-4 w-4" /> Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Invoices" 
         description="View, edit, and manage all your invoices."
-        actions={
-          <Link href="/invoices/create" passHref>
-            <Button>
-              <FilePlus2 className="mr-2 h-4 w-4" /> Create New Invoice
-            </Button>
-          </Link>
-        }
+        actions={pageActions}
       />
 
       <Card>

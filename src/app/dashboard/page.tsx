@@ -173,8 +173,13 @@ export default function DashboardPage() {
         <PageHeader title="Dashboard" description="Overview of your business performance" />
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error.message}</AlertDescription>
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access the database. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
         </Alert>
         <Button onClick={() => refetch()} className="flex items-center gap-2">
           <RefreshCw className="h-4 w-4" /> Try Again

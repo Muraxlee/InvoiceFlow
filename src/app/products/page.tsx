@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PackagePlus, MoreHorizontal, Edit, Trash2, Loader2 } from "lucide-react";
+import { PackagePlus, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -15,6 +15,7 @@ import { ProductForm, type ProductFormValues } from "@/components/product-form";
 import type { Product } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
@@ -23,7 +24,7 @@ export default function ProductsPage() {
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const { toast } = useToast();
   
-  const { data: products, isLoading: isDataLoading } = useQuery<Product[]>({
+  const { data: products, isLoading: isDataLoading, error, refetch } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
     initialData: [],
@@ -80,33 +81,56 @@ export default function ProductsPage() {
     }
   };
 
+  const pageActions = (
+     <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Add New Product</DialogTitle>
+          <DialogDescription>
+            Fill in the details below to add a new product to your catalog.
+          </DialogDescription>
+        </DialogHeader>
+        <ProductForm 
+          onSubmit={handleAddProduct} 
+          isLoading={addMutation.isPending}
+          onCancel={() => setIsAddProductDialogOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (error) {
+     return (
+      <div className="space-y-6">
+        <PageHeader title="Manage Products" description="View, add, and manage your product catalog." actions={pageActions} />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access product data. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => refetch()} className="flex items-center gap-2">
+          <RefreshCw className="h-4 w-4" /> Try Again
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Products" 
         description="View, add, and manage your product catalog."
-        actions={
-          <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PackagePlus className="mr-2 h-4 w-4" /> Add New Product
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add New Product</DialogTitle>
-                <DialogDescription>
-                  Fill in the details below to add a new product to your catalog.
-                </DialogDescription>
-              </DialogHeader>
-              <ProductForm 
-                onSubmit={handleAddProduct} 
-                isLoading={addMutation.isPending}
-                onCancel={() => setIsAddProductDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        }
+        actions={pageActions}
       />
 
       <Dialog open={isEditProductDialogOpen} onOpenChange={(isOpen) => {

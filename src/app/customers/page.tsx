@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2 } from "lucide-react";
+import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { CustomerForm, type CustomerFormValues } from "@/components/customer-for
 import type { Customer } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore-actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -24,7 +25,7 @@ export default function CustomersPage() {
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
   const { toast } = useToast();
 
-  const { data: customers, isLoading: isDataLoading } = useQuery<Customer[]>({
+  const { data: customers, isLoading: isDataLoading, error, refetch } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
     initialData: []
@@ -80,34 +81,57 @@ export default function CustomersPage() {
       updateMutation.mutate({ id: currentCustomer.id, values: data });
     }
   };
+  
+  const pageActions = (
+     <Dialog open={isAddCustomerDialogOpen} onOpenChange={setIsAddCustomerDialogOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[525px]">
+        <DialogHeader>
+          <DialogTitle>Add New Customer</DialogTitle>
+          <DialogDescription>
+            Fill in the details below to add a new customer.
+          </DialogDescription>
+        </DialogHeader>
+        <CustomerForm 
+          onSubmit={handleAddCustomer} 
+          isLoading={addMutation.isPending}
+          onCancel={() => setIsAddCustomerDialogOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (error) {
+     return (
+      <div className="space-y-6">
+        <PageHeader title="Manage Customers" description="View, add, and manage your customer information." actions={pageActions} />
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access the customer data. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => refetch()} className="flex items-center gap-2">
+          <RefreshCw className="h-4 w-4" /> Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Manage Customers" 
         description="View, add, and manage your customer information."
-        actions={
-           <Dialog open={isAddCustomerDialogOpen} onOpenChange={setIsAddCustomerDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" /> Add New Customer
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
-              <DialogHeader>
-                <DialogTitle>Add New Customer</DialogTitle>
-                <DialogDescription>
-                  Fill in the details below to add a new customer.
-                </DialogDescription>
-              </DialogHeader>
-              <CustomerForm 
-                onSubmit={handleAddCustomer} 
-                isLoading={addMutation.isPending}
-                onCancel={() => setIsAddCustomerDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        }
+        actions={pageActions}
       />
 
       <Dialog open={isEditCustomerDialogOpen} onOpenChange={(isOpen) => {

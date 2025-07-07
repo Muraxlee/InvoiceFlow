@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InvoiceForm, type InvoiceFormValues } from '@/components/invoice-form';
 import { InvoicePrint } from '@/components/invoice-print';
-import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Save, Printer, CalendarDays, Info, Truck, Anchor, UserCircle, Banknote, PackageSearch, FileText, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { type StoredInvoice, type CompanyData } from '@/types/database';
@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 export default function InvoiceDetailPage() {
@@ -30,7 +31,7 @@ export default function InvoiceDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("view");
 
-  const { data: invoice, isLoading: isInvoiceLoading, error: invoiceError } = useQuery<StoredInvoice | null>({
+  const { data: invoice, isLoading: isInvoiceLoading, error: invoiceError, refetch: refetchInvoice } = useQuery<StoredInvoice | null>({
     queryKey: ['invoice', params.id],
     queryFn: () => getInvoice(params.id),
     enabled: !!params.id,
@@ -67,7 +68,7 @@ export default function InvoiceDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (!isInvoiceLoading && !invoice) {
+    if (!isInvoiceLoading && !invoice && !invoiceError) {
         toast({
             title: 'Invoice Not Found',
             description: `Could not find invoice with ID ${params.id}`,
@@ -75,19 +76,13 @@ export default function InvoiceDetailPage() {
         });
         router.push('/invoices');
     }
-  }, [isInvoiceLoading, invoice, params.id, router, toast]);
+  }, [isInvoiceLoading, invoice, params.id, router, toast, invoiceError]);
 
 
   const handleSave = async (data: InvoiceFormValues) => {
     if (!invoice?.id) return;
-
-    const updatedInvoiceData = {
-        ...data,
-        amount: finalTotal, // Use the calculated final total
-        roundOffApplied: applyRoundOff
-    };
     
-    saveMutation.mutate({ id: invoice.id, values: updatedInvoiceData });
+    saveMutation.mutate({ id: invoice.id, values: data });
   };
   
   const statusVariant = (status: string | undefined) => {
@@ -112,8 +107,8 @@ export default function InvoiceDetailPage() {
     );
   };
   
-  const { applyRoundOff, subtotal, igstAmount, cgstAmount, sgstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
-    if (!invoice) return { applyRoundOff: false, subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, total: 0, roundOffDifference: 0, finalTotal: 0 };
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
+    if (!invoice) return { subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, total: 0, roundOffDifference: 0, finalTotal: 0 };
     
     const currentItems = invoice.items || [];
     const sub = currentItems.reduce((acc: number, item: any) => acc + (item.quantity || 0) * (item.price || 0), 0);
@@ -133,7 +128,6 @@ export default function InvoiceDetailPage() {
     const diff = finalAmount - grandTotal;
     
     return {
-      applyRoundOff: useRounding,
       subtotal: sub,
       igstAmount: igst,
       cgstAmount: cgst, 
@@ -152,20 +146,34 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (!invoice) {
+  if (invoiceError) {
     return (
       <div className="space-y-6">
-        <PageHeader 
-          title="Invoice Not Found" 
-          description="The requested invoice could not be found or you do not have permission to view it."
-          actions={
-            <Link href="/invoices">
-              <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices</Button>
-            </Link>
-          }
-        />
+        <PageHeader title="Error" description="There was a problem loading this invoice."/>
+         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+          <AlertDescription>
+            <p>The application cannot access this invoice. This is usually because the Firestore security rules have not been deployed to your project.</p>
+            <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+            <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+            <p>After deploying, please refresh this page.</p>
+          </AlertDescription>
+        </Alert>
+        <div className="flex gap-2">
+          <Link href="/invoices">
+            <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Invoices</Button>
+          </Link>
+          <Button onClick={() => refetchInvoice()} className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" /> Try Again
+          </Button>
+        </div>
       </div>
     );
+  }
+
+  if (!invoice) {
+    return null; // Should be handled by useEffect redirect
   }
 
   return (

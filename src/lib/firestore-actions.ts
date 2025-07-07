@@ -22,6 +22,12 @@ const PRODUCTS = 'products';
 const COMPANY = 'company';
 const USERS = 'users';
 
+const checkDb = () => {
+    if (!db) {
+        throw new Error("Firestore is not initialized. Please check your Firebase configuration.");
+    }
+}
+
 // Helper to convert Firestore Timestamps to Dates
 const fromFirestore = <T extends { [key: string]: any }>(docData: T): T => {
     const data = { ...docData };
@@ -35,12 +41,14 @@ const fromFirestore = <T extends { [key: string]: any }>(docData: T): T => {
 
 // Invoice Actions
 export async function getInvoices(): Promise<StoredInvoice[]> {
+  checkDb();
   const q = query(collection(db, INVOICES), orderBy('createdAt', 'desc'));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as StoredInvoice));
 }
 
 export async function getInvoice(id: string): Promise<StoredInvoice | null> {
+  checkDb();
   const docRef = doc(db, INVOICES, id);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
@@ -50,6 +58,7 @@ export async function getInvoice(id: string): Promise<StoredInvoice | null> {
 }
 
 export async function saveInvoice(invoiceData: Omit<StoredInvoice, 'id' | 'createdAt' | 'updatedAt'>, id?: string): Promise<string> {
+  checkDb();
   if (id) {
     const docRef = doc(db, INVOICES, id);
     await setDoc(docRef, { ...invoiceData, updatedAt: serverTimestamp() }, { merge: true });
@@ -65,17 +74,20 @@ export async function saveInvoice(invoiceData: Omit<StoredInvoice, 'id' | 'creat
 }
 
 export async function deleteInvoice(id: string): Promise<void> {
+  checkDb();
   await deleteDoc(doc(db, INVOICES, id));
 }
 
 // Customer Actions
 export async function getCustomers(): Promise<Customer[]> {
+  checkDb();
   const q = query(collection(db, CUSTOMERS), orderBy('name'));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as Customer));
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id' | 'createdAt'>): Promise<string> {
+    checkDb();
     const docRef = await addDoc(collection(db, CUSTOMERS), { 
         ...customerData, 
         createdAt: serverTimestamp()
@@ -84,21 +96,25 @@ export async function addCustomer(customerData: Omit<Customer, 'id' | 'createdAt
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id' | 'createdAt'>>): Promise<void> {
+    checkDb();
     await updateDoc(doc(db, CUSTOMERS, id), customerData);
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
+    checkDb();
     await deleteDoc(doc(db, CUSTOMERS, id));
 }
 
 // Product Actions
 export async function getProducts(): Promise<Product[]> {
+    checkDb();
     const q = query(collection(db, PRODUCTS), orderBy('name'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as Product));
 }
 
 export async function addProduct(productData: Omit<Product, 'id' | 'createdAt'>): Promise<string> {
+    checkDb();
     const docRef = await addDoc(collection(db, PRODUCTS), {
         ...productData,
         createdAt: serverTimestamp()
@@ -107,15 +123,18 @@ export async function addProduct(productData: Omit<Product, 'id' | 'createdAt'>)
 }
 
 export async function updateProduct(id: string, productData: Partial<Omit<Product, 'id' | 'createdAt'>>): Promise<void> {
+    checkDb();
     await updateDoc(doc(db, PRODUCTS, id), productData);
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+    checkDb();
     await deleteDoc(doc(db, PRODUCTS, id));
 }
 
 // Company Info Actions
 export async function getCompanyInfo(): Promise<CompanyData | null> {
+  checkDb();
   const docRef = doc(db, COMPANY, 'main');
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
@@ -125,18 +144,19 @@ export async function getCompanyInfo(): Promise<CompanyData | null> {
 }
 
 export async function saveCompanyInfo(companyData: Omit<CompanyData, 'id'>): Promise<void> {
+  checkDb();
   await setDoc(doc(db, COMPANY, 'main'), companyData, { merge: true });
 }
 
 // User role management (Simplified - a full system would use Cloud Functions)
 export async function getUserRole(uid: string): Promise<User | null> {
+    checkDb();
     const userDocRef = doc(db, USERS, uid);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
         return userDocSnap.data() as User;
     }
     // If user doesn't exist in 'users' collection, create them with 'user' role.
-    // This is a fallback for users created directly in Firebase Auth console.
     const fallbackUser: User = {
         uid,
         email: 'N/A',
@@ -150,10 +170,11 @@ export async function getUserRole(uid: string): Promise<User | null> {
 
 // Batch delete helper
 async function deleteCollection(collectionPath: string) {
+    checkDb();
     const q = query(collection(db, collectionPath));
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) return;
-    const batch = writeBatch(db);
+    const batch = writeBatch(db!);
     querySnapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
     });
@@ -173,11 +194,12 @@ export async function clearAllInvoices(): Promise<void> {
 }
 
 export async function clearAllData(): Promise<void> {
+    checkDb();
     await Promise.all([
         clearAllCustomers(),
         clearAllProducts(),
         clearAllInvoices(),
         // Company info is a single doc, so we delete it separately
-        deleteDoc(doc(db, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
+        deleteDoc(doc(db!, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
     ]);
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getFirestore, enableIndexedDbPersistence, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,34 +13,38 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check for missing configuration
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.error(
-    "Firebase config is missing. Please create a .env file with your Firebase project credentials. See .env.example for reference."
-  );
-}
+export const isFirebaseConfigured =
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.apiKey !== 'your-api-key'; // Check against placeholder
 
-// Initialize Firebase
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let auth: Auth | null = null;
 
+if (isFirebaseConfigured) {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
 
-// Enable offline persistence if not in a server environment
-if (typeof window !== 'undefined') {
-  try {
-    enableIndexedDbPersistence(db)
-      .then(() => console.log("Firestore offline persistence enabled."))
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-          console.warn("Firestore offline persistence could not be enabled: multiple tabs open.");
-        } else if (err.code == 'unimplemented') {
-          console.warn("Firestore offline persistence is not available in this browser.");
+    // Enable offline persistence if not in a server environment
+    if (typeof window !== 'undefined') {
+        try {
+            enableIndexedDbPersistence(db)
+            .catch((err) => {
+                if (err.code == 'failed-precondition') {
+                // This can happen if multiple tabs are open and is not a critical error.
+                } else if (err.code == 'unimplemented') {
+                console.warn("Firestore offline persistence is not available in this browser.");
+                }
+            });
+        } catch(error) {
+            console.error("Error enabling offline persistence:", error)
         }
-      });
-  } catch(error) {
-    console.error("Error enabling offline persistence:", error)
-  }
+    }
+} else if (typeof window !== 'undefined') {
+    // Log a clear error message in the browser console
+    console.error("Firebase config is missing or invalid. Please create and configure your .env file with your Firebase project credentials. See README.md for reference.");
 }
 
 export { db, auth };

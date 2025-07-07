@@ -63,7 +63,7 @@ export default function DashboardPage() {
     let revenue = 0;
     let outstanding = 0;
     let pendingCount = 0;
-    const statusCounts: Record<string, number> = { Paid: 0, Pending: 0, Overdue: 0, Draft: 0 };
+    const statusCounts: Record<string, number> = {};
     const dailySales: Record<string, number> = {};
     const today = new Date();
     const last30Days = Array.from({ length: 30 }, (_, i) => format(subDays(today, 29 - i), 'yyyy-MM-dd'));
@@ -117,7 +117,9 @@ export default function DashboardPage() {
       totalCustomers: customers.length,
       pendingInvoicesCount: pendingCount,
       salesData: trendData,
-      invoiceStatusData: Object.entries(statusCounts).map(([name, value]) => ({ name, value })),
+      invoiceStatusData: Object.entries(statusCounts)
+        .map(([name, value]) => ({ name, value }))
+        .filter(item => item.value > 0),
       topCustomers,
       topProducts,
       recentInvoices,
@@ -298,14 +300,19 @@ export default function DashboardPage() {
         <Card className="shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader> <CardTitle className="flex items-center"> <PieChartIcon className="h-5 w-5 mr-2 text-primary" /> Invoice Status </CardTitle> <CardDescription>Distribution by status</CardDescription> </CardHeader>
           <CardContent className="h-[350px] p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie activeIndex={activeStatusIndex} activeShape={renderActiveShape} data={dashboardMetrics.invoiceStatusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value" onMouseEnter={(_, index) => setActiveStatusIndex(index)}>
-                  {dashboardMetrics.invoiceStatusData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} /> ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            {dashboardMetrics.invoiceStatusData.length === 0 && ( <div className="flex items-center justify-center h-full"> <p className="text-muted-foreground">No invoice status data available.</p> </div> )}
+            {dashboardMetrics.invoiceStatusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie activeIndex={activeStatusIndex} activeShape={renderActiveShape} data={dashboardMetrics.invoiceStatusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" dataKey="value" onMouseEnter={(_, index) => setActiveStatusIndex(index)}>
+                    {dashboardMetrics.invoiceStatusData.map((entry, index) => ( <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} /> ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground text-center">No invoice status data available.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

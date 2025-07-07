@@ -396,7 +396,213 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
-        {/* The rest of the form JSX remains the same */}
+        {/* Main Details Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoice Details</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+             <FormField
+                control={form.control}
+                name="customerId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Customer*</FormLabel>
+                    <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
+                            {field.value ? customers?.find((c) => c.id === field.value)?.name : "Select a customer"}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search customers..." />
+                          <CommandList>
+                            <CommandEmpty>
+                              <div className="p-4 text-center text-sm">
+                                <p>No customers found.</p>
+                                <Link href="/customers" passHref><Button variant="link" className="mt-1">Add a Customer</Button></Link>
+                              </div>
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {customers?.map((customer) => (
+                                <CommandItem value={customer.name} key={customer.id} onSelect={() => handleSelectCustomer(customer.id)}>
+                                  <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
+                                  {customer.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField control={form.control} name="invoiceDate" render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Invoice Date</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                          {field.value && isValid(new Date(field.value)) ? (formatDateFns(new Date(field.value), "PP")) : (<span>Pick a date</span>)}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button></FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
+                  </Popover><FormMessage />
+                </FormItem>
+              )}/>
+               <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Invoice Number</FormLabel><FormControl><Input {...field} readOnly className="bg-muted cursor-not-allowed"/></FormControl><FormMessage /></FormItem>
+              )}/>
+
+              <div className="flex items-center space-x-2 pt-4">
+                  <Checkbox id="show-due-date" checked={showDueDate} onCheckedChange={(checked) => setShowDueDate(Boolean(checked))} />
+                  <Label htmlFor="show-due-date" className="text-sm font-medium leading-none">Add a due date</Label>
+              </div>
+
+              {showDueDate && (
+                <FormField control={form.control} name="dueDate" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Due Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                            {field.value && isValid(new Date(field.value)) ? (formatDateFns(new Date(field.value), "PP")) : (<span>Pick a date</span>)}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button></FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent>
+                    </Popover><FormMessage />
+                  </FormItem>
+                )}/>
+              )}
+
+              <FormField control={form.control} name="paymentStatus" render={({ field }) => (
+                <FormItem><FormLabel>Payment Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="Paid">Paid</SelectItem>
+                      <SelectItem value="Unpaid">Unpaid</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Draft">Draft</SelectItem>
+                    </SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
+              )}/>
+          </CardContent>
+        </Card>
+
+        {/* Items Card */}
+        <Card>
+          <CardHeader><CardTitle>Invoice Items</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="grid grid-cols-12 gap-x-4 gap-y-2 p-3 border rounded-md relative hover:bg-muted/30">
+                  <div className="col-span-12 md:col-span-4">
+                    <FormField control={form.control} name={`items.${index}.productId`} render={({ field: productField }) => (
+                      <FormItem><FormLabel>Product/Service</FormLabel>
+                        <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(p => { const n = [...p]; n[index] = isOpen; return n; })}>
+                          <PopoverTrigger asChild><FormControl>
+                              <Button variant="outline" role="combobox" className="w-full justify-between">
+                                {productField.value ? products?.find(p => p.id === productField.value)?.name : "Select product"}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
+                              </Button>
+                          </FormControl></PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
+                              <CommandInput placeholder="Search products..." />
+                              <CommandList><CommandEmpty>No products found.</CommandEmpty>
+                                <CommandGroup>{products?.map(p => (
+                                  <CommandItem value={p.name} key={p.id} onSelect={() => handleSelectProduct(index, p.id)}>
+                                    <Check className={cn("mr-2 h-4 w-4", p.id === productField.value ? "opacity-100" : "opacity-0")} />
+                                    {p.name}
+                                  </CommandItem>
+                                ))}</CommandGroup>
+                              </CommandList>
+                          </Command></PopoverContent>
+                        </Popover><FormMessage />
+                      </FormItem>
+                    )}/>
+                  </div>
+                  <div className="col-span-6 md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field: qtyField }) => (
+                    <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...qtyField} /></FormControl><FormMessage /></FormItem>
+                  )}/></div>
+                  <div className="col-span-6 md:col-span-2"><FormField control={form.control} name={`items.${index}.price`} render={({ field: priceField }) => (
+                    <FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" {...priceField} /></FormControl><FormMessage /></FormItem>
+                  )}/></div>
+                  <div className="col-span-12 md:col-span-4"><FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: gstField }) => (
+                    <FormItem><FormLabel>HSN/SAC</FormLabel><FormControl><Input {...gstField} /></FormControl><FormMessage /></FormItem>
+                  )}/></div>
+
+                  <div className="col-span-12 flex justify-end">
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="button" variant="outline" onClick={() => append({ productId: "", description: "", quantity: 1, price: 0, productName: "", gstCategory: "", applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9 })}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Totals Section */}
+        <Card>
+            <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
+            <CardContent className="flex justify-end">
+                <div className="w-full max-w-sm space-y-3">
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
+                    {igstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">IGST</span><span>₹{igstAmount.toFixed(2)}</span></div>}
+                    {cgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">CGST</span><span>₹{cgstAmount.toFixed(2)}</span></div>}
+                    {sgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">SGST</span><span>₹{sgstAmount.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-sm font-medium border-t pt-2"><span className="text-muted-foreground">Total Before Round Off</span><span>₹{total.toFixed(2)}</span></div>
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="round-off" className="flex items-center gap-2">Round Off Total
+                            <TooltipProvider><Tooltip>
+                                <TooltipTrigger asChild><HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                                <TooltipContent><p>Rounds the final invoice amount to the nearest rupee.</p></TooltipContent>
+                            </Tooltip></TooltipProvider>
+                        </Label>
+                        <Switch id="round-off" checked={applyRoundOff} onCheckedChange={setApplyRoundOff} />
+                    </div>
+                    {applyRoundOff && roundOffDifference !== 0 && (
+                        <div className="flex justify-between text-sm text-muted-foreground"><span >Round Off Adjustment</span><span>{roundOffDifference > 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>
+                    )}
+                    <div className="flex justify-between text-xl font-bold border-t pt-2"><span>Grand Total</span><span>₹{finalTotal.toFixed(2)}</span></div>
+                </div>
+            </CardContent>
+        </Card>
+        
+        {/* Notes and Terms */}
+        <Card>
+            <CardHeader><CardTitle>Notes & Terms</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="notes" render={({ field }) => (
+                    <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea placeholder="Any additional notes for the customer..." {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={form.control} name="termsAndConditions" render={({ field }) => (
+                    <FormItem><FormLabel>Terms & Conditions</FormLabel><FormControl><Textarea placeholder="e.g., Payment due within 30 days..." {...field} /></FormControl><FormMessage /></FormItem>
+                )}/>
+            </CardContent>
+        </Card>
+        
+        <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={handleCancel} disabled={formSubmitLoading}>Cancel</Button>
+            <Button type="submit" disabled={formSubmitLoading}>
+                {formSubmitLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {defaultValuesProp?.id ? "Save Changes" : "Create Invoice"}
+            </Button>
+        </div>
       </form>
     </Form>
   );

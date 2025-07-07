@@ -211,7 +211,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Revenue (Paid)</CardTitle>
             <div className="rounded-full bg-primary/10 p-2 text-primary"> <CircleDollarSign className="h-5 w-5" /> </div>
           </CardHeader>
           <CardContent>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
                 {dashboardMetrics.revenueGrowth >= 0 ? <ArrowUp className="h-3 w-3 mr-1" /> : <ArrowDown className="h-3 w-3 mr-1" />}
                 {Math.abs(dashboardMetrics.revenueGrowth).toFixed(1)}%
               </Badge>
-              <span className="text-xs text-muted-foreground ml-2">from previous period</span>
+              <span className="text-xs text-muted-foreground ml-2">vs. prior 15 days</span>
             </div>
           </CardContent>
         </Card>
@@ -248,7 +248,13 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{dashboardMetrics.totalCustomers}</div>
             <div className="flex items-center pt-1">
               <span className="text-xs text-muted-foreground">
-                {dashboardMetrics.topCustomers.length > 0 ? `Top customer: ${dashboardMetrics.topCustomers[0].name}` : 'No customers yet'}
+                {
+                  dashboardMetrics.totalCustomers === 0
+                    ? 'No customers yet'
+                    : dashboardMetrics.topCustomers.length > 0
+                    ? `Top customer: ${dashboardMetrics.topCustomers[0].name}`
+                    : 'No paid invoices to rank customers'
+                }
               </span>
             </div>
           </CardContent>

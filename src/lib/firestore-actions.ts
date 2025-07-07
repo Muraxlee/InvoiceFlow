@@ -208,31 +208,19 @@ export async function seedSampleData(): Promise<void> {
     checkDb();
     const batch = writeBatch(db!);
 
-    // 1. Sample Customers with predictable IDs
-    const customersData = [
-        { id: "sample-customer-1", data: { name: "Acme Innovations", email: "contact@acmeinnovations.com", phone: "555-0101", address: "123 Innovation Dr, Tech City, 11001", gstin: "29AABCU9567M1Z5", state: "Karnataka", stateCode: "29" }},
-        { id: "sample-customer-2", data: { name: "Quantum Solutions", email: "support@quantum.com", phone: "555-0102", address: "456 Quantum Way, Silicon Valley, 94043", gstin: "33ALMPA7890B2Z6", state: "Tamil Nadu", stateCode: "33" }},
-    ];
-    customersData.forEach(c => {
-        const ref = doc(db!, CUSTOMERS, c.id);
-        batch.set(ref, { ...c.data, createdAt: serverTimestamp() });
-    });
+    // 1. Sample Customer with a predictable ID
+    const customerData = { id: "sample-customer-1", data: { name: "Acme Innovations", email: "contact@acmeinnovations.com", phone: "555-0101", address: "123 Innovation Dr, Tech City, 11001", gstin: "29AABCU9567M1Z5", state: "Karnataka", stateCode: "29" }};
+    const customerRef = doc(db!, CUSTOMERS, customerData.id);
+    batch.set(customerRef, { ...customerData.data, createdAt: serverTimestamp() });
 
-    // 2. Sample Products with predictable IDs
-    const productsData = [
-        { id: "sample-product-1", data: { name: "Pro-Grade Website Development", description: "10-page responsive website", price: 50000, hsn: "998314", igstRate: 18, cgstRate: 9, sgstRate: 9 }},
-        { id: "sample-product-2", data: { name: "Cloud Hosting - 1 Year", description: "Standard cloud hosting package", price: 12000, hsn: "998315", igstRate: 18, cgstRate: 9, sgstRate: 9 }},
-        { id: "sample-product-3", data: { name: "Monthly SEO Service", description: "Monthly SEO and analytics report", price: 25000, hsn: "998313", igstRate: 18, cgstRate: 9, sgstRate: 9 }},
-    ];
-    productsData.forEach(p => {
-        const ref = doc(db!, PRODUCTS, p.id);
-        batch.set(ref, { ...p.data, createdAt: serverTimestamp() });
-    });
+    // 2. Sample Product with a predictable ID
+    const productData = { id: "sample-product-1", data: { name: "Pro-Grade Website Development", description: "10-page responsive website", price: 50000, hsn: "998314", igstRate: 18, cgstRate: 9, sgstRate: 9 }};
+    const productRef = doc(db!, PRODUCTS, productData.id);
+    batch.set(productRef, { ...productData.data, createdAt: serverTimestamp() });
 
-    // 3. Sample Invoice using the first customer and first two products
+    // 3. Sample Invoice using the customer and product
     const sampleInvoiceItems = [
-        { productId: productsData[0].id, productName: productsData[0].data.name, quantity: 1, price: productsData[0].data.price, gstCategory: productsData[0].data.hsn, applyIgst: false, applyCgst: true, applySgst: true, igstRate: 18, cgstRate: 9, sgstRate: 9 },
-        { productId: productsData[1].id, productName: productsData[1].data.name, quantity: 1, price: productsData[1].data.price, gstCategory: productsData[1].data.hsn, applyIgst: false, applyCgst: true, applySgst: true, igstRate: 18, cgstRate: 9, sgstRate: 9 },
+        { productId: productData.id, productName: productData.data.name, quantity: 1, price: productData.data.price, gstCategory: productData.data.hsn, applyIgst: false, applyCgst: true, applySgst: true, igstRate: 18, cgstRate: 9, sgstRate: 9 },
     ];
     const subtotal = sampleInvoiceItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
     const tax = subtotal * 0.18; // simplified 9% + 9%
@@ -242,13 +230,13 @@ export async function seedSampleData(): Promise<void> {
         invoiceNumber: "SMPL-001",
         invoiceDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-        customerId: customersData[0].id,
-        customerName: customersData[0].data.name,
-        customerEmail: customersData[0].data.email,
-        customerAddress: customersData[0].data.address,
-        customerGstin: customersData[0].data.gstin,
-        customerState: customersData[0].data.state,
-        customerStateCode: customersData[0].data.stateCode,
+        customerId: customerData.id,
+        customerName: customerData.data.name,
+        customerEmail: customerData.data.email,
+        customerAddress: customerData.data.address,
+        customerGstin: customerData.data.gstin,
+        customerState: customerData.data.state,
+        customerStateCode: customerData.data.stateCode,
         items: sampleInvoiceItems,
         amount: Math.round(total),
         status: "Pending",

@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData } from "@/lib/localStorage";
 
-import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/app/layout"; 
+import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/components/providers"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from "next/link";
 import { format } from "date-fns"; 
@@ -377,7 +377,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Seed Sample Data</CardTitle>
               <CardDescription>
-                Populate your database with sample customers, products, and invoices to explore the app's features. This is safe to run multiple times.
+                Populate your database with a sample customer, product, and invoice to explore the app's features. This is safe to run multiple times.
               </CardDescription>
             </CardHeader>
             <CardContent>

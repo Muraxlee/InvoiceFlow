@@ -1,9 +1,10 @@
+
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ReactNode, useState, createContext, useContext, useEffect, useCallback } from "react";
-import { onAuthStateChanged, type User, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { onAuthStateChanged, type User, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { auth as firebaseAuth, db, isFirebaseConfigured, firebaseError } from "@/lib/firebase";
 import { getUserRole, type User as AppUser } from "@/lib/firestore-actions";
 import { setDoc, doc } from 'firebase/firestore';
@@ -113,6 +114,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<any>;
   logout: () => Promise<any>;
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -121,6 +123,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => {},
   logout: async () => {},
+  sendPasswordReset: async () => {},
 });
 
 export function useAuth() {
@@ -167,8 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signOut(firebaseAuth);
   };
 
+  const sendPasswordReset = (email: string) => {
+    if (!firebaseAuth) throw new Error("Firebase Auth is not configured.");
+    return sendPasswordResetEmail(firebaseAuth, email);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, appUser, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, appUser, loading, login, logout, sendPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );

@@ -144,8 +144,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const { data: customers, isLoading: isLoadingCustomers, error: customersError, refetch: refetchCustomers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: getCustomers });
   const { data: products, isLoading: isLoadingProducts, error: productsError, refetch: refetchProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
   
-  const [isCustomerSelected, setIsCustomerSelected] = useState(false);
-  
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
@@ -207,11 +205,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       dueDate: initialDueDate, 
     });
 
-    if (defaultValuesProp?.customerId) {
-      setIsCustomerSelected(true);
-    } else {
-      setIsCustomerSelected(false);
-    }
   }, [defaultValuesProp, reset]);
 
   useEffect(() => {
@@ -226,32 +219,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     if (sameAsBilling && customerId) {
       const customer = customers?.find(c => c.id === customerId);
       if (customer) {
-        setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
-        setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
-        setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
-        setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
+        setValue("shipmentDetails.consigneeName", customer.name);
+        setValue("shipmentDetails.consigneeAddress", customer.address || "");
+        setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
+        setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
       }
     }
   }, [sameAsBilling, customerId, customers, setValue]);
-
-  const handleSelectProduct = (index: number, productId: string) => {
-    const product = products?.find(p => p.id === productId);
-    if (product) {
-      form.setValue(`items.${index}.productId`, product.id);
-      form.setValue(`items.${index}.description`, product.description || product.name);
-      form.setValue(`items.${index}.price`, product.price);
-      form.setValue(`items.${index}.productName`, product.name);
-      form.setValue(`items.${index}.gstCategory`, product.hsn || "");
-      form.setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
-      form.setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
-      form.setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
-      form.setValue(`items.${index}.applyIgst`, true); 
-      form.setValue(`items.${index}.applyCgst`, false);
-      form.setValue(`items.${index}.applySgst`, false);
-            
-      setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
-    }
-  };
 
   const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
     if (type === 'igst') {
@@ -276,31 +250,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     const { applyIgst, applyCgst, applySgst } = form.getValues(`items.${index}`);
     if (!applyIgst && !applyCgst && !applySgst) {
       form.setValue(`items.${index}.applyIgst`, true);
-    }
-  };
-
-  const handleSelectCustomer = (customerId: string) => {
-    const customer = customers?.find(c => c.id === customerId);
-    if (customer) {
-      form.setValue("customerId", customer.id, { shouldValidate: true });
-      form.setValue("customerName", customer.name, { shouldValidate: true });
-      form.setValue("customerEmail", customer.email || "", { shouldValidate: true });
-      form.setValue("customerAddress", customer.address || "", { shouldValidate: true });
-      form.setValue("customerGstin", customer.gstin || "", { shouldValidate: true });
-      form.setValue("customerState", customer.state || "", { shouldValidate: true });
-      form.setValue("customerStateCode", customer.stateCode || "", { shouldValidate: true });
-      
-      if (sameAsBilling) {
-        form.setValue("shipmentDetails.consigneeName", customer.name, { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeAddress", customer.address || "", { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "", { shouldValidate: true });
-        form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "", { shouldValidate: true });
-      }
-      
-      setIsCustomerSelected(true);
-      setIsCustomerPopoverOpen(false); 
-    } else {
-      setIsCustomerSelected(false);
     }
   };
 
@@ -429,7 +378,25 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             </CommandEmpty>
                             <CommandGroup>
                               {customers?.map((customer) => (
-                                <CommandItem value={customer.name} key={customer.id} onSelect={() => handleSelectCustomer(customer.id)}>
+                                <CommandItem value={customer.name} key={customer.id} onSelect={() => {
+                                  field.onChange(customer.id);
+                                  const selectedCustomer = customers?.find(c => c.id === customer.id);
+                                  if (selectedCustomer) {
+                                      setValue("customerName", selectedCustomer.name);
+                                      setValue("customerEmail", selectedCustomer.email || "");
+                                      setValue("customerAddress", selectedCustomer.address || "");
+                                      setValue("customerGstin", selectedCustomer.gstin || "");
+                                      setValue("customerState", selectedCustomer.state || "");
+                                      setValue("customerStateCode", selectedCustomer.stateCode || "");
+                                      if (sameAsBilling) {
+                                        setValue("shipmentDetails.consigneeName", selectedCustomer.name);
+                                        setValue("shipmentDetails.consigneeAddress", selectedCustomer.address || "");
+                                        setValue("shipmentDetails.consigneeGstin", selectedCustomer.gstin || "");
+                                        setValue("shipmentDetails.consigneeStateCode", selectedCustomer.state ? `${selectedCustomer.state} / ${selectedCustomer.stateCode || ''}` : "");
+                                      }
+                                  }
+                                  setIsCustomerPopoverOpen(false);
+                                }}>
                                   <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
                                   {customer.name}
                                 </CommandItem>
@@ -521,7 +488,23 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                               <CommandInput placeholder="Search products..." />
                               <CommandList><CommandEmpty>No products found.</CommandEmpty>
                                 <CommandGroup>{products?.map(p => (
-                                  <CommandItem value={p.name} key={p.id} onSelect={() => handleSelectProduct(index, p.id)}>
+                                  <CommandItem value={p.name} key={p.id} onSelect={() => {
+                                      productField.onChange(p.id);
+                                      const product = products?.find(prod => prod.id === p.id);
+                                      if (product) {
+                                          setValue(`items.${index}.description`, product.description || product.name);
+                                          setValue(`items.${index}.price`, product.price);
+                                          setValue(`items.${index}.productName`, product.name);
+                                          setValue(`items.${index}.gstCategory`, product.hsn || "");
+                                          setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+                                          setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+                                          setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+                                          setValue(`items.${index}.applyIgst`, true);
+                                          setValue(`items.${index}.applyCgst`, false);
+                                          setValue(`items.${index}.applySgst`, false);
+                                      }
+                                      setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
+                                  }}>
                                     <Check className={cn("mr-2 h-4 w-4", p.id === productField.value ? "opacity-100" : "opacity-0")} />
                                     {p.name}
                                   </CommandItem>
@@ -565,7 +548,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     {igstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">IGST</span><span>₹{igstAmount.toFixed(2)}</span></div>}
                     {cgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">CGST</span><span>₹{cgstAmount.toFixed(2)}</span></div>}
                     {sgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">SGST</span><span>₹{sgstAmount.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-sm font-medium border-t pt-2"><span className="text-muted-foreground">Total Before Round Off</span><span>₹{total.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-sm font-medium border-t pt-2 mt-1"><span className="text-muted-foreground">Total Before Round Off</span><span>₹{total.toFixed(2)}</span></div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="round-off" className="flex items-center gap-2">Round Off Total
                             <TooltipProvider><Tooltip>

@@ -14,7 +14,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -40,14 +40,17 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Login error:", error);
-      let errorMessage = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-password') {
-        errorMessage = "Invalid credentials. Please check your email and password.";
-      } else if (error.code === 'auth/user-not-found') {
-        errorMessage = "This user does not exist. Please check the email address.";
+      let errorMessage = `An unexpected error occurred. Code: ${error.code || 'N/A'}`;
+      
+      // Modern Firebase Auth (v9+) consolidates many errors into 'auth/invalid-credential'.
+      if (error.code === 'auth/invalid-credential') {
+        errorMessage = "Invalid credentials. Please check your email and password. New users must be created in the Firebase Console.";
       } else if (error.code === 'auth/operation-not-allowed') {
         errorMessage = "Email/Password sign-in is not enabled. Please enable it in the Firebase console (Authentication > Sign-in method).";
+      } else if (error.code === 'auth/user-not-found') { // Fallback for some environments
+        errorMessage = "This user does not exist. Please create an account in the Firebase Console first.";
       }
+      
       toast({ title: "Login Failed", description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -61,7 +64,14 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>Enter your credentials to access your account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>First-time user?</AlertTitle>
+            <AlertDescription>
+              User accounts must be created in the Firebase Console before signing in.
+            </AlertDescription>
+          </Alert>
           <Form {...loginForm}>
             <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6">
               <FormField control={loginForm.control} name="email" render={({ field }) => (

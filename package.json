@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm:emulators:start\" \"npm:start-app\"",
-    "start-app": "wait-on tcp:127.0.0.1:8258 tcp:127.0.0.1:9259 && next dev",
+    "start-app": "wait-on tcp:127.0.0.1:8288 tcp:127.0.0.1:9299 && next dev",
     "emulators:start": "firebase emulators:start --project demo-invoiceflow --import ./.firebase-data --export-on-exit",
     "build": "next build",
     "start": "next start",

@@ -1,4 +1,3 @@
-
 // src/components/app-nav.tsx
 "use client";
 
@@ -15,7 +14,6 @@ import {
   FileText,
   Package,
   BarChart3,
-  Settings as SettingsIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,7 +33,6 @@ const navItems: NavItem[] = [
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
   { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & AI Advisor' },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, tooltip: 'Application Settings' },
 ];
 
 export function AppNav() {

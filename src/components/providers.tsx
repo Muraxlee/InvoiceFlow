@@ -7,8 +7,10 @@ import { onAuthStateChanged, type User, signInWithEmailAndPassword, signOut } fr
 import { auth as firebaseAuth, db, isFirebaseConfigured, firebaseError } from "@/lib/firebase";
 import { getUserRole, type User as AppUser } from "@/lib/firestore-actions";
 import { setDoc, doc } from 'firebase/firestore';
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Settings as SettingsIcon } from "lucide-react";
 import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 import {
   SidebarProvider,
@@ -17,6 +19,10 @@ import {
   SidebarContent,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { AppNav } from '@/components/app-nav';
 import { UserNav } from '@/components/user-nav';
@@ -193,6 +199,13 @@ function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  const isSettingsActive = pathname === '/settings';
+  const settingsButtonClass = cn(
+      "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",
+      isSettingsActive && "bg-sidebar-primary text-sidebar-primary-foreground font-medium",
+      !isSettingsActive && "font-normal"
+  );
+
   if (isLoginPage) {
     return <>{children}</>;
   }
@@ -213,6 +226,26 @@ function AppShell({ children }: { children: ReactNode }) {
           <SidebarContent className="flex-1 mt-2">
             <AppNav />
           </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu className="group-[[data-state=collapsed]]:px-0 gap-0.5">
+              <SidebarMenuItem className="relative">
+                <Link href="/settings">
+                  <SidebarMenuButton
+                      isActive={isSettingsActive}
+                      tooltip={{ children: 'Application Settings', className: "group-[[data-state=expanded]]:hidden" }}
+                      aria-label="Application Settings"
+                      className={settingsButtonClass}
+                  >
+                      {isSettingsActive && (
+                      <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-sm group-[[data-state=collapsed]]:hidden"></span>
+                      )}
+                      <SettingsIcon className={cn("h-5 w-5 shrink-0", isSettingsActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/70")} />
+                      <span className={cn("group-[[data-state=collapsed]]:hidden ml-2")}>Settings</span>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
         </Sidebar>
         <div className="flex flex-col flex-1">
           <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">

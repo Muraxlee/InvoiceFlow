@@ -103,7 +103,7 @@ const invoiceSchema = z.object({
 export type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 interface InvoiceFormProps {
-  onSubmit: (data: InvoiceFormValues) => void;
+  onSubmit: (data: InvoiceFormValues & { amount: number }) => void;
   defaultValues?: Partial<InvoiceFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
@@ -284,7 +284,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   };
 
   const handleFormSubmit = (data: InvoiceFormValues) => {
-    const submissionData = { ...data, roundOffApplied: applyRoundOff };
+    const submissionData = { ...data, amount: finalTotal, roundOffApplied: applyRoundOff };
     if (!showDueDate) {
       submissionData.dueDate = null;
     }

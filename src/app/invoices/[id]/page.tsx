@@ -44,7 +44,7 @@ export default function InvoiceDetailPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: { id: string; values: InvoiceFormValues }) => saveInvoice(data.values, data.id),
+    mutationFn: (data: { id: string; values: InvoiceFormValues & { amount: number } }) => saveInvoice(data.values, data.id),
     onSuccess: (savedId) => {
       toast({
         title: 'Invoice Updated',
@@ -80,7 +80,7 @@ export default function InvoiceDetailPage() {
   }, [isInvoiceLoading, invoice, params.id, router, toast, invoiceError]);
 
 
-  const handleSave = async (data: InvoiceFormValues) => {
+  const handleSave = async (data: InvoiceFormValues & { amount: number }) => {
     if (!invoice?.id) return;
     
     saveMutation.mutate({ id: invoice.id, values: data });

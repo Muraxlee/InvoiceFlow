@@ -71,17 +71,17 @@ export default function DashboardPage() {
       statusCounts[status] = (statusCounts[status] || 0) + 1;
       
       if (status === "Paid") {
-        revenue += invoice.amount;
+        revenue += invoice.amount || 0;
         const dateStr = format(invDate, 'yyyy-MM-dd');
         if (dailySales[dateStr] !== undefined) {
-          dailySales[dateStr] += invoice.amount;
+          dailySales[dateStr] += invoice.amount || 0;
         }
-        customerSales[invoice.customerId] = (customerSales[invoice.customerId] || 0) + invoice.amount;
+        customerSales[invoice.customerId] = (customerSales[invoice.customerId] || 0) + (invoice.amount || 0);
         invoice.items?.forEach(item => {
           productSales[item.productId] = (productSales[item.productId] || 0) + (item.quantity * item.price);
         });
       } else if (["Pending", "Overdue"].includes(status)) {
-        outstanding += invoice.amount;
+        outstanding += invoice.amount || 0;
         if (status === "Pending") pendingCount++;
       }
     });
@@ -318,7 +318,7 @@ export default function DashboardPage() {
                       <TableCell className="font-medium"> <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary"> {invoice.invoiceNumber} </Link> </TableCell>
                       <TableCell>{invoice.customerName}</TableCell>
                       <TableCell> {format(new Date(invoice.invoiceDate), 'dd MMM yyyy')} </TableCell>
-                      <TableCell>₹{invoice.amount.toLocaleString('en-IN')}</TableCell>
+                      <TableCell>₹{(invoice.amount || 0).toLocaleString('en-IN')}</TableCell>
                       <TableCell> <Badge variant={statusVariant(invoice.status) as any} className="text-xs"> {invoice.status} </Badge> </TableCell>
                     </TableRow>
                   ))}

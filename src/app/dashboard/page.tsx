@@ -88,9 +88,9 @@ export default function DashboardPage() {
         invoice.items?.forEach(item => {
           productSales[item.productId] = (productSales[item.productId] || 0) + (item.quantity * item.price);
         });
-      } else if (["Pending", "Overdue"].includes(status)) {
+      } else if (["Pending", "Overdue", "Unpaid", "Partially Paid"].includes(status)) {
         outstanding += invoice.amount || 0;
-        if (status === "Pending") pendingCount++;
+        pendingCount++;
       }
     });
 

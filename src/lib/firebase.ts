@@ -22,15 +22,16 @@ export const isFirebaseConfigured =
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
+let firebaseError: Error | null = null;
 
 if (isFirebaseConfigured) {
-    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
+    try {
+        app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
 
-    // Enable offline persistence if not in a server environment
-    if (typeof window !== 'undefined') {
-        try {
+        // Enable offline persistence if not in a server environment
+        if (typeof window !== 'undefined') {
             enableIndexedDbPersistence(db)
             .catch((err) => {
                 if (err.code == 'failed-precondition') {
@@ -39,13 +40,17 @@ if (isFirebaseConfigured) {
                 console.warn("Firestore offline persistence is not available in this browser.");
                 }
             });
-        } catch(error) {
-            console.error("Error enabling offline persistence:", error)
         }
+    } catch (error: any) {
+        console.error("Firebase initialization error:", error);
+        firebaseError = error;
+        app = null;
+        db = null;
+        auth = null;
     }
 } else if (typeof window !== 'undefined') {
     // Log a clear error message in the browser console
     console.error("Firebase config is missing or invalid. Please create and configure your .env file with your Firebase project credentials. See README.md for reference.");
 }
 
-export { db, auth };
+export { db, auth, firebaseError };

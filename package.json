@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "emulators:start": "firebase emulators:start --project demo-invoiceflow",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

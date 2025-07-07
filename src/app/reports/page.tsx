@@ -13,7 +13,7 @@ import type { StoredInvoice, Customer, Product } from "@/types/database";
 import { format, subMonths } from 'date-fns';
 import PageHeader from "@/components/page-header";
 import Link from "next/link";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -32,24 +32,35 @@ export default function ReportsPage() {
   const { toast } = useToast();
   const [salesSuggestions, setSalesSuggestions] = useState<string[]>([]);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
+    queryKey: ['invoices'],
+    queryFn: getInvoices
+  });
   
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['reportData'],
-    queryFn: async () => {
-      const [invoices, customers, products] = await Promise.all([
-        getInvoices(),
-        getCustomers(),
-        getProducts(),
-      ]);
-      return { invoices, customers, products };
-    }
+  const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: getCustomers
+  });
+  
+  const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: getProducts
   });
 
-  const reportData = useMemo<ReportData | null>(() => {
-    if (!data) return null;
-    
-    const { invoices, customers, products } = data;
+  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;
+  const error = invoicesError || customersError || productsError;
 
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+  };
+
+  const reportData = useMemo<ReportData | null>(() => {
+    if (!invoices || !customers || !products) return null;
+    
     let totalRevenue = 0;
     let totalUnpaid = 0;
     const paymentStatusCounts: { [key: string]: number } = {};
@@ -125,7 +136,7 @@ export default function ReportsPage() {
       topCustomers,
       topProducts,
     };
-  }, [data]);
+  }, [invoices, customers, products]);
 
   const handleGetSalesSuggestions = async () => {
     if (!reportData) {
@@ -143,7 +154,7 @@ export default function ReportsPage() {
         businessContext: "A business using InvoiceFlow for managing invoices, customers, and products, seeking to improve sales performance.",
         totalRevenue: reportData.totalRevenue,
         invoiceCount: reportData.totalInvoices,
-        customerCount: data?.customers.length || 0,
+        customerCount: customers?.length || 0,
         productSummary: productSummary,
       };
       const result = await getSalesEnhancementSuggestions(input);

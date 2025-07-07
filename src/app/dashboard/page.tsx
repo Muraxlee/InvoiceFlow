@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -31,27 +31,35 @@ const chartConfigSales = {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2'];
 
 export default function DashboardPage() {
-  
-  const { data, isLoading, error, refetch } = useQuery<{
-    invoices: StoredInvoice[];
-    customers: Customer[];
-    products: Product[];
-  }>({
-    queryKey: ['dashboardData'],
-    queryFn: async () => {
-      const [invoices, customers, products] = await Promise.all([
-        getInvoices(),
-        getCustomers(),
-        getProducts(),
-      ]);
-      return { invoices, customers, products };
-    },
+  const queryClient = useQueryClient();
+
+  const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
+    queryKey: ['invoices'],
+    queryFn: getInvoices,
   });
 
-  const dashboardMetrics = useMemo(() => {
-    if (!data) return null;
+  const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: getCustomers,
+  });
 
-    const { invoices, customers, products } = data;
+  const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: getProducts,
+  });
+  
+  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;
+  const error = invoicesError || customersError || productsError;
+
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+  };
+
+  const dashboardMetrics = useMemo(() => {
+    if (!invoices || !customers || !products) return null;
+
     let revenue = 0;
     let outstanding = 0;
     let pendingCount = 0;
@@ -115,7 +123,7 @@ export default function DashboardPage() {
       recentInvoices,
       revenueGrowth: growthRate,
     };
-  }, [data]);
+  }, [invoices, customers, products]);
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   

@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown } from "lucide-react";
+import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown, AlertCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useQuery } from '@tanstack/react-query';
 import { getCustomers, getProducts } from '@/lib/firestore-actions';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const invoiceItemSchema = z.object({
   productId: z.string().min(1, "Product ID is required"),
@@ -140,8 +141,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const router = useRouter();
   const { toast } = useToast();
   
-  const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: getCustomers });
-  const { data: products, isLoading: isLoadingProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
+  const { data: customers, isLoading: isLoadingCustomers, error: customersError, refetch: refetchCustomers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: getCustomers });
+  const { data: products, isLoading: isLoadingProducts, error: productsError, refetch: refetchProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
   
   const [isCustomerSelected, setIsCustomerSelected] = useState(false);
   
@@ -348,6 +349,40 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
     onSubmit(submissionData);
   };
+  
+  const queryError = customersError || productsError;
+  const handleRefetch = () => {
+    if (customersError) refetchCustomers();
+    if (productsError) refetchProducts();
+  };
+
+  if (queryError) {
+     return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Error Loading Form Data</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error: Missing or Insufficient Permissions</AlertTitle>
+                  <AlertDescription>
+                    <p>The form cannot load required data (customers, products). This is usually because the Firestore security rules have not been deployed to your project.</p>
+                    <p className="mt-2 font-semibold">Please deploy the rules using the Firebase CLI:</p>
+                    <code className="block my-2 p-2 bg-black/20 rounded text-xs">firebase deploy --only firestore:rules</code>
+                    <p>After deploying, please refresh this page or click "Try Again".</p>
+                  </AlertDescription>
+                </Alert>
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={handleRefetch} className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" /> Try Again
+                  </Button>
+                   <Button variant="outline" onClick={handleCancel}>Back</Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+  }
 
   if (isLoadingCustomers || isLoadingProducts) { 
     return (

@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown, AlertCircle, RefreshCw } from "lucide-react";
+import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown, AlertCircle, RefreshCw, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
@@ -464,6 +464,43 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   </Select><FormMessage />
                 </FormItem>
               )}/>
+          </CardContent>
+        </Card>
+
+        {/* Shipment Details Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shipment & Transport Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-muted-foreground">Consignee (Shipped To)</h3>
+                <div className="flex items-center space-x-2">
+                  <Switch id="same-as-billing" checked={sameAsBilling} onCheckedChange={setSameAsBilling} />
+                  <Label htmlFor="same-as-billing">Same as Billing Address</Label>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md bg-muted/20">
+                <FormField control={form.control} name="shipmentDetails.consigneeName" render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Consignee Name" {...field} disabled={sameAsBilling} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.consigneeAddress" render={({ field }) => (<FormItem><FormLabel>Address</FormLabel><FormControl><Input placeholder="Consignee Address" {...field} disabled={sameAsBilling} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.consigneeGstin" render={({ field }) => (<FormItem><FormLabel>GSTIN</FormLabel><FormControl><Input placeholder="Consignee GSTIN" {...field} disabled={sameAsBilling} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.consigneeStateCode" render={({ field }) => (<FormItem><FormLabel>State / Code</FormLabel><FormControl><Input placeholder="e.g. Karnataka / 29" {...field} disabled={sameAsBilling} /></FormControl><FormMessage /></FormItem>)}/>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-muted-foreground mb-4">Transport Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 border p-4 rounded-md bg-muted/20">
+                <FormField control={form.control} name="shipmentDetails.transportationMode" render={({ field }) => (<FormItem><FormLabel>Mode</FormLabel><FormControl><Input placeholder="e.g., Road" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.lrNo" render={({ field }) => (<FormItem><FormLabel>LR No.</FormLabel><FormControl><Input placeholder="Lorry Receipt No." {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.vehicleNo" render={({ field }) => (<FormItem><FormLabel>Vehicle No.</FormLabel><FormControl><Input placeholder="e.g., KA01AB1234" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.carrierName" render={({ field }) => (<FormItem><FormLabel>Carrier Name</FormLabel><FormControl><Input placeholder="e.g., VRL Logistics" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.trackingNumber" render={({ field }) => (<FormItem><FormLabel>Tracking No.</FormLabel><FormControl><Input placeholder="Tracking ID" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.placeOfSupply" render={({ field }) => (<FormItem><FormLabel>Place of Supply</FormLabel><FormControl><Input placeholder="e.g., Bangalore" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.shipDate" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Ship Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
+                <FormField control={form.control} name="shipmentDetails.dateOfSupply" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Date of Supply</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (formatDateFns(field.value, "PP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

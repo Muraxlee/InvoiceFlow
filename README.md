@@ -33,17 +33,13 @@ To ensure your application can read and write data from Firestore, you must depl
 
 **Option A: Using the Firebase CLI (Recommended)**
 
-1.  **Install the Firebase CLI** if you haven't already:
+1.  **Log in to Firebase**:
     ```bash
-    npm install -g firebase-tools
+    npx firebase login
     ```
-2.  **Log in to Firebase**:
+2.  **Deploy the Rules**: From your project's root directory, run the following command. This uses the version of `firebase-tools` included with the project.
     ```bash
-    firebase login
-    ```
-3.  **Deploy the Rules**: From your project's root directory, run the following command:
-    ```bash
-    firebase deploy --only firestore:rules
+    npx firebase deploy --only firestore:rules
     ```
 
 **Option B: Using the Firebase Console**
@@ -70,8 +66,8 @@ For AI-powered features like suggestions, you need a Google AI API Key.
 1.  In the Firebase Console, go to **Build > Authentication > Users** and click **Add user**. Create your first user account.
 2.  Once your `.env` file is configured and security rules are deployed, you can start the development server:
     ```bash
-    pnpm install
-    pnpm run dev
+    npm install
+    npm run dev
     ```
 3.  Log in with the user account you just created.
 
@@ -80,3 +76,4 @@ The application will now be running at [http://localhost:3000](http://localhost:
 ### Step 5: Load Sample Data (Optional)
 
 To get started with some sample data, navigate to **Settings > Data** in the application and click the "Load Sample Data" button.
+

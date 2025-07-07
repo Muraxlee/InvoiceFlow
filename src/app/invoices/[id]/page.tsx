@@ -258,12 +258,12 @@ export default function InvoiceDetailPage() {
                     <h4 className="text-md font-medium mb-2 text-muted-foreground flex items-center gap-1"><Truck className="h-4 w-4" /> Transport Information</h4>
                     <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 ml-2 pl-4 border-l">
                       <DetailItem label="Mode" value={invoice.shipmentDetails.transportationMode} />
-                      <DetailItem label="Date of Supply" value={invoice.shipmentDetails.dateOfSupply ? formatDateFns(new Date(invoice.shipmentDetails.dateOfSupply), 'PP') : 'N/A'} />
+                      <DetailItem label="Date of Supply" value={invoice.shipmentDetails.dateOfSupply && isValid(new Date(invoice.shipmentDetails.dateOfSupply)) ? formatDateFns(new Date(invoice.shipmentDetails.dateOfSupply), 'PP') : 'N/A'} />
                       <DetailItem label="LR No." value={invoice.shipmentDetails.lrNo} />
                       <DetailItem label="Vehicle No." value={invoice.shipmentDetails.vehicleNo} />
                       <DetailItem label="Carrier Name" value={invoice.shipmentDetails.carrierName} />
                       <DetailItem label="Tracking No." value={invoice.shipmentDetails.trackingNumber} />
-                      <DetailItem label="Ship Date" value={invoice.shipmentDetails.shipDate ? formatDateFns(new Date(invoice.shipmentDetails.shipDate), 'PP') : 'N/A'} />
+                      <DetailItem label="Ship Date" value={invoice.shipmentDetails.shipDate && isValid(new Date(invoice.shipmentDetails.shipDate)) ? formatDateFns(new Date(invoice.shipmentDetails.shipDate), 'PP') : 'N/A'} />
                        <DetailItem label="Place of Supply" value={invoice.shipmentDetails.placeOfSupply} />
                     </dl>
                   </div>

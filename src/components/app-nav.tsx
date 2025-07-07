@@ -18,6 +18,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/providers';
+import { useQueryClient } from '@tanstack/react-query';
+import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
 
 type NavItem = {
   href: string;
@@ -39,6 +41,27 @@ export function AppNav() {
   const pathname = usePathname();
   const { appUser } = useAuth();
   const userRole = appUser?.role || 'user';
+  const queryClient = useQueryClient();
+
+  const prefetchData = (href: string) => {
+    switch (href) {
+      case '/invoices':
+        queryClient.prefetchQuery({ queryKey: ['invoices'], queryFn: getInvoices });
+        break;
+      case '/customers':
+        queryClient.prefetchQuery({ queryKey: ['customers'], queryFn: getCustomers });
+        break;
+      case '/products':
+        queryClient.prefetchQuery({ queryKey: ['products'], queryFn: getProducts });
+        break;
+      case '/dashboard':
+      case '/reports':
+        queryClient.prefetchQuery({ queryKey: ['invoices'], queryFn: getInvoices });
+        queryClient.prefetchQuery({ queryKey: ['customers'], queryFn: getCustomers });
+        queryClient.prefetchQuery({ queryKey: ['products'], queryFn: getProducts });
+        break;
+    }
+  };
 
   const renderNavItem = (item: NavItem) => {
     if (item.adminOnly && userRole !== 'admin') {
@@ -55,7 +78,7 @@ export function AppNav() {
 
     return (
       <SidebarMenuItem key={item.href} className="relative">
-        <Link href={item.href}>
+        <Link href={item.href} onMouseEnter={() => prefetchData(item.href)}>
           <SidebarMenuButton
             isActive={isActive}
             tooltip={{ children: item.tooltip, className: "group-[[data-state=expanded]]:hidden" }}

@@ -3,12 +3,52 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ReactNode, useState, createContext, useContext, useEffect } from "react";
+import { ReactNode, useState, createContext, useContext, useEffect, useCallback } from "react";
 import { onAuthStateChanged, type User, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth as firebaseAuth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { getUserRole, type User as AppUser } from "@/lib/firestore-actions";
 import { setDoc, doc } from 'firebase/firestore';
 import { Loader2, AlertTriangle } from "lucide-react";
+import { usePathname } from 'next/navigation';
+
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarInset,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { AppNav } from '@/components/app-nav';
+import { UserNav } from '@/components/user-nav';
+
+import {
+  loadFromLocalStorage,
+  saveToLocalStorage,
+  COMPANY_NAME_STORAGE_KEY,
+  DEFAULT_COMPANY_NAME,
+  CUSTOM_THEME_STORAGE_KEY,
+  type CustomThemeValues,
+  DEFAULT_CUSTOM_THEME_VALUES,
+} from '@/lib/localStorage';
+import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings';
+
+export const THEME_STORAGE_KEY = 'app-theme';
+export const AVAILABLE_THEMES = {
+  'quanti-dark': 'Quanti Dark (Default)',
+  'oceanic-blue': 'Oceanic Blue',
+  'crimson-peak': 'Crimson Peak (Dark Red)',
+  'forest-whisper': 'Forest Whisper (Dark Green)',
+  'midnight-purple': 'Midnight Purple (Dark Purple)',
+  'daybreak-classic': 'Daybreak Classic (Light Blue)',
+  'minty-fresh': 'Minty Fresh (Light Green)',
+  'sunny-citrus': 'Sunny Citrus (Light Orange)',
+  'high-contrast-dark': 'High Contrast Dark',
+  'high-contrast-light': 'High Contrast Light',
+  'vscode-dark': 'VS Code Dark',
+  'custom': 'Custom User Theme',
+};
+export const DEFAULT_THEME_KEY = 'quanti-dark';
 
 function FirebaseConfigError() {
   return (
@@ -42,7 +82,6 @@ function FirebaseConfigError() {
   );
 }
 
-
 interface AuthContextType {
   user: User | null;
   appUser: AppUser | null;
@@ -69,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!firebaseAuth) { // Check if auth is configured
+    if (!isFirebaseConfigured) {
       setLoading(false);
       return;
     }
@@ -103,7 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return signOut(firebaseAuth);
   };
   
-  if (loading) {
+  const { authLoading } = useAuth();
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -118,6 +158,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login';
+  
+  const [companyName, setCompanyName] = useState<string>(DEFAULT_COMPANY_NAME);
+  const [companyInitial, setCompanyInitial] = useState<string>(DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
+
+  useEffect(() => {
+    const storedCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
+    setCompanyName(storedCompanyName);
+    setCompanyInitial(storedCompanyName.substring(0,1).toUpperCase() || DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === COMPANY_NAME_STORAGE_KEY) {
+        const newName = event.newValue ? JSON.parse(event.newValue) : DEFAULT_COMPANY_NAME;
+        setCompanyName(newName);
+        setCompanyInitial(newName.substring(0,1).toUpperCase() || DEFAULT_COMPANY_NAME.substring(0,1).toUpperCase());
+        document.title = newName || DEFAULT_COMPANY_NAME;
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  return (
+     <SidebarProvider defaultOpen>
+        <Sidebar variant="sidebar" collapsible="icon" className="bg-sidebar text-sidebar-foreground hidden md:flex border-r border-sidebar-border">
+          <SidebarHeader className="p-3 border-b border-sidebar-border">
+            <div className="px-1 py-2 group-[[data-state=expanded]]:block group-[[data-state=collapsed]]:hidden">
+              <h1 className="text-xl font-semibold text-sidebar-primary-foreground truncate" title={companyName}>{companyName}</h1>
+            </div>
+            <div className="p-1 text-center group-[[data-state=collapsed]]:block group-[[data-state=expanded]]:hidden">
+              <span className="flex items-center justify-center h-6 w-6 mx-auto text-sidebar-foreground/80 font-bold text-lg">
+                {companyInitial}
+              </span>
+            </div>
+          </SidebarHeader>
+          <SidebarContent className="flex-1 mt-2">
+            <AppNav />
+          </SidebarContent>
+        </Sidebar>
+        <div className="flex flex-col flex-1">
+          <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground shadow-sm sm:px-6">
+            <SidebarTrigger className="text-header-foreground hover:bg-accent/10 md:hidden" />
+            <div className="flex-1 flex justify-center px-4">
+              {/* Search input removed */}
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <UserNav />
+            </div>
+          </header>
+          <SidebarInset className="bg-background">
+            <main className="flex-1 p-4 sm:p-6 md:p-8">
+              {children}
+            </main>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+  );
+}
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -129,6 +234,81 @@ export default function Providers({ children }: { children: ReactNode }) {
     },
   }));
 
+  const applyCustomThemeVariables = useCallback((customTheme: CustomThemeValues) => {
+    const root = document.documentElement;
+    if (customTheme.background) root.style.setProperty('--background', customTheme.background); else root.style.removeProperty('--background');
+    if (customTheme.foreground) root.style.setProperty('--foreground', customTheme.foreground); else root.style.removeProperty('--foreground');
+    if (customTheme.primary) root.style.setProperty('--primary', customTheme.primary); else root.style.removeProperty('--primary');
+  }, []);
+
+  const resetCustomThemeVariables = useCallback(() => {
+    const root = document.documentElement;
+    root.style.removeProperty('--background');
+    root.style.removeProperty('--foreground');
+    root.style.removeProperty('--primary');
+  }, []);
+
+  const applyTheme = useCallback((themeKey: string) => {
+    const htmlElement = document.documentElement;
+    htmlElement.setAttribute('data-theme', themeKey);
+    localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+
+    if (themeKey === 'custom') {
+      const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
+      applyCustomThemeVariables(storedCustomTheme);
+    } else {
+      resetCustomThemeVariables();
+    }
+  }, [applyCustomThemeVariables, resetCustomThemeVariables]);
+
+  const applyFont = useCallback((fontKey: string) => {
+    const htmlElement = document.documentElement;
+    Object.keys(AVAILABLE_FONTS).forEach(key => {
+      htmlElement.classList.remove(`font-${key}`);
+    });
+    if (fontKey !== "system") {
+      htmlElement.classList.add(`font-${fontKey}`);
+    }
+    
+    document.body.style.fontFamily = fontKey === "system"
+      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
+      : `var(--font-${fontKey}), sans-serif`;
+
+    localStorage.setItem(FONT_STORAGE_KEY, fontKey);
+  }, []);
+  
+  useEffect(() => {
+    const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
+      applyTheme(storedThemeKey);
+    } else {
+      applyTheme(DEFAULT_THEME_KEY);
+    }
+
+    const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY);
+    if (storedFontKey && AVAILABLE_FONTS[storedFontKey as keyof typeof AVAILABLE_FONTS]) {
+      applyFont(storedFontKey);
+    } else {
+      applyFont(DEFAULT_FONT_KEY);
+    }
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === THEME_STORAGE_KEY && event.newValue && AVAILABLE_THEMES[event.newValue as keyof typeof AVAILABLE_THEMES]) {
+        applyTheme(event.newValue);
+      }
+      if (event.key === FONT_STORAGE_KEY && event.newValue && AVAILABLE_FONTS[event.newValue as keyof typeof AVAILABLE_FONTS]) {
+        applyFont(event.newValue);
+      }
+      if (event.key === CUSTOM_THEME_STORAGE_KEY && localStorage.getItem(THEME_STORAGE_KEY) === 'custom') {
+        applyCustomThemeVariables(event.newValue ? JSON.parse(event.newValue) : DEFAULT_CUSTOM_THEME_VALUES);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [applyTheme, applyFont, applyCustomThemeVariables]);
+
+
   if (!isFirebaseConfigured) {
     return <FirebaseConfigError />;
   }
@@ -136,7 +316,9 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        <AppShell>
+          {children}
+        </AppShell>
         <ReactQueryDevtools initialIsOpen={false} />
       </AuthProvider>
     </QueryClientProvider>

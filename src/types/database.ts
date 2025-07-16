@@ -45,12 +45,20 @@ export interface Product {
   createdAt: any; // Firestore ServerTimestamp
 }
 
+export interface MeasurementValue {
+  name: string; // e.g., 'Chest', 'Waist', 'Custom Field'
+  value: number;
+  unit: string; // e.g., 'in', 'cm'
+}
+
 export interface Measurement {
   id: string;
-  type: string;
-  customType?: string;
-  value: number;
-  unit: string;
+  uniqueId: string; // A user-friendly, unique ID
+  customerId: string;
+  customerName: string;
+  type: string; // e.g., 'Shirt', 'Pant', 'Custom'
+  customType?: string; // Only if type is 'Custom'
+  values: MeasurementValue[];
   recordedDate: any; // Firestore Timestamp
   notes?: string;
   createdAt: any; // Firestore ServerTimestamp

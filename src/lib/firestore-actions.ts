@@ -272,6 +272,7 @@ export async function seedSampleData(): Promise<void> {
         customerId: customerData.id,
         customerName: customerData.data.name,
         customerEmail: customerData.data.email,
+        customerPhone: customerData.data.phone,
         customerAddress: customerData.data.address,
         customerGstin: customerData.data.gstin,
         customerState: customerData.data.state,

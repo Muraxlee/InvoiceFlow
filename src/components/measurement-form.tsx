@@ -110,7 +110,9 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
-                        {form.getValues('customerName') || "Select a customer"}
+                        {field.value
+                          ? customers?.find((customer) => customer.id === field.value)?.name
+                          : "Select customer"}
                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </FormControl>

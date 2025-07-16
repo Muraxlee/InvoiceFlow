@@ -16,6 +16,7 @@ import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { loadFromLocalStorage, INVOICES_STORAGE_KEY } from "@/lib/localStorage";
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
@@ -24,7 +25,7 @@ export default function InvoicesPage() {
   const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
-    initialData: [],
+    initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
 
   const deleteMutation = useMutation({
@@ -110,7 +111,7 @@ export default function InvoicesPage() {
           <CardDescription>A list of all invoices in the system.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading && !invoices?.length ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>

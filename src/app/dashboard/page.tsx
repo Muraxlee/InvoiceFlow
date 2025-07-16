@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type { StoredInvoice, Customer, Product } from '@/types/database';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
-
+import { loadFromLocalStorage, INVOICES_STORAGE_KEY, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY } from '@/lib/localStorage';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -41,16 +41,19 @@ export default function DashboardPage() {
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
+    initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
 
   const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
+    initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, []),
   });
 
   const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
+    initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
   
   const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;

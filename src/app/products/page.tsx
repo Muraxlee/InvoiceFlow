@@ -16,6 +16,7 @@ import type { Product } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { loadFromLocalStorage, PRODUCTS_STORAGE_KEY } from "@/lib/localStorage";
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
@@ -27,7 +28,7 @@ export default function ProductsPage() {
   const { data: products, isLoading: isDataLoading, error, refetch } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
-    initialData: [],
+    initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
 
   const addMutation = useMutation({
@@ -171,7 +172,7 @@ export default function ProductsPage() {
           <CardDescription>A list of all products.</CardDescription>
         </CardHeader>
         <CardContent>
-        {isDataLoading ? (
+        {isDataLoading && !products?.length ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>

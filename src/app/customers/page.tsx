@@ -17,6 +17,7 @@ import type { Customer } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { loadFromLocalStorage, CUSTOMERS_STORAGE_KEY } from "@/lib/localStorage";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -28,7 +29,7 @@ export default function CustomersPage() {
   const { data: customers, isLoading: isDataLoading, error, refetch } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
-    initialData: []
+    initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, [])
   });
 
   const addMutation = useMutation({
@@ -172,7 +173,7 @@ export default function CustomersPage() {
           <CardDescription>A list of all customers.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isDataLoading ? (
+          {isDataLoading && !customers?.length ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>

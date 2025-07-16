@@ -3,15 +3,15 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Printer, FileText, Eye } from 'lucide-react';
-import { StoredInvoice } from '@/lib/database'; // Updated type
+import { Printer, FileText, Eye, Anchor } from 'lucide-react';
+import { StoredInvoice, CompanyData } from '@/types/database'; 
 import { format } from 'date-fns';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface InvoicePrintProps {
   invoice: StoredInvoice;
-  company: any; // Consider defining a Company type
+  company: CompanyData | null;
   printType?: 'Original' | 'Duplicate' | 'Triplicate';
 }
 
@@ -136,8 +136,112 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     
     return result.trim() + ' Only';
   };
+  
+  const generateQuotationHTML = () => {
+    const quotationItemsHtml = invoice.items && invoice.items.length > 0 ? (
+      invoice.items.map((item, index) => `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td>${item.productName || item.description || ''}</td>
+          <td class="text-right">₹${(item.price || 0).toFixed(2)}</td>
+        </tr>
+      `).join('')
+    ) : `<tr><td colspan="3" class="text-center" style="height: 100px; vertical-align: middle;">No items quoted</td></tr>`;
+
+    return `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Quotation - ${invoice.invoiceNumber}</title>
+          <style>
+            @page { size: A4; margin: 15mm; } 
+            body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12pt; line-height: 1.5; }
+            .quotation-container { width: 100%; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .cell-no { font-size: 10pt; font-weight: bold; }
+            .company-name { font-size: 24pt; font-weight: bold; margin: 5px 0; }
+            .address { font-size: 11pt; }
+            .gst-no { font-size: 11pt; margin-bottom: 10px; }
+            hr { border: 0; border-top: 1px solid #000; margin: 15px 0; }
+            .meta-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+            .to-address { width: 60%; }
+            .date { width: 40%; text-align: right; }
+            .letter-body { margin-bottom: 20px; }
+            .letter-body p { margin: 0 0 10px 0; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+            th { font-weight: bold; background-color: #f2f2f2; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .footer-notes { margin-top: 20px; }
+            .footer { margin-top: 40px; }
+            .signature { margin-top: 60px; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="quotation-container">
+            <div class="header">
+              <div class="cell-no">CELL NO: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''}</div>
+              <div class="company-name">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
+              <div class="address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
+              <div class="gst-no">GST No: ${company?.gstin || ''}</div>
+            </div>
+            <hr/>
+            <div class="meta-info">
+              <div class="to-address">
+                <p>To,<br/>
+                <strong>${invoice.customerName}</strong><br/>
+                ${invoice.customerAddress ? invoice.customerAddress.replace(/\n/g, '<br/>') : ''}
+                </p>
+              </div>
+              <div class="date">
+                <strong>Date:</strong> ${format(new Date(invoice.invoiceDate), "dd/MM/yyyy")}
+              </div>
+            </div>
+            <div class="letter-body">
+              <p>Dear Sir,</p>
+              <p><strong>Sub: Quotation - ${invoice.notes || "Boiler Suit Uniform"} - Reg</strong></p>
+              <p>We thank you for your enquiry and have pleasure in submitting hereunder our quotation for the same. Which we trust, will meet with your kind approval.</p>
+              <p>Thanking you,</p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center" style="width: 10%;">S.no</th>
+                  <th>Description</th>
+                  <th class="text-right" style="width: 25%;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${quotationItemsHtml}
+              </tbody>
+            </table>
+            <div class="footer-notes">
+              <p><strong>Note:</strong></p>
+              <p style="white-space: pre-wrap;">${invoice.termsAndConditions || 'GST will be applicable as per government norms.'}</p>
+            </div>
+            <div class="footer">
+              <p>Regards,<br/><strong>${company?.name || 'SEAFARER NAVEL TAILORS'}</strong></p>
+              <br/><br/>
+              <hr/>
+              <p class="text-center">IF YOU HAVE ANY QUESTION REGARDING THIS QUOTATION. CONTACT US.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
 
   const generateInvoiceHTML = () => {
+    if (invoiceType === 'quotation') {
+      return generateQuotationHTML();
+    }
+    
+    // Fallback to original Tax Invoice format
     const itemRowsHtml = invoice.items && invoice.items.length > 0 ? (
       invoice.items.map((item, index) => {
         const itemAmount = (item.quantity || 0) * (item.price || 0);
@@ -162,7 +266,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       }).join('')
     ) : `<tr><td colspan="9" class="text-center" style="height: 100px; vertical-align: middle;">No items</td></tr>`;
 
-    const targetItemRows = 15; // Increased from 10 to 15
+    const targetItemRows = 15;
     const actualItemCount = invoice.items?.length || 0;
     const emptyRowCount = Math.max(0, targetItemRows - actualItemCount);
 
@@ -443,7 +547,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             <Eye className="mr-2 h-4 w-4" /> Preview / Refresh
           </Button>
           <Button onClick={handlePrint} className="no-print">
-            <Printer className="mr-2 h-4 w-4" /> Print: {getCurrentDocumentType()}
+            <Printer className="mr-2 h-4 w-4" /> Print: {getCurrentInvoiceTypeTitle()}
           </Button>
         </div>
         

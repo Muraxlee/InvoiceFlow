@@ -8,22 +8,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Barcode, Search, User, Package, CalendarCheck2 } from "lucide-react";
 import { useState, useMemo } from "react";
-import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { MeasurementForm, type MeasurementFormValues } from "@/components/measurement-form";
 import type { Measurement } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getMeasurements, updateMeasurement, deleteMeasurement } from "@/lib/firestore-actions";
+import { getMeasurements, addMeasurement, updateMeasurement, deleteMeasurement } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format, isValid } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
+function generateUniqueMeasurementId() {
+  const prefix = "MEA";
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
+  return `${prefix}-${timestamp}-${randomPart}`;
+}
+
 export default function MeasurementsPage() {
   const queryClient = useQueryClient();
-  const [isEditMeasurementDialogOpen, setIsEditMeasurementDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentMeasurement, setCurrentMeasurement] = useState<Measurement | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -43,12 +49,24 @@ export default function MeasurementsPage() {
     );
   }, [measurements, searchTerm]);
 
+  const addMutation = useMutation({
+    mutationFn: (data: Omit<Measurement, 'id' | 'createdAt'>) => addMeasurement(data),
+    onSuccess: () => {
+      toast({ title: "Measurement Added", description: "The new measurement has been saved." });
+      queryClient.invalidateQueries({ queryKey: ['measurements'] });
+      setIsDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data: { id: string, values: Partial<Omit<Measurement, 'id' | 'createdAt'>> }) => updateMeasurement(data.id, data.values),
     onSuccess: () => {
       toast({ title: "Measurement Updated", description: "Measurement record has been updated." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
-      setIsEditMeasurementDialogOpen(false);
+      setIsDialogOpen(false);
       setCurrentMeasurement(null);
     },
     onError: (error: any) => {
@@ -67,25 +85,44 @@ export default function MeasurementsPage() {
     },
   });
 
-  const handleEditMeasurementClick = (measurement: Measurement) => {
+  const handleEditClick = (measurement: Measurement) => {
     setCurrentMeasurement(measurement);
-    setIsEditMeasurementDialogOpen(true);
+    setIsDialogOpen(true);
   };
 
-  const handleSaveEditedMeasurement = async (data: MeasurementFormValues) => {
+  const handleAddClick = () => {
+    setCurrentMeasurement(null);
+    setIsDialogOpen(true);
+  }
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setCurrentMeasurement(null);
+  }
+
+  const handleFormSubmit = async (data: MeasurementFormValues) => {
+    const { id, ...measurementData } = data;
     if (currentMeasurement) {
-      const { id, ...measurementData } = data;
       updateMutation.mutate({ id: currentMeasurement.id, values: measurementData });
+    } else {
+      addMutation.mutate(measurementData as Omit<Measurement, 'id' | 'createdAt'>);
     }
+  };
+
+  const defaultValues: Partial<MeasurementFormValues> = currentMeasurement ? currentMeasurement : {
+    uniqueId: generateUniqueMeasurementId(),
+    recordedDate: new Date(),
+    deliveryDate: null,
+    values: [{ name: "", value: 0, unit: "in" }],
+    customerId: "",
+    customerName: ""
   };
 
   const pageActions = (
     <div className="flex items-center gap-2">
-      <Link href="/measurements/create" passHref>
-        <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
-        </Button>
-      </Link>
+      <Button onClick={handleAddClick}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
+      </Button>
     </div>
   );
 
@@ -118,28 +155,20 @@ export default function MeasurementsPage() {
         actions={pageActions}
       />
 
-      <Dialog open={isEditMeasurementDialogOpen} onOpenChange={(isOpen) => {
-        setIsEditMeasurementDialogOpen(isOpen);
-        if (!isOpen) setCurrentMeasurement(null);
-      }}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
-            <DialogTitle>Edit Measurement</DialogTitle>
+            <DialogTitle>{currentMeasurement ? "Edit Measurement" : "Add New Measurement"}</DialogTitle>
             <DialogDescription>
-              Update the measurement details below.
+              {currentMeasurement ? "Update the measurement details below." : "Fill in the details to record a new measurement."}
             </DialogDescription>
           </DialogHeader>
-          {currentMeasurement && (
-            <MeasurementForm 
-              onSubmit={handleSaveEditedMeasurement}
-              defaultValues={currentMeasurement}
-              isLoading={updateMutation.isPending}
-              onCancel={() => {
-                setIsEditMeasurementDialogOpen(false);
-                setCurrentMeasurement(null);
-              }}
-            />
-          )}
+          <MeasurementForm 
+            onSubmit={handleFormSubmit}
+            defaultValues={defaultValues}
+            isLoading={addMutation.isPending || updateMutation.isPending}
+            onCancel={handleDialogClose}
+          />
         </DialogContent>
       </Dialog>
 
@@ -194,8 +223,8 @@ export default function MeasurementsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2 max-w-xs">
-                        {m.values.slice(0, 4).map(v => (
-                            <Badge key={v.name} variant="secondary">{v.name}: {v.value}{v.unit}</Badge>
+                        {m.values.slice(0, 4).map((v, index) => (
+                            <Badge key={index} variant="secondary">{v.name}: {v.value}{v.unit}</Badge>
                         ))}
                         {m.values.length > 4 && <Badge variant="outline">+{m.values.length - 4} more</Badge>}
                     </div>
@@ -206,10 +235,10 @@ export default function MeasurementsPage() {
                          <CalendarCheck2 className="h-3.5 w-3.5 text-muted-foreground"/> 
                          <span className="text-xs">Recorded: {m.recordedDate && isValid(new Date(m.recordedDate)) ? format(new Date(m.recordedDate), 'PP') : 'N/A'}</span>
                       </div>
-                      {m.deliveryDate && (
+                      {m.deliveryDate && isValid(new Date(m.deliveryDate)) && (
                         <div className="flex items-center gap-2">
                           <CalendarCheck2 className="h-3.5 w-3.5 text-primary"/> 
-                          <span className="text-xs font-medium">Delivery: {isValid(new Date(m.deliveryDate)) ? format(new Date(m.deliveryDate), 'PP') : 'N/A'}</span>
+                          <span className="text-xs font-medium">Delivery: {format(new Date(m.deliveryDate), 'PP')}</span>
                         </div>
                       )}
                     </div>
@@ -223,7 +252,7 @@ export default function MeasurementsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditMeasurementClick(m)}>
+                        <DropdownMenuItem onClick={() => handleEditClick(m)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <ConfirmDialog

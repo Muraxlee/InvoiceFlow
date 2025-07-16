@@ -69,21 +69,25 @@ export default function MeasurementsPage() {
       toast({ title: "Measurement Added", description: "The new measurement has been saved." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
       setIsDialogOpen(false);
+      setCurrentMeasurement(null);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to save measurement.", variant: "destructive" });
+      console.error("Add measurement error:", error);
+      toast({ title: "Error Saving", description: error.message || "Failed to save measurement. Check data and permissions.", variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string, values: Partial<Omit<Measurement, 'id' | 'createdAt'>> }) => updateMeasurement(data.id, data.values),
+    mutationFn: (data: { id: string, values: Partial<Omit<Measurement, 'id'>> }) => updateMeasurement(data.id, data.values),
     onSuccess: () => {
       toast({ title: "Measurement Updated", description: "Measurement record has been updated." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
       setIsDialogOpen(false);
+      setCurrentMeasurement(null);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+       console.error("Update measurement error:", error);
+      toast({ title: "Error Updating", description: error.message, variant: "destructive" });
     },
   });
 
@@ -94,16 +98,25 @@ export default function MeasurementsPage() {
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error Deleting", description: error.message, variant: "destructive" });
     },
   });
 
   const handleFormSubmit = async (data: MeasurementFormValues) => {
+    const customer = customers?.find(c => c.id === data.customerId);
+    if (!customer) {
+        toast({ title: "Error", description: "Selected customer not found.", variant: "destructive"});
+        return;
+    }
+
+    // Ensure customerName is explicitly set from the valid customer object
+    const finalData = { ...data, customerName: customer.name };
+
     if (currentMeasurement?.id) {
-      const { id, ...measurementData } = data;
+      const { id, ...measurementData } = finalData;
       updateMutation.mutate({ id: currentMeasurement.id, values: measurementData });
     } else {
-      const { id, ...measurementData } = data;
+      const { id, ...measurementData } = finalData;
       addMutation.mutate(measurementData as Omit<Measurement, 'id' | 'createdAt'>);
     }
   };
@@ -150,7 +163,10 @@ export default function MeasurementsPage() {
         actions={pageActions}
       />
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+          setIsDialogOpen(isOpen);
+          if (!isOpen) setCurrentMeasurement(null);
+      }}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle>{currentMeasurement ? "Edit Measurement" : "Add New Measurement"}</DialogTitle>
@@ -160,10 +176,13 @@ export default function MeasurementsPage() {
           </DialogHeader>
           <MeasurementForm 
             onSubmit={handleFormSubmit}
-            defaultValues={currentMeasurement ? currentMeasurement : { uniqueId: generateUniqueMeasurementId(), recordedDate: new Date() }}
+            defaultValues={currentMeasurement ? currentMeasurement : { uniqueId: generateUniqueMeasurementId(), recordedDate: new Date(), values: [{ name: "", value: 0, unit: "in" }] }}
             customers={customers}
             isLoading={addMutation.isPending || updateMutation.isPending}
-            onCancel={() => setIsDialogOpen(false)}
+            onCancel={() => {
+                setIsDialogOpen(false);
+                setCurrentMeasurement(null);
+            }}
           />
         </DialogContent>
       </Dialog>

@@ -59,7 +59,7 @@ const garmentTypes = ["Shirt", "Pant", "Kurta", "Blouse", "Suit", "Coat", "Custo
 const defaultUnits = ["in", "cm"];
 
 interface MeasurementFormProps {
-  onSubmit: (data: MeasurementFormValues) => Promise<void> | void;
+  onSubmit: (data: MeasurementFormValues) => void;
   defaultValues?: Partial<MeasurementFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
@@ -111,7 +111,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
                     <FormControl>
                       <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
                         {field.value
-                          ? customers?.find((customer) => customer.id === field.value)?.name
+                          ? form.getValues('customerName') || "Select customer"
                           : "Select customer"}
                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -125,8 +125,8 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
                         <CommandGroup>
                           {customers?.map((customer) => (
                             <CommandItem value={customer.name} key={customer.id} onSelect={() => {
-                              form.setValue("customerId", customer.id);
-                              form.setValue("customerName", customer.name);
+                              form.setValue("customerId", customer.id, { shouldValidate: true });
+                              form.setValue("customerName", customer.name, { shouldValidate: true });
                               setIsCustomerPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />

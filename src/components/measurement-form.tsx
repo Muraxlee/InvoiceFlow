@@ -38,7 +38,7 @@ const measurementSchema = z.object({
   id: z.string().optional(),
   uniqueId: z.string().min(1, "Unique ID is required."),
   customerId: z.string().min(1, "Customer is required"),
-  customerName: z.string().min(1, "Customer name is required"), // Make sure customerName is required
+  customerName: z.string().min(1, "Customer name is required"),
   type: z.string().min(1, "Garment type is required"),
   customType: z.string().optional(),
   recordedDate: z.date({ required_error: "Date is required." }),
@@ -112,7 +112,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
-                        {field.value ? customers?.find((c) => c.id === field.value)?.name : "Select a customer"}
+                        {form.getValues('customerName') || "Select a customer"}
                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </FormControl>

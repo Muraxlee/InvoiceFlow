@@ -10,7 +10,7 @@ import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, Refresh
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MeasurementForm, type MeasurementFormValues } from "@/components/measurement-form";
 import type { Measurement } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -55,9 +55,10 @@ export default function MeasurementsPage() {
       toast({ title: "Measurement Added", description: "The new measurement has been saved." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
       setIsDialogOpen(false);
+      setCurrentMeasurement(null);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to save measurement.", variant: "destructive" });
     },
   });
 
@@ -108,7 +109,7 @@ export default function MeasurementsPage() {
       addMutation.mutate(measurementData as Omit<Measurement, 'id' | 'createdAt'>);
     }
   };
-
+  
   const defaultValues: Partial<MeasurementFormValues> = currentMeasurement ? currentMeasurement : {
     uniqueId: generateUniqueMeasurementId(),
     recordedDate: new Date(),
@@ -155,7 +156,7 @@ export default function MeasurementsPage() {
         actions={pageActions}
       />
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle>{currentMeasurement ? "Edit Measurement" : "Add New Measurement"}</DialogTitle>

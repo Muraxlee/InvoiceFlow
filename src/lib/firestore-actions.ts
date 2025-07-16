@@ -54,14 +54,22 @@ const fromFirestore = <T extends { [key: string]: any }>(data: T): T => {
 async function getCollectionWithCache<T extends {id: string}>(collectionPath: string, storageKey: string, orderByField: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<T[]> {
     checkDb();
     
-    // Immediately return from cache if available
+    // Server-side, just fetch, don't cache.
+    if (typeof window === 'undefined') {
+        const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
+    }
+
+    // Client-side logic
     const cachedData = loadFromLocalStorage<T[] | null>(storageKey, null);
     
-    // Fetch from Firestore in the background
+    // Fetch from Firestore in the background to update cache
     const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
     getDocs(q).then(querySnapshot => {
         const firestoreData = querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
         saveToLocalStorage(storageKey, firestoreData);
+        // Optional: Could add logic here to notify app of new data
     }).catch(error => {
         console.error(`Error fetching ${collectionPath} in background:`, error);
     });

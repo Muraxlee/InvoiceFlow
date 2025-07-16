@@ -14,6 +14,7 @@ import {
   FileText,
   Package,
   BarChart3,
+  Ruler,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
+  { href: '/measurements', label: 'Measurement', icon: Ruler, tooltip: 'Manage Measurements' },
   { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & AI Advisor' },
 ];
 
@@ -68,7 +70,8 @@ export function AppNav() {
       return null;
     }
     
-    const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
+    const isActive = pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/');
+
 
     const buttonClass = cn(
       "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",

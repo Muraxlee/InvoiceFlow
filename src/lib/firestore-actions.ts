@@ -13,11 +13,12 @@ import {
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore';
-import type { StoredInvoice, CompanyData, Customer, Product, User } from '@/types/database';
+import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement } from '@/types/database';
 
 const INVOICES = 'invoices';
 const CUSTOMERS = 'customers';
 const PRODUCTS = 'products';
+const MEASUREMENTS = 'measurements';
 const COMPANY = 'company';
 const USERS = 'users';
 
@@ -142,6 +143,33 @@ export async function deleteProduct(id: string): Promise<void> {
     await deleteDoc(doc(db, PRODUCTS, id));
 }
 
+// Measurement Actions
+export async function getMeasurements(): Promise<Measurement[]> {
+  checkDb();
+  const q = query(collection(db, MEASUREMENTS), orderBy('recordedDate', 'desc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as Measurement));
+}
+
+export async function addMeasurement(measurementData: Omit<Measurement, 'id' | 'createdAt'>): Promise<string> {
+  checkDb();
+  const docRef = await addDoc(collection(db, MEASUREMENTS), {
+    ...measurementData,
+    createdAt: serverTimestamp()
+  });
+  return docRef.id;
+}
+
+export async function updateMeasurement(id: string, measurementData: Partial<Omit<Measurement, 'id' | 'createdAt'>>): Promise<void> {
+  checkDb();
+  await updateDoc(doc(db, MEASUREMENTS, id), measurementData);
+}
+
+export async function deleteMeasurement(id: string): Promise<void> {
+  checkDb();
+  await deleteDoc(doc(db, MEASUREMENTS, id));
+}
+
 // Company Info Actions
 export async function getCompanyInfo(): Promise<CompanyData | null> {
   checkDb();
@@ -209,6 +237,7 @@ export async function clearAllData(): Promise<void> {
         clearAllCustomers(),
         clearAllProducts(),
         clearAllInvoices(),
+        deleteCollection(MEASUREMENTS),
         // Company info is a single doc, so we delete it separately
         deleteDoc(doc(db!, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
     ]);

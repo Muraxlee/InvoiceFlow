@@ -45,6 +45,18 @@ export interface Product {
   createdAt: any; // Firestore ServerTimestamp
 }
 
+export interface Measurement {
+  id: string;
+  type: string;
+  customType?: string;
+  value: number;
+  unit: string;
+  recordedDate: any; // Firestore Timestamp
+  notes?: string;
+  createdAt: any; // Firestore ServerTimestamp
+}
+
+
 export interface CompanyData {
   id: string; // Document ID is 'main'
   name: string;

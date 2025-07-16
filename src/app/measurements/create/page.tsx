@@ -66,7 +66,10 @@ export default function CreateMeasurementPage() {
   });
 
   const handleSubmit = (data: MeasurementFormValues) => {
+    // Omitting the 'id' field, which is not needed for creation.
     const { id, ...measurementData } = data;
+    
+    // Ensure all optional fields have a default value to prevent Firestore errors with 'undefined'.
     const finalData = {
       ...measurementData,
       notes: measurementData.notes || '',

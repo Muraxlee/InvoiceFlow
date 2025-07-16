@@ -72,8 +72,8 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
     defaultValues: {
+      values: [{ name: "", value: 0, unit: "in" }],
       ...defaultValues,
-      values: defaultValues?.values?.length ? defaultValues.values : [{ name: "", value: 0, unit: "in" }],
     },
   });
 

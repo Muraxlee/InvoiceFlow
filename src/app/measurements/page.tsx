@@ -37,19 +37,21 @@ export default function MeasurementsPage() {
   const { data: measurements, isLoading: isMeasurementsLoading, error: measurementsError, refetch: refetchMeasurements } = useQuery<Measurement[]>({
     queryKey: ['measurements'],
     queryFn: getMeasurements,
+    initialData: [],
   });
 
   const { data: customers, isLoading: isCustomersLoading, error: customersError, refetch: refetchCustomers } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
+    initialData: [],
   });
 
   const isDataLoading = isMeasurementsLoading || isCustomersLoading;
   const error = measurementsError || customersError;
 
   const refetch = () => {
-    if (measurementsError) refetchMeasurements();
-    if (customersError) refetchCustomers();
+    refetchMeasurements();
+    refetchCustomers();
   };
 
   const filteredMeasurements = useMemo(() => {
@@ -67,7 +69,6 @@ export default function MeasurementsPage() {
       toast({ title: "Measurement Added", description: "The new measurement has been saved." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
       setIsDialogOpen(false);
-      setCurrentMeasurement(null);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to save measurement.", variant: "destructive" });
@@ -80,7 +81,6 @@ export default function MeasurementsPage() {
       toast({ title: "Measurement Updated", description: "Measurement record has been updated." });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
       setIsDialogOpen(false);
-      setCurrentMeasurement(null);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -98,43 +98,24 @@ export default function MeasurementsPage() {
     },
   });
 
-  const handleEditClick = (measurement: Measurement) => {
-    setCurrentMeasurement(measurement);
-    setIsDialogOpen(true);
-  };
-
-  const handleAddClick = () => {
-    setCurrentMeasurement(null);
-    setIsDialogOpen(true);
-  }
-
-  const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    setCurrentMeasurement(null);
-  }
-
   const handleFormSubmit = async (data: MeasurementFormValues) => {
-    const { id, ...measurementData } = data;
-    
     if (currentMeasurement?.id) {
+      const { id, ...measurementData } = data;
       updateMutation.mutate({ id: currentMeasurement.id, values: measurementData });
     } else {
+      const { id, ...measurementData } = data;
       addMutation.mutate(measurementData as Omit<Measurement, 'id' | 'createdAt'>);
     }
   };
   
-  const defaultValues: Partial<MeasurementFormValues> = currentMeasurement ? currentMeasurement : {
-    uniqueId: generateUniqueMeasurementId(),
-    recordedDate: new Date(),
-    deliveryDate: null,
-    values: [{ name: "", value: 0, unit: "in" }],
-    customerId: "",
-    customerName: ""
+  const handleOpenDialog = (measurement: Measurement | null = null) => {
+    setCurrentMeasurement(measurement);
+    setIsDialogOpen(true);
   };
-
+  
   const pageActions = (
     <div className="flex items-center gap-2">
-      <Button onClick={handleAddClick}>
+      <Button onClick={() => handleOpenDialog(null)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
       </Button>
     </div>
@@ -169,7 +150,7 @@ export default function MeasurementsPage() {
         actions={pageActions}
       />
 
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle>{currentMeasurement ? "Edit Measurement" : "Add New Measurement"}</DialogTitle>
@@ -179,10 +160,10 @@ export default function MeasurementsPage() {
           </DialogHeader>
           <MeasurementForm 
             onSubmit={handleFormSubmit}
-            defaultValues={defaultValues}
+            defaultValues={currentMeasurement ? currentMeasurement : { uniqueId: generateUniqueMeasurementId(), recordedDate: new Date() }}
             customers={customers}
             isLoading={addMutation.isPending || updateMutation.isPending}
-            onCancel={handleDialogClose}
+            onCancel={() => setIsDialogOpen(false)}
           />
         </DialogContent>
       </Dialog>
@@ -267,7 +248,7 @@ export default function MeasurementsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditClick(m)}>
+                        <DropdownMenuItem onClick={() => handleOpenDialog(m)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <ConfirmDialog

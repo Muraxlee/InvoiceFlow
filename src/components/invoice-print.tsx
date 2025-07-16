@@ -154,11 +154,11 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           <meta charset="UTF-8">
           <title>Quotation - ${invoice.invoiceNumber}</title>
           <style>
-            @page { size: A4; margin: 15mm; } 
+            @page { size: A4; margin: 20mm; } 
             body { font-family: 'Times New Roman', Times, serif; color: #000; font-size: 12pt; line-height: 1.5; }
             .quotation-container { width: 100%; margin: 0 auto; }
             .header { text-align: center; margin-bottom: 20px; }
-            .cell-no { font-size: 10pt; font-weight: bold; }
+            .cell-no { font-size: 11pt; font-weight: bold; }
             .company-name { font-size: 24pt; font-weight: bold; margin: 5px 0; }
             .address { font-size: 11pt; }
             .gst-no { font-size: 11pt; margin-bottom: 10px; }
@@ -173,7 +173,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             th { font-weight: bold; background-color: #f2f2f2; }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
-            .footer-notes { margin-top: 20px; }
+            .footer-notes { margin-top: 20px; font-size: 11pt; }
             .footer { margin-top: 40px; }
             .signature { margin-top: 60px; }
             @media print {
@@ -193,10 +193,9 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             <hr/>
             <div class="meta-info">
               <div class="to-address">
-                <p>To,<br/>
+                To,<br/>
                 <strong>${invoice.customerName}</strong><br/>
                 ${invoice.customerAddress ? invoice.customerAddress.replace(/\n/g, '<br/>') : ''}
-                </p>
               </div>
               <div class="date">
                 <strong>Date:</strong> ${format(new Date(invoice.invoiceDate), "dd/MM/yyyy")}
@@ -204,7 +203,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             </div>
             <div class="letter-body">
               <p>Dear Sir,</p>
-              <p><strong>Sub: Quotation - ${invoice.notes || "Boiler Suit Uniform"} - Reg</strong></p>
+              <p><strong>Sub: Quotation - ${invoice.notes || "Supply of Goods"} - Reg</strong></p>
               <p>We thank you for your enquiry and have pleasure in submitting hereunder our quotation for the same. Which we trust, will meet with your kind approval.</p>
               <p>Thanking you,</p>
             </div>
@@ -221,14 +220,14 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
               </tbody>
             </table>
             <div class="footer-notes">
-              <p><strong>Note:</strong></p>
-              <p style="white-space: pre-wrap;">${invoice.termsAndConditions || 'GST will be applicable as per government norms.'}</p>
+              <strong>Note:</strong>
+              <div style="white-space: pre-wrap;">${invoice.termsAndConditions || 'GST will be applicable as per government norms.'}</div>
             </div>
             <div class="footer">
               <p>Regards,<br/><strong>${company?.name || 'SEAFARER NAVEL TAILORS'}</strong></p>
               <br/><br/>
               <hr/>
-              <p class="text-center">IF YOU HAVE ANY QUESTION REGARDING THIS QUOTATION. CONTACT US.</p>
+              <p class="text-center" style="font-size: 10pt;">IF YOU HAVE ANY QUESTION REGARDING THIS QUOTATION. CONTACT US.</p>
             </div>
           </div>
         </body>

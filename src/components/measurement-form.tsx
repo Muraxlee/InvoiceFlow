@@ -22,9 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
 import type { Customer } from "@/types/database";
-import { getCustomers } from "@/lib/firestore-actions";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 
@@ -65,10 +63,10 @@ interface MeasurementFormProps {
   defaultValues?: Partial<MeasurementFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
+  customers?: Customer[];
 }
 
-export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }: MeasurementFormProps) {
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: getCustomers });
+export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, customers }: MeasurementFormProps) {
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
 
   const form = useForm<MeasurementFormValues>({
@@ -125,8 +123,8 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                         <CommandGroup>
                           {customers?.map((customer) => (
                             <CommandItem value={customer.name} key={customer.id} onSelect={() => {
-                              form.setValue("customerId", customer.id, { shouldValidate: true });
-                              form.setValue("customerName", customer.name, { shouldValidate: true });
+                              form.setValue("customerId", customer.id);
+                              form.setValue("customerName", customer.name);
                               setIsCustomerPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />

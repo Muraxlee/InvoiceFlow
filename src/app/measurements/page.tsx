@@ -12,9 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MeasurementForm, type MeasurementFormValues } from "@/components/measurement-form";
-import type { Measurement } from "@/types/database";
+import type { Measurement, Customer } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getMeasurements, addMeasurement, updateMeasurement, deleteMeasurement } from "@/lib/firestore-actions";
+import { getMeasurements, addMeasurement, updateMeasurement, deleteMeasurement, getCustomers } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format, isValid } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -34,11 +34,23 @@ export default function MeasurementsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   
-  const { data: measurements, isLoading: isDataLoading, error, refetch } = useQuery<Measurement[]>({
+  const { data: measurements, isLoading: isMeasurementsLoading, error: measurementsError, refetch: refetchMeasurements } = useQuery<Measurement[]>({
     queryKey: ['measurements'],
     queryFn: getMeasurements,
-    initialData: [],
   });
+
+  const { data: customers, isLoading: isCustomersLoading, error: customersError, refetch: refetchCustomers } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: getCustomers,
+  });
+
+  const isDataLoading = isMeasurementsLoading || isCustomersLoading;
+  const error = measurementsError || customersError;
+
+  const refetch = () => {
+    if (measurementsError) refetchMeasurements();
+    if (customersError) refetchCustomers();
+  };
 
   const filteredMeasurements = useMemo(() => {
     if (!measurements) return [];
@@ -103,10 +115,20 @@ export default function MeasurementsPage() {
 
   const handleFormSubmit = async (data: MeasurementFormValues) => {
     const { id, ...measurementData } = data;
+    const customer = customers?.find(c => c.id === measurementData.customerId);
+
+    if (!customer) {
+      toast({ title: "Error", description: "Selected customer not found.", variant: "destructive" });
+      return;
+    }
+    
+    // Ensure customerName is always correctly set
+    const finalData = { ...measurementData, customerName: customer.name };
+
     if (currentMeasurement) {
-      updateMutation.mutate({ id: currentMeasurement.id, values: measurementData });
+      updateMutation.mutate({ id: currentMeasurement.id, values: finalData });
     } else {
-      addMutation.mutate(measurementData as Omit<Measurement, 'id' | 'createdAt'>);
+      addMutation.mutate(finalData as Omit<Measurement, 'id' | 'createdAt'>);
     }
   };
   
@@ -141,7 +163,7 @@ export default function MeasurementsPage() {
             <p>After deploying, please refresh this page.</p>
           </AlertDescription>
         </Alert>
-        <Button onClick={() => refetch()} className="flex items-center gap-2">
+        <Button onClick={refetch} className="flex items-center gap-2">
           <RefreshCw className="h-4 w-4" /> Try Again
         </Button>
       </div>
@@ -167,6 +189,7 @@ export default function MeasurementsPage() {
           <MeasurementForm 
             onSubmit={handleFormSubmit}
             defaultValues={defaultValues}
+            customers={customers}
             isLoading={addMutation.isPending || updateMutation.isPending}
             onCancel={handleDialogClose}
           />

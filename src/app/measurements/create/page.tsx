@@ -40,7 +40,7 @@ export default function CreateMeasurementPage() {
         description: `The new measurement record has been successfully saved.`,
       });
       queryClient.invalidateQueries({ queryKey: ['measurements'] });
-      router.push(`/measurements/${measurementId}`);
+      router.push(`/measurements`);
     },
     onError: (error) => {
       console.error('Error saving measurement:', error);

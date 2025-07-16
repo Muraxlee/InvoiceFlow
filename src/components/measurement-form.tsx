@@ -25,6 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Customer } from "@/types/database";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
+import { useQuery } from "@tanstack/react-query";
+import { getCustomers } from "@/lib/firestore-actions";
 
 const measurementValueSchema = z.object({
   name: z.string().min(1, "Field name is required"),
@@ -63,16 +65,20 @@ interface MeasurementFormProps {
   defaultValues?: Partial<MeasurementFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
-  customers?: Customer[];
 }
 
-export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, customers }: MeasurementFormProps) {
+export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }: MeasurementFormProps) {
+  const { data: customers, isLoading: customersLoading } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: getCustomers
+  });
+  
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
 
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
     defaultValues: {
-      values: [{ name: "", value: 0, unit: "in" }],
+      values: [{ name: "Chest", value: 0, unit: "in" }],
       ...defaultValues,
     },
   });
@@ -111,7 +117,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
                     <FormControl>
                       <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
                         {field.value
-                          ? form.getValues('customerName') || "Select customer"
+                          ? customers?.find(c => c.id === field.value)?.name || "Select customer"
                           : "Select customer"}
                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -121,6 +127,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel, 
                     <Command>
                       <CommandInput placeholder="Search customers..." />
                       <CommandList>
+                        {customersLoading && <div className="p-4 text-center text-sm">Loading...</div>}
                         <CommandEmpty>No customers found.</CommandEmpty>
                         <CommandGroup>
                           {customers?.map((customer) => (

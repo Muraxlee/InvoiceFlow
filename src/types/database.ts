@@ -55,7 +55,7 @@ export interface Measurement {
   id: string;
   uniqueId: string; // A user-friendly, unique ID
   customerId: string;
-  customerName: string;
+  customerName: string; // This is now a required field
   type: string; // e.g., 'Shirt', 'Pant', 'Custom'
   customType?: string; // Only if type is 'Custom'
   values: MeasurementValue[];

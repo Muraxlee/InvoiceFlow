@@ -36,7 +36,7 @@ const measurementValueSchema = z.object({
 
 const measurementSchema = z.object({
   id: z.string().optional(),
-  uniqueId: z.string(),
+  uniqueId: z.string().min(1, "Unique ID is required."),
   customerId: z.string().min(1, "Customer is required"),
   customerName: z.string().min(1, "Customer name is required"), // Make sure customerName is required
   type: z.string().min(1, "Garment type is required"),
@@ -60,13 +60,6 @@ export type MeasurementFormValues = z.infer<typeof measurementSchema>;
 const garmentTypes = ["Shirt", "Pant", "Kurta", "Blouse", "Suit", "Coat", "Custom"];
 const defaultUnits = ["in", "cm"];
 
-function generateUniqueMeasurementId() {
-  const prefix = "MEA";
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `${prefix}-${timestamp}-${randomPart}`;
-}
-
 interface MeasurementFormProps {
   onSubmit: (data: MeasurementFormValues) => Promise<void> | void;
   defaultValues?: Partial<MeasurementFormValues>;
@@ -81,9 +74,6 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
     defaultValues: {
-      recordedDate: new Date(),
-      uniqueId: generateUniqueMeasurementId(),
-      deliveryDate: null,
       ...defaultValues,
       values: defaultValues?.values?.length ? defaultValues.values : [{ name: "", value: 0, unit: "in" }],
     },

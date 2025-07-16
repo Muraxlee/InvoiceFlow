@@ -11,10 +11,24 @@ import type { Measurement } from "@/types/database";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+function generateUniqueMeasurementId() {
+  const prefix = "MEA";
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
+  return `${prefix}-${timestamp}-${randomPart}`;
+}
+
 export default function CreateMeasurementPage() {
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const defaultValues: Partial<MeasurementFormValues> = {
+    uniqueId: generateUniqueMeasurementId(),
+    recordedDate: new Date(),
+    deliveryDate: null,
+    values: [{ name: "", value: 0, unit: "in" }],
+  };
 
   const createMutation = useMutation({
     mutationFn: (newMeasurement: Omit<Measurement, 'id' | 'createdAt'>) => addMeasurement(newMeasurement),
@@ -58,6 +72,7 @@ export default function CreateMeasurementPage() {
       />
       <MeasurementForm 
         onSubmit={handleSubmit} 
+        defaultValues={defaultValues}
         isLoading={createMutation.isPending}
         onCancel={handleCancel}
       />

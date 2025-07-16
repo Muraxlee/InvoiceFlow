@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addMeasurement } from "@/lib/firestore-actions";
 import type { Measurement } from '@/types/database';
 import { useState, useEffect } from 'react';
+import { Loader2 } from "lucide-react";
 
 function generateUniqueMeasurementId() {
   const prefix = "MEA";

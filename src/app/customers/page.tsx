@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, MapPin, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -18,12 +18,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { loadFromLocalStorage, CUSTOMERS_STORAGE_KEY } from "@/lib/localStorage";
+import { Input } from "@/components/ui/input";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [isEditCustomerDialogOpen, setIsEditCustomerDialogOpen] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState<Customer | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const { data: customers, isLoading: isDataLoading, error, refetch } = useQuery<Customer[]>({
@@ -31,6 +33,18 @@ export default function CustomersPage() {
     queryFn: getCustomers,
     initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, [])
   });
+
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return customers.filter(customer => 
+      customer.name.toLowerCase().includes(lowercasedTerm) ||
+      customer.email.toLowerCase().includes(lowercasedTerm) ||
+      customer.phone?.toLowerCase().includes(lowercasedTerm) ||
+      customer.address?.toLowerCase().includes(lowercasedTerm) ||
+      customer.gstin?.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [customers, searchTerm]);
 
   const addMutation = useMutation({
     mutationFn: (data: Omit<Customer, 'id' | 'createdAt'>) => addCustomer(data),
@@ -168,9 +182,20 @@ export default function CustomersPage() {
       </Dialog>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Customer List</CardTitle>
-          <CardDescription>A list of all customers.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Customer List</CardTitle>
+            <CardDescription>A list of all customers.</CardDescription>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search customers..." 
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isDataLoading && !customers?.length ? (
@@ -181,7 +206,7 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer ID</TableHead>
+                  <TableHead className="w-[50px]">#</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
@@ -190,9 +215,9 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers?.map((customer) => (
+                {filteredCustomers.map((customer, index) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.id}</TableCell>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>{customer.name}</TableCell>
                     <TableCell><Link href={`mailto:${customer.email}`} className="hover:underline flex items-center gap-1"><Mail className="h-3 w-3 text-muted-foreground"/> {customer.email}</Link></TableCell>
                     <TableCell><Link href={`tel:${customer.phone}`} className="hover:underline flex items-center gap-1"><Phone className="h-3 w-3 text-muted-foreground"/> {customer.phone}</Link></TableCell>
@@ -232,8 +257,10 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           )}
-           {!isDataLoading && (!customers || customers.length === 0) && (
-            <p className="py-4 text-center text-muted-foreground">No customers found. Add a new customer to get started.</p>
+           {!isDataLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
+            <p className="py-4 text-center text-muted-foreground">
+              {searchTerm ? `No customers found for "${searchTerm}".` : "No customers found. Add a new customer to get started."}
+            </p>
           )}
         </CardContent>
       </Card>

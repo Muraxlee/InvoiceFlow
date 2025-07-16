@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Ruler, User } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Ruler, User, Search } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -17,16 +17,30 @@ import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { loadFromLocalStorage, MEASUREMENTS_STORAGE_KEY } from "@/lib/localStorage";
+import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
 
 export default function MeasurementsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: measurements, isLoading, error, refetch } = useQuery<Measurement[]>({
     queryKey: ['measurements'],
     queryFn: getMeasurements,
     initialData: () => loadFromLocalStorage(MEASUREMENTS_STORAGE_KEY, []),
   });
+
+  const filteredMeasurements = useMemo(() => {
+    if (!measurements) return [];
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return measurements.filter(m =>
+      m.uniqueId.toLowerCase().includes(lowercasedTerm) ||
+      m.customerName.toLowerCase().includes(lowercasedTerm) ||
+      m.type.toLowerCase().includes(lowercasedTerm) ||
+      (m.type === 'Custom' && m.customType?.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [measurements, searchTerm]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteMeasurement,
@@ -94,9 +108,20 @@ export default function MeasurementsPage() {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Measurement Records</CardTitle>
-          <CardDescription>A list of all measurement records in the system.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Measurement Records</CardTitle>
+            <CardDescription>A list of all measurement records in the system.</CardDescription>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by ID, customer, type..." 
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading && !measurements?.length ? (
@@ -115,7 +140,7 @@ export default function MeasurementsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {measurements?.map((measurement) => (
+                {filteredMeasurements.map((measurement) => (
                   <TableRow key={measurement.id}>
                     <TableCell className="font-mono text-xs">{measurement.uniqueId}</TableCell>
                     <TableCell className="font-medium flex items-center gap-2">
@@ -165,8 +190,10 @@ export default function MeasurementsPage() {
               </TableBody>
             </Table>
           )}
-          {!isLoading && (!measurements || measurements.length === 0) && (
-            <p className="py-4 text-center text-muted-foreground">No measurements found. Add a new record to get started.</p>
+          {!isLoading && (!filteredMeasurements || filteredMeasurements.length === 0) && (
+            <p className="py-4 text-center text-muted-foreground">
+              {searchTerm ? `No records found for "${searchTerm}".` : "No measurements found. Add a new record to get started."}
+            </p>
           )}
         </CardContent>
       </Card>

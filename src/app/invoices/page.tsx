@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -17,16 +17,29 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { loadFromLocalStorage, INVOICES_STORAGE_KEY } from "@/lib/localStorage";
+import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
     initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
+
+  const filteredInvoices = useMemo(() => {
+    if (!invoices) return [];
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return invoices.filter(invoice => 
+      invoice.invoiceNumber.toLowerCase().includes(lowercasedTerm) ||
+      invoice.customerName.toLowerCase().includes(lowercasedTerm) ||
+      invoice.status?.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [invoices, searchTerm]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteInvoice,
@@ -106,9 +119,20 @@ export default function InvoicesPage() {
       />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Invoice List</CardTitle>
-          <CardDescription>A list of all invoices in the system.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Invoice List</CardTitle>
+            <CardDescription>A list of all invoices in the system.</CardDescription>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by ID, customer, status..." 
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading && !invoices?.length ? (
@@ -129,7 +153,7 @@ export default function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices?.map((invoice) => (
+                {filteredInvoices.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.customerName}</TableCell>
@@ -185,8 +209,10 @@ export default function InvoicesPage() {
               </TableBody>
             </Table>
           )}
-          {!isLoading && (!invoices || invoices.length === 0) && (
-            <p className="py-4 text-center text-muted-foreground">No invoices found. Create a new invoice to get started.</p>
+          {!isLoading && (!filteredInvoices || filteredInvoices.length === 0) && (
+            <p className="py-4 text-center text-muted-foreground">
+              {searchTerm ? `No invoices found for "${searchTerm}".` : "No invoices found. Create a new invoice to get started."}
+            </p>
           )}
         </CardContent>
       </Card>

@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PackagePlus, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { PackagePlus, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
@@ -17,12 +17,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { loadFromLocalStorage, PRODUCTS_STORAGE_KEY } from "@/lib/localStorage";
+import { Input } from "@/components/ui/input";
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   
   const { data: products, isLoading: isDataLoading, error, refetch } = useQuery<Product[]>({
@@ -30,6 +32,15 @@ export default function ProductsPage() {
     queryFn: getProducts,
     initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return products.filter(product => 
+      product.name.toLowerCase().includes(lowercasedTerm) ||
+      product.hsn?.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [products, searchTerm]);
 
   const addMutation = useMutation({
     mutationFn: (data: Omit<Product, 'id' | 'createdAt'>) => addProduct(data),
@@ -167,9 +178,20 @@ export default function ProductsPage() {
       </Dialog>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Product List</CardTitle>
-          <CardDescription>A list of all products.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Product List</CardTitle>
+            <CardDescription>A list of all products.</CardDescription>
+          </div>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search products..." 
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </CardHeader>
         <CardContent>
         {isDataLoading && !products?.length ? (
@@ -180,7 +202,7 @@ export default function ProductsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product ID</TableHead>
+                <TableHead className="w-[50px]">#</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>HSN/SAC</TableHead>
                 <TableHead className="text-center">CGST %</TableHead>
@@ -191,9 +213,9 @@ export default function ProductsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products?.map((product) => (
+              {filteredProducts.map((product, index) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.id}</TableCell>
+                  <TableCell className="font-medium">{index + 1}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.hsn || '-'}</TableCell>
                   <TableCell className="text-center">{product.cgstRate}%</TableCell>
@@ -235,8 +257,10 @@ export default function ProductsPage() {
             </TableBody>
           </Table>
           )}
-           {!isDataLoading && (!products || products.length === 0) && (
-            <p className="py-4 text-center text-muted-foreground">No products found. Add a new product to get started.</p>
+           {!isDataLoading && (!filteredProducts || filteredProducts.length === 0) && (
+             <p className="py-4 text-center text-muted-foreground">
+              {searchTerm ? `No products found for "${searchTerm}".` : "No products found. Add a new product to get started."}
+            </p>
           )}
         </CardContent>
       </Card>

@@ -103,15 +103,13 @@ export default function MeasurementsPage() {
   });
 
   const handleFormSubmit = async (data: MeasurementFormValues) => {
-    const customer = customers?.find(c => c.id === data.customerId);
-    if (!customer) {
-        toast({ title: "Error", description: "Selected customer not found.", variant: "destructive"});
-        return;
-    }
-
-    // Ensure customerName is explicitly set from the valid customer object
-    const finalData = { ...data, customerName: customer.name };
-
+    const finalData = {
+      ...data,
+      notes: data.notes || '',
+      customType: data.customType || '',
+      deliveryDate: data.deliveryDate || null,
+    };
+    
     if (currentMeasurement?.id) {
       const { id, ...measurementData } = finalData;
       updateMutation.mutate({ id: currentMeasurement.id, values: measurementData });

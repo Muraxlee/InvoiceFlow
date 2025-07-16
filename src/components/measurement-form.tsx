@@ -20,7 +20,7 @@ import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import type { Customer } from "@/types/database";
@@ -38,10 +38,11 @@ const measurementSchema = z.object({
   id: z.string().optional(),
   uniqueId: z.string(),
   customerId: z.string().min(1, "Customer is required"),
-  customerName: z.string(),
+  customerName: z.string().min(1, "Customer name is required"), // Make sure customerName is required
   type: z.string().min(1, "Garment type is required"),
   customType: z.string().optional(),
   recordedDate: z.date({ required_error: "Date is required." }),
+  deliveryDate: z.date().optional().nullable(),
   values: z.array(measurementValueSchema).min(1, "At least one measurement value is required."),
   notes: z.string().optional(),
 }).refine(data => {
@@ -82,6 +83,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
     defaultValues: {
       recordedDate: new Date(),
       uniqueId: generateUniqueMeasurementId(),
+      deliveryDate: null,
       ...defaultValues,
       values: defaultValues?.values?.length ? defaultValues.values : [{ name: "", value: 0, unit: "in" }],
     },
@@ -98,7 +100,8 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
     if (defaultValues) {
         form.reset({
             ...defaultValues,
-            recordedDate: defaultValues.recordedDate ? new Date(defaultValues.recordedDate) : new Date(),
+            recordedDate: defaultValues.recordedDate && isValid(new Date(defaultValues.recordedDate)) ? new Date(defaultValues.recordedDate) : new Date(),
+            deliveryDate: defaultValues.deliveryDate && isValid(new Date(defaultValues.deliveryDate)) ? new Date(defaultValues.deliveryDate) : null,
         });
     }
   }, [defaultValues, form]);
@@ -133,7 +136,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                           {customers?.map((customer) => (
                             <CommandItem value={customer.id} key={customer.id} onSelect={() => {
                               form.setValue("customerId", customer.id);
-                              form.setValue("customerName", customer.name);
+                              form.setValue("customerName", customer.name); // Make sure this is set
                               setIsCustomerPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
@@ -166,7 +169,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
             )}
           />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="type"
@@ -215,6 +218,29 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="deliveryDate"
+            render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel>Date of Delivery (Optional)</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      {field.value && isValid(field.value) ? format(field.value, "PP") : (<span>Pick a date</span>)}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                 </PopoverContent>
               </Popover>
               <FormMessage />

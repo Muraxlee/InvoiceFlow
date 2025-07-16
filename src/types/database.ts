@@ -60,6 +60,7 @@ export interface Measurement {
   customType?: string; // Only if type is 'Custom'
   values: MeasurementValue[];
   recordedDate: any; // Firestore Timestamp
+  deliveryDate?: any; // Firestore Timestamp, optional
   notes?: string;
   createdAt: any; // Firestore ServerTimestamp
 }

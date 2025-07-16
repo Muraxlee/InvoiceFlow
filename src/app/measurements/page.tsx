@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Barcode, Search, User, Package } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Barcode, Search, User, Package, CalendarCheck2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +17,7 @@ import type { Measurement } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMeasurements, updateMeasurement, deleteMeasurement } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
@@ -169,7 +169,7 @@ export default function MeasurementsPage() {
                 <TableHead>Customer / ID</TableHead>
                 <TableHead>Garment Type</TableHead>
                 <TableHead>Measurements</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Dates</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -193,14 +193,27 @@ export default function MeasurementsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 max-w-xs">
                         {m.values.slice(0, 4).map(v => (
                             <Badge key={v.name} variant="secondary">{v.name}: {v.value}{v.unit}</Badge>
                         ))}
                         {m.values.length > 4 && <Badge variant="outline">+{m.values.length - 4} more</Badge>}
                     </div>
                   </TableCell>
-                  <TableCell>{format(new Date(m.recordedDate), 'PP')}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                         <CalendarCheck2 className="h-3.5 w-3.5 text-muted-foreground"/> 
+                         <span className="text-xs">Recorded: {m.recordedDate && isValid(new Date(m.recordedDate)) ? format(new Date(m.recordedDate), 'PP') : 'N/A'}</span>
+                      </div>
+                      {m.deliveryDate && (
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck2 className="h-3.5 w-3.5 text-primary"/> 
+                          <span className="text-xs font-medium">Delivery: {isValid(new Date(m.deliveryDate)) ? format(new Date(m.deliveryDate), 'PP') : 'N/A'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

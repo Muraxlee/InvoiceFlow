@@ -56,7 +56,7 @@ export default function MeasurementsPage() {
     if (!measurements) return [];
     if (!searchTerm) return measurements;
     return measurements.filter(m => 
-      m.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.uniqueId.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [measurements, searchTerm]);
@@ -116,16 +116,16 @@ export default function MeasurementsPage() {
   const handleFormSubmit = async (data: MeasurementFormValues) => {
     const { id, ...measurementData } = data;
     const customer = customers?.find(c => c.id === measurementData.customerId);
-
+    
     if (!customer) {
       toast({ title: "Error", description: "Selected customer not found.", variant: "destructive" });
       return;
     }
     
-    // Ensure customerName is always correctly set
+    // Ensure customerName is explicitly set from the selected customer
     const finalData = { ...measurementData, customerName: customer.name };
 
-    if (currentMeasurement) {
+    if (currentMeasurement?.id) {
       updateMutation.mutate({ id: currentMeasurement.id, values: finalData });
     } else {
       addMutation.mutate(finalData as Omit<Measurement, 'id' | 'createdAt'>);

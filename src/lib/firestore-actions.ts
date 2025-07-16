@@ -151,6 +151,16 @@ export async function getMeasurements(): Promise<Measurement[]> {
   return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as Measurement));
 }
 
+export async function getMeasurement(id: string): Promise<Measurement | null> {
+  checkDb();
+  const docRef = doc(db, MEASUREMENTS, id);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return fromFirestore({ id: docSnap.id, ...docSnap.data() } as Measurement);
+  }
+  return null;
+}
+
 export async function addMeasurement(measurementData: Omit<Measurement, 'id' | 'createdAt'>): Promise<string> {
   checkDb();
   const docRef = await addDoc(collection(db, MEASUREMENTS), {

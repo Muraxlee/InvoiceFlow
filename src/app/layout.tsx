@@ -20,11 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     // The html tag is now managed by the Providers component to avoid hydration mismatches
-    <html lang="en" suppressHydrationWarning>
-      <body className="antialiased bg-background text-foreground">
-        <Providers>{children}</Providers>
+    <Providers>
+        {children}
         <Toaster />
-      </body>
-    </html>
+    </Providers>
   );
 }

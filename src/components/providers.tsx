@@ -360,21 +360,37 @@ export default function Providers({ children }: { children: ReactNode }) {
   }, [applyTheme, applyFont, applyCustomThemeVariables]);
 
   if (firebaseError) {
-    return <FirebaseInitError error={firebaseError} />;
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <body>
+          <FirebaseInitError error={firebaseError} />
+        </body>
+      </html>
+    );
   }
   
   if (!isFirebaseConfigured) {
-    return <FirebaseConfigError />;
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <body>
+          <FirebaseConfigError />
+        </body>
+      </html>
+    );
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppShell>
-          {children}
-        </AppShell>
-        <ReactQueryDevtools initialIsOpen={false} />
-      </AuthProvider>
-    </QueryClientProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased bg-background text-foreground">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+            <ReactQueryDevtools initialIsOpen={false} />
+          </AuthProvider>
+        </QueryClientProvider>
+      </body>
+    </html>
   );
 }

@@ -12,7 +12,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Customer } from "@/types/database";
 import { getCustomers } from "@/lib/firestore-actions";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Label } from "@/components/ui/label";
 
 const measurementValueSchema = z.object({
   name: z.string().min(1, "Field name is required"),

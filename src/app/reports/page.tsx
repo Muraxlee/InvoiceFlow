@@ -3,16 +3,12 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Sparkles, Loader2, DollarSign, FileText, TrendingUp, AlertTriangle, Users, Package, BarChartHorizontalBig, Activity, RefreshCw, AlertCircle } from "lucide-react";
+import { Download, Loader2, DollarSign, FileText, AlertTriangle, Users, Package, BarChartHorizontalBig, RefreshCw, AlertCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useState, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
-import type { SalesEnhancementInput } from "@/ai/flows/sales-enhancement-flow";
-import { getSalesEnhancementSuggestions } from "@/ai/flows/sales-enhancement-flow";
+import { useMemo } from "react";
 import type { StoredInvoice, Customer, Product } from "@/types/database";
 import { format, subMonths } from 'date-fns';
 import PageHeader from "@/components/page-header";
-import Link from "next/link";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -30,9 +26,6 @@ interface ReportData {
 }
 
 export default function ReportsPage() {
-  const { toast } = useToast();
-  const [salesSuggestions, setSalesSuggestions] = useState<string[]>([]);
-  const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
@@ -142,49 +135,6 @@ export default function ReportsPage() {
     };
   }, [invoices, customers, products]);
 
-  const handleGetSalesSuggestions = async () => {
-    if (!reportData) {
-      toast({ title: "No data available", description: "Cannot generate suggestions without report data.", variant: "destructive" });
-      return;
-    }
-    setIsGeneratingSuggestions(true);
-    setSalesSuggestions([]);
-    try {
-      const productSummary = reportData.topProducts.length > 0 
-        ? `Top products: ${reportData.topProducts.map(p => p.name).join(", ")}.`
-        : "No specific product sales data available from recent reports.";
-
-      const input: SalesEnhancementInput = { 
-        businessContext: "A business using InvoiceFlow for managing invoices, customers, and products, seeking to improve sales performance.",
-        totalRevenue: reportData.totalRevenue,
-        invoiceCount: reportData.totalInvoices,
-        customerCount: customers?.length || 0,
-        productSummary: productSummary,
-      };
-      const result = await getSalesEnhancementSuggestions(input);
-      setSalesSuggestions(result.suggestions);
-      toast({
-        title: "AI Suggestions Received",
-        description: "Sales enhancement suggestions have been generated based on your data.",
-      });
-    } catch (error) {
-      console.error("Error generating sales suggestions:", error);
-      toast({
-        title: "Error",
-        description: "Could not fetch sales suggestions. Please verify your API key in Settings > Modules > AI Settings.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingSuggestions(false);
-    }
-  };
-
-  const printGrid = (elementId: string) => {
-    // This functionality is simplified as it can be complex to implement robustly here.
-    // A more advanced solution would use a dedicated printing library.
-    window.print();
-  };
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)]">
@@ -239,19 +189,6 @@ export default function ReportsPage() {
               <Download className="mr-2 h-4 w-4" />
               Print Page
             </Button>
-            <Button onClick={handleGetSalesSuggestions} disabled={isGeneratingSuggestions}>
-              {isGeneratingSuggestions ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  AI Insights
-                </>
-              )}
-            </Button>
           </div>
         }
       />
@@ -299,30 +236,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-
-      {salesSuggestions.length > 0 && (
-        <Card className="bg-muted/30">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Sparkles className="h-5 w-5 mr-2 text-primary" />
-              AI-Powered Sales Enhancement Suggestions
-            </CardTitle>
-            <CardDescription>
-              Personalized recommendations based on your business data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {salesSuggestions.map((suggestion, index) => (
-                <li key={index} className="flex">
-                  <TrendingUp className="h-5 w-5 mr-2 text-primary shrink-0 mt-0.5" />
-                  <span>{suggestion}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card id="customer-revenue-grid">

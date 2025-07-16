@@ -24,12 +24,10 @@ import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCir
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
-import { suggestGstCategory, type GstSuggestionOutput } from '@/ai/flows/gst-suggestion';
 import { useToast } from "@/hooks/use-toast";
 import { generateInvoiceNumber } from "@/lib/localStorage";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { Product, Customer } from "@/types/database";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Brain, Sparkles, Trash2, Settings2 as SettingsIcon, Save, KeyRound, ExternalLink, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Trash2, Settings2 as SettingsIcon, Save, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, GOOGLE_AI_API_KEY_STORAGE_KEY, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, type AllApplicationData } from "@/lib/localStorage";
+import { useQueryClient } from "@tanstack/react-query";
+import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY } from "@/lib/localStorage";
 
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/components/providers"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -35,8 +35,6 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
-  const [googleApiKey, setGoogleApiKey] = useState("");
-  const [originalGoogleApiKey, setOriginalGoogleApiKey] = useState("");
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); 
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); 
@@ -48,7 +46,6 @@ export default function SettingsPage() {
   const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   
   const [lastSettingsBackupTimestamp, setLastSettingsBackupTimestamp] = useState<number | null>(null);
-  const importSettingsFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
@@ -57,10 +54,6 @@ export default function SettingsPage() {
     });
     setInvoicePrefix(config.prefix);
     setOriginalInvoicePrefix(config.prefix);
-
-    const storedApiKey = loadFromLocalStorage<string>(GOOGLE_AI_API_KEY_STORAGE_KEY, "");
-    setGoogleApiKey(storedApiKey);
-    setOriginalGoogleApiKey(storedApiKey);
 
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY;
     setSelectedThemeKey(storedTheme);
@@ -93,7 +86,7 @@ export default function SettingsPage() {
 
   }, []);
 
-  const seedMutation = useMutation({
+  const { mutate: seedMutation, isPending: isSeeding } = useMutation({
     mutationFn: seedSampleData,
     onSuccess: () => {
         toast({
@@ -116,7 +109,7 @@ export default function SettingsPage() {
   });
 
   const handleSeedData = () => {
-      seedMutation.mutate();
+      seedMutation();
   };
 
   const handleDataAction = async (actionName: string, dataType?: 'customers' | 'products' | 'allData' | 'settings') => {
@@ -137,7 +130,7 @@ export default function SettingsPage() {
       if (dataType === 'allData' || dataType === 'settings') {
           // This part handles localStorage clearing which is client-side.
           const keysToClearFromLocalStorage = [
-              COMPANY_NAME_STORAGE_KEY, GOOGLE_AI_API_KEY_STORAGE_KEY, INVOICE_CONFIG_KEY, 
+              COMPANY_NAME_STORAGE_KEY, INVOICE_CONFIG_KEY, 
               THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
           ];
           keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
@@ -145,7 +138,6 @@ export default function SettingsPage() {
           setCompanyNameInput(DEFAULT_COMPANY_NAME);
           setCurrentCompanyName(DEFAULT_COMPANY_NAME);
           if (document) document.title = DEFAULT_COMPANY_NAME;
-          setGoogleApiKey(""); setOriginalGoogleApiKey("");
           const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
           saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
           setInvoicePrefix(defaultConfig.prefix); setOriginalInvoicePrefix(defaultConfig.prefix);
@@ -190,15 +182,6 @@ export default function SettingsPage() {
     toast({ title: "Invoice Settings Saved", description: `Invoice prefix updated to ${currentConfig.prefix}.`});
   };
   
-  const handleSaveApiKey = () => {
-    if (!googleApiKey.trim()) {
-      saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, ""); setOriginalGoogleApiKey("");
-      toast({ title: "API Key Cleared", description: "Google AI API Key has been cleared. Restart server for changes to take effect."}); return;
-    }
-    saveToLocalStorage(GOOGLE_AI_API_KEY_STORAGE_KEY, googleApiKey); setOriginalGoogleApiKey(googleApiKey);
-    toast({ title: "API Key Saved", description: "Google AI API Key has been saved. Set it in .env and restart server."});
-  };
-
   const handleSaveAppTitle = () => {
     if (!companyNameInput.trim()) {
       toast({ title: "Application Title Empty", description: "Please enter an application title.", variant: "destructive"}); return;
@@ -342,34 +325,6 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle>AI Settings</CardTitle><CardDescription>Configure AI-powered features.</CardDescription></CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="googleApiKey">Google AI API Key (stored locally)</Label>
-                <div className="flex gap-2 items-center flex-wrap">
-                  <Input id="googleApiKey" type="password" value={googleApiKey} onChange={(e) => setGoogleApiKey(e.target.value)} className="max-w-md flex-grow" placeholder="Enter Google AI API Key"/>
-                  <Button onClick={handleSaveApiKey} disabled={googleApiKey === originalGoogleApiKey}><Save className="mr-2 h-4 w-4" /> {googleApiKey ? "Save" : "Clear"} Key</Button>
-                </div>
-                <p className="text-xs text-muted-foreground">Your API key is stored locally in your browser for display and reference.</p>
-              </div>
-              <div className="text-sm space-y-2 p-4 border rounded-md bg-muted/50">
-                <h4 className="font-semibold text-md flex items-center gap-2"><KeyRound className="h-5 w-5"/> Using Your Google AI API Key</h4>
-                <p>AI features use Google AI models. Get your key from <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center">Google AI Studio <ExternalLink className="h-3 w-3 ml-1"/></Link>.</p>
-                <p className="font-semibold text-destructive">Important:</p>
-                <ol className="list-decimal list-inside pl-4 space-y-1 text-muted-foreground">
-                  <li>Save your key above (stores in browser for your reference).</li>
-                  <li>Create/open a <code className="bg-secondary px-1 py-0.5 rounded text-foreground">.env</code> file in the project's root directory.</li>
-                  <li>Add the line: <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto">GOOGLE_API_KEY=YOUR_API_KEY_HERE</pre></li>
-                  <li><strong>Restart development server(s)</strong> (Next.js & Genkit) for Genkit to pick up the key.</li>
-                </ol>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-6">
-           <UserManagementSettings />
         </TabsContent>
         
         <TabsContent value="data" className="space-y-6">
@@ -381,8 +336,8 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleSeedData} disabled={seedMutation.isPending}>
-                {seedMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+              <Button onClick={handleSeedData} disabled={isSeeding}>
+                {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                 Load Sample Data
               </Button>
             </CardContent>

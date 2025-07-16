@@ -124,9 +124,9 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                         <CommandEmpty>No customers found.</CommandEmpty>
                         <CommandGroup>
                           {customers?.map((customer) => (
-                            <CommandItem value={customer.id} key={customer.id} onSelect={() => {
-                              form.setValue("customerId", customer.id);
-                              form.setValue("customerName", customer.name); // Make sure this is set
+                            <CommandItem value={customer.name} key={customer.id} onSelect={() => {
+                              form.setValue("customerId", customer.id, { shouldValidate: true });
+                              form.setValue("customerName", customer.name, { shouldValidate: true });
                               setIsCustomerPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />

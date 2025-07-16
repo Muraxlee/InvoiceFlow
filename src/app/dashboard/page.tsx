@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +32,11 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2'
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
@@ -58,7 +63,7 @@ export default function DashboardPage() {
   };
 
   const dashboardMetrics = useMemo(() => {
-    if (!invoices || !customers || !products) return null;
+    if (!invoices || !customers || !products || !isClient) return null;
 
     let revenue = 0;
     let outstanding = 0;
@@ -125,7 +130,7 @@ export default function DashboardPage() {
       recentInvoices,
       revenueGrowth: growthRate,
     };
-  }, [invoices, customers, products]);
+  }, [invoices, customers, products, isClient]);
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   
@@ -168,7 +173,7 @@ export default function DashboardPage() {
     );
   };
   
-  if (isLoading) {
+  if (isLoading || !isClient) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
         <Activity className="h-10 w-10 animate-spin text-primary mb-4" />
@@ -198,7 +203,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (!dashboardMetrics) return null;
+  if (!dashboardMetrics) return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
+        <Activity className="h-10 w-10 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Preparing dashboard...</p>
+      </div>
+  );
 
   return (
     <div className="space-y-6">

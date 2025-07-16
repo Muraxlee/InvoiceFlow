@@ -26,7 +26,7 @@ import { format as formatDateFns, isValid, addDays } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
 import { suggestGstCategory, type GstSuggestionOutput } from '@/ai/flows/gst-suggestion';
 import { useToast } from "@/hooks/use-toast";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig } from "@/lib/localStorage";
+import { generateInvoiceNumber } from "@/lib/localStorage";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { Product, Customer } from "@/types/database";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -108,35 +108,6 @@ interface InvoiceFormProps {
   defaultValues?: Partial<InvoiceFormValues>;
   isLoading?: boolean;
   onCancel?: () => void;
-}
-
-export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = false): string {
-  if (typeof window === 'undefined') {
-    const prefix = DEFAULT_INVOICE_PREFIX.substring(0,3).toUpperCase();
-    const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
-    const sequentialNumber = "0001"; 
-    return `${prefix}${dateKey}${sequentialNumber}`;
-  }
-
-  const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
-    prefix: DEFAULT_INVOICE_PREFIX,
-    dailyCounters: {},
-  });
-
-  const prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
-  const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
-
-  const currentCounter = config.dailyCounters[dateKey] || 0;
-  const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
-
-  if (increment) {
-    config.dailyCounters[dateKey] = useCounter;
-    saveToLocalStorage(INVOICE_CONFIG_KEY, config);
-  }
-  
-  const sequentialNumber = String(useCounter).padStart(4, '0');
-
-  return `${prefix}${dateKey}${sequentialNumber}`;
 }
 
 export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoading: formSubmitLoading, onCancel }: InvoiceFormProps) {

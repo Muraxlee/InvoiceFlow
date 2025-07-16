@@ -1,6 +1,8 @@
 
 'use client';
 
+import { format as formatDateFns } from 'date-fns';
+
 // Helper function to safely get data from localStorage
 export function loadFromLocalStorage<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
@@ -44,6 +46,36 @@ export interface InvoiceConfig {
     [dateKey: string]: number; // dateKey will be "DDMMYYYY"
   };
 }
+
+export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = false): string {
+  if (typeof window === 'undefined') {
+    const prefix = DEFAULT_INVOICE_PREFIX.substring(0,3).toUpperCase();
+    const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
+    const sequentialNumber = "0001"; 
+    return `${prefix}${dateKey}${sequentialNumber}`;
+  }
+
+  const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
+    prefix: DEFAULT_INVOICE_PREFIX,
+    dailyCounters: {},
+  });
+
+  const prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
+  const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
+
+  const currentCounter = config.dailyCounters[dateKey] || 0;
+  const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
+
+  if (increment) {
+    config.dailyCounters[dateKey] = useCounter;
+    saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+  }
+  
+  const sequentialNumber = String(useCounter).padStart(4, '0');
+
+  return `${prefix}${dateKey}${sequentialNumber}`;
+}
+
 
 // Key for storing Google AI API Key
 export const GOOGLE_AI_API_KEY_STORAGE_KEY = "app_google_ai_api_key";

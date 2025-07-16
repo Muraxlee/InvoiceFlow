@@ -46,7 +46,7 @@ const measurementSchema = z.object({
   values: z.array(measurementValueSchema).min(1, "At least one measurement value is required."),
   notes: z.string().optional(),
 }).refine(data => {
-    if (data.type === 'Custom' && !data.customType) {
+    if (data.type === 'Custom' && (!data.customType || data.customType.trim() === '')) {
         return false;
     }
     return true;

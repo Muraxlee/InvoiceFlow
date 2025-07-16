@@ -64,7 +64,12 @@ export default function MeasurementDetailPage() {
   const handleSave = async (data: MeasurementFormValues) => {
     if (!measurement?.id) return;
     const { id, ...updateData } = data;
-    saveMutation.mutate({ id: measurement.id, values: updateData });
+    const finalData = {
+        ...updateData,
+        notes: updateData.notes || '',
+        customType: updateData.customType || '',
+    };
+    saveMutation.mutate({ id: measurement.id, values: finalData });
   };
   
   const DetailItem = ({ label, value, icon, className }: { label: string; value: string | React.ReactNode; icon?: React.ElementType; className?: string }) => {
@@ -191,4 +196,3 @@ export default function MeasurementDetailPage() {
     </div>
   );
 }
-

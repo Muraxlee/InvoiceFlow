@@ -1,39 +1,14 @@
-/* Import Google Fonts */
+/* Import Google Fonts - This is for the default set, custom fonts are loaded dynamically */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Nunito:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Add modern transitions for improved UX */
 @layer base {
-  /* Font classes */
-  html.font-inter, .font-inter {
-    font-family: 'Inter', sans-serif;
-  }
-  
-  html.font-roboto, .font-roboto {
-    font-family: 'Roboto', sans-serif;
-  }
-  
-  html.font-open-sans, .font-open-sans {
-    font-family: 'Open Sans', sans-serif;
-  }
-  
-  html.font-montserrat, .font-montserrat {
-    font-family: 'Montserrat', sans-serif;
-  }
-  
-  html.font-poppins, .font-poppins {
-    font-family: 'Poppins', sans-serif;
-  }
-  
-  html.font-lato, .font-lato {
-    font-family: 'Lato', sans-serif;
-  }
-  
-  html.font-nunito, .font-nunito {
-    font-family: 'Nunito', sans-serif;
+  :root {
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
   }
   
   * {
@@ -589,6 +564,6 @@ html[data-theme="custom"] {
   }
   body {
     @apply bg-background text-foreground; /* Uses CSS vars, will change with theme */
+    font-family: var(--font-sans), sans-serif;
   }
 }
-

@@ -36,6 +36,8 @@ import {
   CUSTOM_THEME_STORAGE_KEY,
   type CustomThemeValues,
   DEFAULT_CUSTOM_THEME_VALUES,
+  CUSTOM_FONTS_STORAGE_KEY,
+  type CustomFont,
 } from '@/lib/localStorage';
 import { FONT_STORAGE_KEY, DEFAULT_FONT_KEY, AVAILABLE_FONTS } from '@/components/font-settings';
 
@@ -314,20 +316,29 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   const applyFont = useCallback((fontKey: string) => {
     const htmlElement = document.documentElement;
-    Object.keys(AVAILABLE_FONTS).forEach(key => {
-      htmlElement.classList.remove(`font-${key}`);
-    });
-    if (fontKey !== "system") {
-      htmlElement.classList.add(`font-${fontKey}`);
-    }
-    
-    document.body.style.fontFamily = fontKey === "system"
-      ? "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
-      : `var(--font-${fontKey}), sans-serif`;
+    const bodyStyle = document.body.style;
 
-    localStorage.setItem(FONT_STORAGE_KEY, fontKey);
+    // Set CSS variable for the font family name
+    const font = AVAILABLE_FONTS[fontKey as keyof typeof AVAILABLE_FONTS] || fontKey;
+    htmlElement.style.setProperty('--font-sans', font);
   }, []);
   
+  const loadCustomFonts = useCallback(() => {
+    const customFonts = loadFromLocalStorage<CustomFont[]>(CUSTOM_FONTS_STORAGE_KEY, []);
+    const head = document.head;
+
+    // Clear previously added custom font links to prevent duplicates
+    head.querySelectorAll('link[data-custom-font]').forEach(link => link.remove());
+
+    customFonts.forEach(font => {
+      const link = document.createElement('link');
+      link.href = font.url;
+      link.rel = 'stylesheet';
+      link.setAttribute('data-custom-font', 'true');
+      head.appendChild(link);
+    });
+  }, []);
+
   useEffect(() => {
     const storedThemeKey = localStorage.getItem(THEME_STORAGE_KEY);
     if (storedThemeKey && AVAILABLE_THEMES[storedThemeKey as keyof typeof AVAILABLE_THEMES]) {
@@ -336,28 +347,28 @@ export default function Providers({ children }: { children: ReactNode }) {
       applyTheme(DEFAULT_THEME_KEY);
     }
 
-    const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY);
-    if (storedFontKey && AVAILABLE_FONTS[storedFontKey as keyof typeof AVAILABLE_FONTS]) {
-      applyFont(storedFontKey);
-    } else {
-      applyFont(DEFAULT_FONT_KEY);
-    }
+    loadCustomFonts();
+    const storedFontKey = localStorage.getItem(FONT_STORAGE_KEY) || DEFAULT_FONT_KEY;
+    applyFont(storedFontKey);
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY && event.newValue && AVAILABLE_THEMES[event.newValue as keyof typeof AVAILABLE_THEMES]) {
         applyTheme(event.newValue);
       }
-      if (event.key === FONT_STORAGE_KEY && event.newValue && AVAILABLE_FONTS[event.newValue as keyof typeof AVAILABLE_FONTS]) {
+      if (event.key === FONT_STORAGE_KEY && event.newValue) {
         applyFont(event.newValue);
       }
       if (event.key === CUSTOM_THEME_STORAGE_KEY && localStorage.getItem(THEME_STORAGE_KEY) === 'custom') {
         applyCustomThemeVariables(event.newValue ? JSON.parse(event.newValue) : DEFAULT_CUSTOM_THEME_VALUES);
       }
+      if (event.key === CUSTOM_FONTS_STORAGE_KEY) {
+        loadCustomFonts();
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [applyTheme, applyFont, applyCustomThemeVariables]);
+  }, [applyTheme, applyFont, applyCustomThemeVariables, loadCustomFonts]);
 
   if (firebaseError) {
     return (
@@ -381,7 +392,7 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased bg-background text-foreground">
+      <body className="antialiased bg-background text-foreground font-sans">
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <AppShell>

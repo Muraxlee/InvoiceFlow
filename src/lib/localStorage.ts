@@ -98,6 +98,13 @@ export const DEFAULT_CUSTOM_THEME_VALUES: CustomThemeValues = {
   primary: "180 60% 45%",
 };
 
+// Key for storing custom fonts
+export const CUSTOM_FONTS_STORAGE_KEY = "app_custom_fonts";
+export interface CustomFont {
+  name: string;
+  url: string;
+}
+
 // Key for storing last manual backup timestamp
 export const LAST_BACKUP_TIMESTAMP_KEY = "app_last_backup_timestamp";
 
@@ -105,19 +112,20 @@ export const LAST_BACKUP_TIMESTAMP_KEY = "app_last_backup_timestamp";
 export const CUSTOMERS_STORAGE_KEY = "app_customers";
 export const PRODUCTS_STORAGE_KEY = "app_products";
 export const INVOICES_STORAGE_KEY = "app_invoices";
-// THEME_STORAGE_KEY is defined in layout.tsx, but we might need it here for export/import logic if not passed around.
-// For consistency, let's ensure we can access it or define it here too if necessary for the 'all data' operations.
-// However, for now, assuming layout.tsx's THEME_STORAGE_KEY is used.
+export const MEASUREMENTS_STORAGE_KEY = "app_measurements";
+
 
 export interface AllApplicationData {
   [CUSTOMERS_STORAGE_KEY]?: any[];
   [PRODUCTS_STORAGE_KEY]?: any[];
   [INVOICES_STORAGE_KEY]?: any[];
+  [MEASUREMENTS_STORAGE_KEY]?: any[];
   [INVOICE_CONFIG_KEY]?: InvoiceConfig;
   [GOOGLE_AI_API_KEY_STORAGE_KEY]?: string;
   [COMPANY_NAME_STORAGE_KEY]?: string;
-  appThemeKey?: string; // Using a distinct key for theme during export/import
+  appThemeKey?: string; 
   [CUSTOM_THEME_STORAGE_KEY]?: CustomThemeValues;
+  [CUSTOM_FONTS_STORAGE_KEY]?: CustomFont[];
   [LAST_BACKUP_TIMESTAMP_KEY]?: number;
   appVersion?: string;
 }

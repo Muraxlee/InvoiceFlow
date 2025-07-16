@@ -11,6 +11,13 @@ export const metadata: Metadata = {
     template: `%s | ${DEFAULT_COMPANY_NAME}`,
   },
   description: 'Advanced Invoice Management System.',
+  // Adding preconnect links for Google Fonts
+  other: {
+    preconnect: [
+      { href: "https://fonts.googleapis.com" },
+      { href: "https://fonts.gstatic.com", crossOrigin: "anonymous" }
+    ]
+  }
 };
 
 export default function RootLayout({

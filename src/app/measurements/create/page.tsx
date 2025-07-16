@@ -28,7 +28,6 @@ export default function CreateMeasurementPage() {
     recordedDate: new Date(),
     deliveryDate: null,
     values: [{ name: "", value: 0, unit: "in" }],
-    // customerId and customerName will be set when the user selects a customer
     customerId: "",
     customerName: ""
   };
@@ -54,7 +53,6 @@ export default function CreateMeasurementPage() {
   });
 
   const handleSubmit = async (data: MeasurementFormValues) => {
-    // Ensure customerName is present, as it's required by the schema and type now
     if (!data.customerName) {
         toast({
             title: "Customer Name Missing",

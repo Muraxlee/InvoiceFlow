@@ -247,10 +247,11 @@ export async function getUserRole(uid: string): Promise<User | null> {
 // Batch delete helper
 async function deleteCollection(collectionPath: string) {
     checkDb();
+    if (!db) throw new Error("Firestore not initialized");
     const q = query(collection(db, collectionPath));
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) return;
-    const batch = writeBatch(db!);
+    const batch = writeBatch(db);
     querySnapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
     });
@@ -272,31 +273,36 @@ export async function clearAllInvoices(): Promise<void> {
     localStorage.removeItem(INVOICES_STORAGE_KEY);
 }
 
+export async function clearAllMeasurements(): Promise<void> {
+    await deleteCollection(MEASUREMENTS);
+    localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
+}
+
 export async function clearAllData(): Promise<void> {
     checkDb();
+    if (!db) throw new Error("Firestore not initialized");
     await Promise.all([
         clearAllCustomers(),
         clearAllProducts(),
         clearAllInvoices(),
-        deleteCollection(MEASUREMENTS),
-        // Company info is a single doc, so we delete it separately
-        deleteDoc(doc(db!, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
+        clearAllMeasurements(),
+        deleteDoc(doc(db, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
     ]);
-    localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
 }
 
 export async function seedSampleData(): Promise<void> {
     checkDb();
-    const batch = writeBatch(db!);
+    if (!db) throw new Error("Firestore not initialized");
+    const batch = writeBatch(db);
 
     // 1. Sample Customer with a predictable ID
     const customerData = { id: "sample-customer-1", data: { name: "Acme Innovations", email: "contact@acmeinnovations.com", phone: "555-0101", address: "123 Innovation Dr, Tech City, 11001", gstin: "29AABCU9567M1Z5", state: "Karnataka", stateCode: "29" }};
-    const customerRef = doc(db!, CUSTOMERS, customerData.id);
+    const customerRef = doc(db, CUSTOMERS, customerData.id);
     batch.set(customerRef, { ...customerData.data, createdAt: serverTimestamp() });
 
     // 2. Sample Product with a predictable ID
     const productData = { id: "sample-product-1", data: { name: "Pro-Grade Website Development", description: "10-page responsive website", price: 50000, hsn: "998314", igstRate: 18, cgstRate: 9, sgstRate: 9 }};
-    const productRef = doc(db!, PRODUCTS, productData.id);
+    const productRef = doc(db, PRODUCTS, productData.id);
     batch.set(productRef, { ...productData.data, createdAt: serverTimestamp() });
 
     // 3. Sample Invoice using the customer and product
@@ -329,7 +335,7 @@ export async function seedSampleData(): Promise<void> {
         paymentStatus: "Unpaid",
         roundOffApplied: true,
     };
-    const invoiceRef = doc(db!, INVOICES, 'sample-invoice-1');
+    const invoiceRef = doc(db, INVOICES, 'sample-invoice-1');
     batch.set(invoiceRef, sampleInvoiceData as any); // Cast to any to handle serverTimestamp and dates
 
     await batch.commit();

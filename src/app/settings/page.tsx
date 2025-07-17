@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
 import type { CompanyInfo } from "@/types/database";
-import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData } from "@/lib/firestore-actions"; 
+import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 
 const initialCompanyInfo: CompanyInfo = {
@@ -111,58 +111,61 @@ export default function SettingsPage() {
   const handleSeedData = () => {
       seedMutation();
   };
-
-  const handleDataAction = async (actionName: string, dataType?: 'customers' | 'products' | 'allData' | 'settings') => {
-    console.log(`${actionName} for ${dataType} initiated`);
-    let success = false;
-    let requiresReload = false;
-    
-    try {
-      if (dataType === 'customers') {
-          await clearAllCustomers(); success = true;
-      } else if (dataType === 'products') {
-          await clearAllProducts(); success = true;
-      } else if (dataType === 'allData') { 
-          await clearAllData(); success = true; 
-          setCompanyInfo(initialCompanyInfo);
+  
+  const { mutate: dataClearMutation, isPending: isDataClearing } = useMutation({
+    mutationFn: async (dataType: 'customers' | 'products' | 'invoices' | 'measurements' | 'allData' | 'settings') => {
+      switch (dataType) {
+        case 'customers': return clearAllCustomers();
+        case 'products': return clearAllProducts();
+        case 'invoices': return clearAllInvoices();
+        case 'measurements': return clearAllMeasurements();
+        case 'allData': return clearAllData();
+        case 'settings':
+            const keysToClear = [
+                COMPANY_NAME_STORAGE_KEY, INVOICE_CONFIG_KEY, 
+                THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
+            ];
+            keysToClear.forEach(key => localStorage.removeItem(key));
+            return Promise.resolve();
+        default: throw new Error("Invalid data type for clearing.");
       }
+    },
+    onSuccess: (_, dataType) => {
+      let requiresReload = false;
+      const actionName = {
+        customers: "Clear Customer Data",
+        products: "Clear Product Data",
+        invoices: "Clear Invoice Data",
+        measurements: "Clear Measurement Data",
+        allData: "Factory Reset",
+        settings: "Settings Reset",
+      }[dataType];
 
-      if (dataType === 'allData' || dataType === 'settings') {
-          // This part handles localStorage clearing which is client-side.
-          const keysToClearFromLocalStorage = [
-              COMPANY_NAME_STORAGE_KEY, INVOICE_CONFIG_KEY, 
-              THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
-          ];
-          keysToClearFromLocalStorage.forEach(key => localStorage.removeItem(key));
-          
-          setCompanyNameInput(DEFAULT_COMPANY_NAME);
-          setCurrentCompanyName(DEFAULT_COMPANY_NAME);
-          if (document) document.title = DEFAULT_COMPANY_NAME;
-          const defaultConfig = { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} };
-          saveToLocalStorage(INVOICE_CONFIG_KEY, defaultConfig);
-          setInvoicePrefix(defaultConfig.prefix); setOriginalInvoicePrefix(defaultConfig.prefix);
-          handleThemeChange(DEFAULT_THEME_KEY); 
-          setCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES); setOriginalCustomThemeValues(DEFAULT_CUSTOM_THEME_VALUES);
-          saveToLocalStorage(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
-          setLastSettingsBackupTimestamp(null); saveToLocalStorage(LAST_BACKUP_TIMESTAMP_KEY, null);
-          success = true; requiresReload = true;
-      }
-    } catch (error) {
-      console.error(`Error during ${actionName}:`, error);
-      toast({ title: "Error", description: `Failed to perform ${actionName.toLowerCase()}.`, variant: "destructive" });
-      return;
-    }
-    
-    if (success) {
-        toast({
+      toast({
         title: `${actionName} Successful`,
-        description: `The ${actionName.toLowerCase()} operation has been completed. ${requiresReload ? 'Page will reload.' : ''}`,
-        });
-        if (requiresReload) setTimeout(() => window.location.reload(), 1500);
-    } else {
-         toast({ title: `Action Not Fully Supported`, description: `Operation for ${dataType} might not be fully implemented.`, variant: "warning"});
-    }
-  };
+        description: `The operation has been completed.`,
+      });
+
+      // Invalidate relevant queries
+      if (dataType === 'customers' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['customers'] });
+      if (dataType === 'products' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (dataType === 'invoices' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      if (dataType === 'measurements' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['measurements'] });
+      if (dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['companyInfo'] });
+
+      // If settings are reset, or all data is cleared, reload the page
+      if (dataType === 'settings' || dataType === 'allData') {
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    },
+    onError: (error: any, dataType) => {
+      toast({
+        title: "Error",
+        description: `Failed to clear ${dataType} data: ${error.message}`,
+        variant: "destructive"
+      });
+    },
+  });
 
   const handleSaveInvoiceSettings = () => {
     const currentConfig = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} });
@@ -336,7 +339,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleSeedData} disabled={isSeeding}>
+              <Button onClick={handleSeedData} disabled={isSeeding || isDataClearing}>
                 {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                 Load Sample Data
               </Button>
@@ -350,10 +353,10 @@ export default function SettingsPage() {
                   <h3 className="font-semibold text-lg mb-1">{action.label}</h3>
                   <p className="text-sm text-muted-foreground mb-3">{action.description}</p>
                   <ConfirmDialog
-                    triggerButton={<Button variant="destructive" className="w-full sm:w-auto"><Trash2 className="mr-2 h-4 w-4" /> {action.label.replace(/\s\(.*\)/, '')}</Button>}
+                    triggerButton={<Button variant="destructive" className="w-full sm:w-auto" disabled={isDataClearing}><Trash2 className="mr-2 h-4 w-4" /> {action.label.replace(/\s\(.*\)/, '')}</Button>}
                     title={`Confirm ${action.label}`}
                     description={`Are you sure? This cannot be undone.`}
-                    onConfirm={() => handleDataAction(action.label, action.dataType)}
+                    onConfirm={() => dataClearMutation(action.dataType)}
                     confirmText="Yes, Proceed" confirmVariant="destructive"
                   />
                 </div>

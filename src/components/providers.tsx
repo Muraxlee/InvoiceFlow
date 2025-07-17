@@ -316,11 +316,9 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   const applyFont = useCallback((fontKey: string) => {
     const htmlElement = document.documentElement;
-    const bodyStyle = document.body.style;
-
-    // Set CSS variable for the font family name
-    const font = AVAILABLE_FONTS[fontKey as keyof typeof AVAILABLE_FONTS] || fontKey;
-    htmlElement.style.setProperty('--font-sans', font);
+    const fontName = AVAILABLE_FONTS[fontKey as keyof typeof AVAILABLE_FONTS] || fontKey;
+    htmlElement.style.setProperty('--font-sans', `'${fontName}', sans-serif`);
+    localStorage.setItem(FONT_STORAGE_KEY, fontKey);
   }, []);
   
   const loadCustomFonts = useCallback(() => {

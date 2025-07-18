@@ -62,19 +62,17 @@ async function getCollectionWithCache<T extends {id: string}>(collectionPath: st
     }
 
     // Client-side logic
-    const cachedData = loadFromLocalStorage<T[] | null>(storageKey, null);
-    
-    // Fetch from Firestore in the background to update cache
-    const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
-    getDocs(q).then(querySnapshot => {
+    try {
+        const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
+        const querySnapshot = await getDocs(q);
         const firestoreData = querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
         saveToLocalStorage(storageKey, firestoreData);
-        // Optional: Could add logic here to notify app of new data
-    }).catch(error => {
-        console.error(`Error fetching ${collectionPath} in background:`, error);
-    });
-
-    return cachedData || [];
+        return firestoreData;
+    } catch (error) {
+        console.warn(`Error fetching ${collectionPath} from Firestore, falling back to cache:`, error);
+        // If there's an error (e.g., offline), load from cache
+        return loadFromLocalStorage<T[]>(storageKey, []);
+    }
 }
 
 // Invoice Actions

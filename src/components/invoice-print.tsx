@@ -38,7 +38,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
   const getCurrentInvoiceTypeTitle = () => {
     switch (invoiceType) {
       case 'proforma': return "PROFORMA INVOICE";
-      case 'quotation': return "QUOTATION";
+      case 'quotation': return "Quotation";
       case 'tax':
       default: return "TAX INVOICE";
     }
@@ -158,10 +158,10 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             body { font-family: 'Arial', sans-serif; color: #000; font-size: 12pt; line-height: 1.5; }
             .quotation-container { width: 100%; margin: 0 auto; }
             .header { text-align: center; margin-bottom: 20px; }
-            .cell-no { font-size: 11pt; font-weight: bold; }
-            .company-name { font-size: 24pt; font-weight: bold; margin: 5px 0; }
-            .address { font-size: 11pt; }
-            .gst-no { font-size: 11pt; margin-bottom: 10px; }
+            .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
+            .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
+            .company-contact { margin-bottom: 3mm; }
+            .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
             hr { border: 0; border-top: 1px solid #000; margin: 15px 0; }
             .meta-info { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
             .to-address { width: 60%; }
@@ -175,7 +175,6 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             .text-right { text-align: right; }
             .footer-notes { margin-top: 20px; font-size: 11pt; }
             .footer { margin-top: 40px; }
-            .signature { margin-top: 60px; }
             @media print {
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .no-print { display: none; }
@@ -185,10 +184,14 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
         <body>
           <div class="quotation-container">
             <div class="header">
-              <div class="cell-no">CELL NO: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''}</div>
-              <div class="company-name">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
-              <div class="address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
-              <div class="gst-no">GST No: ${company?.gstin || ''}</div>
+              <div class="title">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
+              <div class="company-address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
+              <div class="company-contact">
+                Phone: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''} | 
+                Email: ${company?.email || ''} | 
+                GSTIN: ${company?.gstin || ''}
+              </div>
+              <div class="subtitle">Quotation</div>
             </div>
             <hr/>
             <div class="meta-info">
@@ -224,7 +227,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
               <div style="white-space: pre-wrap;">${invoice.termsAndConditions || 'GST will be applicable as per government norms.'}</div>
             </div>
             <div class="footer">
-              <p>Regards,<br/><strong>${company?.name || 'SEAFARER NAVEL TAILORS'}</strong></p>
+              <p>Regards,<br/><strong>For ${company?.name || 'SEAFARER NAVEL TAILORS'}</strong></p>
               <br/><br/>
               <hr/>
               <p class="text-center" style="font-size: 10pt;">IF YOU HAVE ANY QUESTION REGARDING THIS QUOTATION. CONTACT US.</p>
@@ -298,9 +301,9 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
           .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
-          .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
           .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
           .company-contact { margin-bottom: 3mm; }
+          .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
           .info-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
           .info-box { border: 1px solid #000; flex: 1; margin: 0 0.5mm; display: flex; flex-direction: column; }
           .info-box-title { font-weight: bold; padding: 1mm; border-bottom: 1px solid #000; background-color: #f0f0f0; text-align: center; font-size: 7.5pt;}

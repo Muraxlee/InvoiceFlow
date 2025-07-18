@@ -297,8 +297,8 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           * { box-sizing: border-box; }
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
-          .title { text-align: center; font-weight: bold; font-size: 15pt; margin-bottom: 1.5mm; text-transform: uppercase; color: #000; }
-          .subtitle { text-align: center; font-size: 9.5pt; margin-bottom: 1.5mm; font-weight: bold; color: #000; }
+          .title { text-align: center; font-weight: bold; font-size: 16pt; margin-bottom: 1mm; color: #000; text-transform: none; }
+          .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
           .company-address, .company-contact { text-align: center; font-size: 7.5pt; margin-bottom: 0.8mm; color: #000; }
           .company-contact { margin-bottom: 3mm; }
           .info-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
@@ -351,8 +351,8 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       <body>
         <div class="invoice-box">
           <div class="original-mark">${getCurrentDocumentType()}</div>
-          <div class="title">${getCurrentInvoiceTypeTitle()}</div>
-          <div class="subtitle">${company?.name || 'Your Company Name'}</div>
+          <div class="title">${company?.name || 'Your Company Name'}</div>
+          <div class="subtitle">${getCurrentInvoiceTypeTitle()}</div>
           <div class="company-address">${company?.address || 'Your Company Address'}</div>
           <div class="company-contact">
             Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -184,7 +185,7 @@ export default function MeasurementDetailPage() {
             
             {measurement.notes && (
               <Card>
-                <CardHeader><CardTitle className="text-lg flex items-center gap-1"><StickyNote className="h-5 w-5" />Notes</CardHeader>
+                <CardHeader><CardTitle className="text-lg flex items-center gap-1"><StickyNote className="h-5 w-5" />Notes</CardTitle></CardHeader>
                 <CardContent>
                     <p className="text-sm whitespace-pre-wrap">{measurement.notes}</p>
                 </CardContent>

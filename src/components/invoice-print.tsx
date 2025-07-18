@@ -299,7 +299,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
           .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
           .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
-          .company-address, .company-contact { text-align: center; font-size: 7.5pt; margin-bottom: 0.8mm; color: #000; }
+          .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
           .company-contact { margin-bottom: 3mm; }
           .info-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
           .info-box { border: 1px solid #000; flex: 1; margin: 0 0.5mm; display: flex; flex-direction: column; }
@@ -633,4 +633,3 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     </div>
   );
 }
-

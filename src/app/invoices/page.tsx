@@ -14,15 +14,19 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { type StoredInvoice } from "@/types/database";
 import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from 'date-fns';
+import { format, isPast, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+type StatusFilter = "all" | "paid" | "unpaid" | "overdue";
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
@@ -31,13 +35,38 @@ export default function InvoicesPage() {
 
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return invoices.filter(invoice => 
-      invoice.invoiceNumber.toLowerCase().includes(lowercasedTerm) ||
-      invoice.customerName.toLowerCase().includes(lowercasedTerm) ||
-      invoice.status?.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [invoices, searchTerm]);
+    
+    const today = startOfDay(new Date());
+
+    return invoices.filter(invoice => {
+      // Status Filtering
+      const invoiceStatus = invoice.status || "Unpaid";
+      const isOverdue = invoice.dueDate && isPast(new Date(invoice.dueDate)) && (invoiceStatus === 'Unpaid' || invoiceStatus === 'Partially Paid' || invoiceStatus === 'Pending');
+
+      let statusMatch = true;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'overdue') {
+          statusMatch = isOverdue;
+        } else if (statusFilter === 'unpaid') {
+          statusMatch = (invoiceStatus === 'Unpaid' || invoiceStatus === 'Pending' || invoiceStatus === 'Partially Paid') && !isOverdue;
+        } else {
+          statusMatch = invoiceStatus.toLowerCase() === statusFilter;
+        }
+      }
+
+      // Search Term Filtering
+      if (!statusMatch) return false;
+      
+      const lowercasedTerm = searchTerm.toLowerCase();
+      if (!lowercasedTerm) return true;
+
+      return (
+        invoice.invoiceNumber.toLowerCase().includes(lowercasedTerm) ||
+        invoice.customerName.toLowerCase().includes(lowercasedTerm) ||
+        (isOverdue ? "overdue".includes(lowercasedTerm) : invoiceStatus.toLowerCase().includes(lowercasedTerm))
+      );
+    });
+  }, [invoices, searchTerm, statusFilter]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteInvoice,
@@ -62,17 +91,18 @@ export default function InvoicesPage() {
     deleteMutation.mutate(invoiceId);
   };
 
-  const statusVariant = (status: string | undefined) => {
-    if (!status) return "outline";
-    switch (status.toLowerCase()) {
-      case "paid": return "success"; 
-      case "pending": return "warning"; 
-      case "unpaid": return "warning";
-      case "overdue": return "destructive";
-      case "draft": return "outline";
-      case "partially paid": return "info";
-      default: return "outline";
+  const getStatusBadge = (invoice: StoredInvoice) => {
+    let status = invoice.status || 'Unpaid';
+    if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && (status === 'Unpaid' || status === 'Pending' || status === 'Partially Paid')) {
+        status = 'Overdue';
     }
+
+    const variant = status.toLowerCase() === 'paid' ? 'success' :
+                    status.toLowerCase() === 'overdue' ? 'destructive' :
+                    status.toLowerCase() === 'pending' || status.toLowerCase() === 'unpaid' ? 'warning' :
+                    status.toLowerCase() === 'partially paid' ? 'info' :
+                    'outline';
+    return <Badge variant={variant as any}>{status}</Badge>;
   };
   
   const pageActions = (
@@ -118,19 +148,27 @@ export default function InvoicesPage() {
       />
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>Invoice List</CardTitle>
-            <CardDescription>A list of all invoices in the system.</CardDescription>
+        <CardHeader className="flex-col items-start gap-4">
+          <div className="flex items-center justify-between w-full">
+            <div>
+              <CardTitle>Invoice List</CardTitle>
+              <CardDescription>A list of all invoices in the system.</CardDescription>
+            </div>
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by ID, customer, status..." 
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search by ID, customer, status..." 
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-wrap gap-2 pt-2">
+              <Button variant={statusFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('all')}>All</Button>
+              <Button variant={statusFilter === 'paid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('paid')}>Paid</Button>
+              <Button variant={statusFilter === 'unpaid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('unpaid')}>Unpaid</Button>
+              <Button variant={statusFilter === 'overdue' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('overdue')}>Overdue</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -164,7 +202,7 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-right">₹{(invoice.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant(invoice.status) as any}>{invoice.status || 'Unpaid'}</Badge>
+                      {getStatusBadge(invoice)}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

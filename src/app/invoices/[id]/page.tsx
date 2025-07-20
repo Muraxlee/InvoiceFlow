@@ -31,6 +31,11 @@ export default function InvoiceDetailPage() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("view");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const { data: invoice, isLoading: isInvoiceLoading, error: invoiceError, refetch: refetchInvoice } = useQuery<StoredInvoice | null>({
     queryKey: ['invoice', params.id],
@@ -91,8 +96,8 @@ export default function InvoiceDetailPage() {
     
     let currentStatus = invoice.status;
     
-    // Dynamically determine if the invoice is overdue
-    if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && (currentStatus === 'Unpaid' || currentStatus === 'Pending' || currentStatus === 'Partially Paid')) {
+    // Dynamically determine if the invoice is overdue only on the client
+    if (isClient && invoice.dueDate && isPast(new Date(invoice.dueDate)) && (currentStatus === 'Unpaid' || currentStatus === 'Pending' || currentStatus === 'Partially Paid')) {
       currentStatus = 'Overdue';
     }
 
@@ -109,7 +114,7 @@ export default function InvoiceDetailPage() {
     };
 
     return { displayedStatus: currentStatus, statusVariant: getVariant(currentStatus) };
-  }, [invoice]);
+  }, [invoice, isClient]);
 
   const DetailItem = ({ label, value, icon, className }: { label: string; value: string | React.ReactNode; icon?: React.ElementType; className?: string }) => {
     const Icon = icon;
@@ -371,4 +376,3 @@ export default function InvoiceDetailPage() {
     </div>
   );
 }
-

@@ -81,7 +81,7 @@ export default function DashboardPage() {
           const invDate = new Date(invoice.invoiceDate);
           if (!isValid(invDate)) return;
           
-          const status = invoice.status || "Unknown";
+          const status = invoice.status || "Unpaid";
           statusCounts[status] = (statusCounts[status] || 0) + 1;
           
           if (status === "Paid") {
@@ -124,8 +124,7 @@ export default function DashboardPage() {
             pendingInvoicesCount: pendingCount,
             salesData: trendData,
             invoiceStatusData: Object.entries(statusCounts)
-              .map(([name, value]) => ({ name, value }))
-              .filter(item => item.value > 0),
+              .map(([name, value]) => ({ name, value })),
             topCustomers,
             topProducts,
             recentInvoices,
@@ -313,7 +312,7 @@ export default function DashboardPage() {
                 </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
-            {dashboardMetrics.salesData.length === 0 && ( <div className="flex items-center justify-center h-full"> <p className="text-muted-foreground">No sales data available to display chart.</p> </div> )}
+            {dashboardMetrics.salesData.every(d => d.amount === 0) && ( <div className="flex items-center justify-center h-full"> <p className="text-muted-foreground">No sales data available to display chart.</p> </div> )}
           </CardContent>
         </Card>
         

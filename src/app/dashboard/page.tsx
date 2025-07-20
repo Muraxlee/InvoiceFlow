@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import type { StoredInvoice, Customer, Product } from '@/types/database';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
-import { loadFromLocalStorage, INVOICES_STORAGE_KEY, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY } from '@/lib/localStorage';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -45,36 +44,28 @@ type DashboardMetrics = {
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
-  const [isClient, setIsClient] = useState(false);
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
-    initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
 
   const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
-    initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, []),
   });
 
   const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
-    initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
   
   const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;
   const error = invoicesError || customersError || productsError;
 
   useEffect(() => {
-    if (invoices && customers && products && isClient) {
+    if (invoices && customers && products) {
         let revenue = 0;
         let outstanding = 0;
         let pendingCount = 0;
@@ -141,7 +132,7 @@ export default function DashboardPage() {
             revenueGrowth: growthRate,
         });
     }
-  }, [invoices, customers, products, isClient]);
+  }, [invoices, customers, products]);
 
 
   const refetch = () => {
@@ -158,6 +149,8 @@ export default function DashboardPage() {
       case "pending": return "warning";
       case "overdue": return "destructive";
       case "draft": return "outline";
+      case "unpaid": return "warning";
+      case "partially paid": return "info";
       default: return "outline";
     }
   };
@@ -361,7 +354,7 @@ export default function DashboardPage() {
                       <TableCell>{invoice.customerName}</TableCell>
                       <TableCell> {format(new Date(invoice.invoiceDate), 'dd MMM yyyy')} </TableCell>
                       <TableCell>₹{(invoice.amount || 0).toLocaleString('en-IN')}</TableCell>
-                      <TableCell> <Badge variant={statusVariant(invoice.status) as any} className="text-xs"> {invoice.status} </Badge> </TableCell>
+                      <TableCell> <Badge variant={statusVariant(invoice.status || 'Unpaid')} className="text-xs"> {invoice.status || 'Unpaid'} </Badge> </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

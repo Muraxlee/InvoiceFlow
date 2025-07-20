@@ -12,13 +12,14 @@ import PageHeader from "@/components/page-header";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 interface ReportData {
   totalRevenue: number;
   totalUnpaid: number;
   totalInvoices: number;
   averageInvoiceValue: number;
-  paymentStatusCounts: { [key: string]: number };
+  paymentStatusCounts: { name: string; value: number }[];
   monthlySalesData: { month: string; sales: number }[];
   topCustomers: { name: string; totalAmount: number; id: string }[];
   topProducts: { name:string; totalAmount: number; id: string }[];
@@ -51,6 +52,19 @@ export default function ReportsPage() {
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
+  const statusVariant = (status: string | undefined) => {
+    if (!status) return "outline";
+    switch (status.toLowerCase()) {
+      case "paid": return "success"; 
+      case "pending": return "warning"; 
+      case "unpaid": return "warning";
+      case "overdue": return "destructive";
+      case "draft": return "outline";
+      case "partially paid": return "info";
+      default: return "outline";
+    }
+  };
+
   const reportData = useMemo<ReportData | null>(() => {
     if (!invoices || !customers || !products) return null;
     
@@ -61,7 +75,7 @@ export default function ReportsPage() {
 
     invoices.forEach(inv => {
       const invoiceDate = new Date(inv.invoiceDate);
-      const status = inv.status || "Unknown";
+      const status = inv.status || "Unpaid";
       paymentStatusCounts[status] = (paymentStatusCounts[status] || 0) + 1;
 
       if (inv.status === "Paid") {
@@ -124,7 +138,7 @@ export default function ReportsPage() {
       totalUnpaid,
       totalInvoices,
       averageInvoiceValue,
-      paymentStatusCounts,
+      paymentStatusCounts: Object.entries(paymentStatusCounts).map(([name, value]) => ({ name, value })),
       monthlySalesData,
       topCustomers,
       topProducts,
@@ -234,36 +248,38 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card id="customer-revenue-grid">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <Users className="h-5 w-5 mr-2 text-blue-500" />
-              Top Customers by Revenue
+              Invoice Status Report
             </CardTitle>
             <CardDescription>
-              Your highest-value customers based on total paid invoices.
+              A summary of all invoices by their current payment status.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Count</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportData.topCustomers.length > 0 ? (
-                  reportData.topCustomers.map((customer) => (
-                    <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
-                      <TableCell className="text-right">₹{customer.totalAmount.toLocaleString('en-IN')}</TableCell>
+                {reportData.paymentStatusCounts.length > 0 ? (
+                  reportData.paymentStatusCounts.map((status) => (
+                    <TableRow key={status.name}>
+                      <TableCell className="font-medium">
+                        <Badge variant={statusVariant(status.name) as any}>{status.name}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{status.value}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={2} className="text-center text-muted-foreground">
-                      No customer revenue data available
+                      No status data available
                     </TableCell>
                   </TableRow>
                 )}
@@ -302,6 +318,44 @@ export default function ReportsPage() {
                   <TableRow>
                     <TableCell colSpan={2} className="text-center text-muted-foreground">
                       No product revenue data available
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card id="customer-revenue-grid" className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Users className="h-5 w-5 mr-2 text-blue-500" />
+              Top Customers by Revenue
+            </CardTitle>
+            <CardDescription>
+              Your highest-value customers based on total paid invoices.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportData.topCustomers.length > 0 ? (
+                  reportData.topCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell className="text-right">₹{customer.totalAmount.toLocaleString('en-IN')}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">
+                      No customer revenue data available
                     </TableCell>
                   </TableRow>
                 )}

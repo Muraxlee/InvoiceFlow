@@ -70,6 +70,7 @@ export default function InvoicesPage() {
       case "unpaid": return "warning";
       case "overdue": return "destructive";
       case "draft": return "outline";
+      case "partially paid": return "info";
       default: return "outline";
     }
   };
@@ -163,7 +164,7 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-right">₹{(invoice.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant(invoice.status) as any}>{invoice.status || 'Unknown'}</Badge>
+                      <Badge variant={statusVariant(invoice.status) as any}>{invoice.status || 'Unpaid'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

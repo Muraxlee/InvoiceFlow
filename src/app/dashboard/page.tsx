@@ -10,7 +10,7 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid } from 'date-fns';
+import { format, subDays, parseISO, isValid, isAfter, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -70,24 +70,28 @@ export default function DashboardPage() {
         let outstanding = 0;
         let pendingCount = 0;
         const statusCounts: Record<string, number> = {};
-        const dailySales: Record<string, number> = {};
-        const today = new Date();
-        const last30Days = Array.from({ length: 30 }, (_, i) => format(subDays(today, 29 - i), 'yyyy-MM-dd'));
-        last30Days.forEach(date => { dailySales[date] = 0; });
         const customerSales: Record<string, number> = {};
         const productSales: Record<string, number> = {};
+        
+        const today = startOfDay(new Date());
+        const thirtyDaysAgo = subDays(today, 29);
+        const fifteenDaysAgo = subDays(today, 14);
+
+        const last30DaysDates = Array.from({ length: 30 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd')).reverse();
+        const dailySales: Record<string, number> = {};
+        last30DaysDates.forEach(date => { dailySales[date] = 0; });
         
         invoices.forEach(invoice => {
           const invDate = new Date(invoice.invoiceDate);
           if (!isValid(invDate)) return;
-          
+
           const status = invoice.status || "Unpaid";
           statusCounts[status] = (statusCounts[status] || 0) + 1;
           
           if (status === "Paid") {
             revenue += invoice.amount || 0;
             const dateStr = format(invDate, 'yyyy-MM-dd');
-            if (dailySales[dateStr] !== undefined) {
+            if (dateStr in dailySales) {
               dailySales[dateStr] += invoice.amount || 0;
             }
             customerSales[invoice.customerId] = (customerSales[invoice.customerId] || 0) + (invoice.amount || 0);
@@ -100,8 +104,14 @@ export default function DashboardPage() {
           }
         });
 
-        const recentRevenue = last30Days.slice(15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
-        const previousRevenue = last30Days.slice(0, 15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
+        const recentRevenue = Object.entries(dailySales)
+            .filter(([date]) => isAfter(parseISO(date), fifteenDaysAgo))
+            .reduce((sum, [, amount]) => sum + amount, 0);
+
+        const previousRevenue = Object.entries(dailySales)
+            .filter(([date]) => !isAfter(parseISO(date), fifteenDaysAgo) && isAfter(parseISO(date), thirtyDaysAgo))
+            .reduce((sum, [, amount]) => sum + amount, 0);
+
         const growthRate = previousRevenue > 0 ? ((recentRevenue - previousRevenue) / previousRevenue) * 100 : (recentRevenue > 0 ? 100 : 0);
 
         const topCustomers = Object.entries(customerSales)
@@ -112,7 +122,7 @@ export default function DashboardPage() {
           .map(([id, totalAmount]) => ({ id, name: products.find(p => p.id === id)?.name || 'Unknown', totalAmount }))
           .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
           
-        const trendData = last30Days.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
+        const trendData = last30DaysDates.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
         
         const recentInvoices = [...invoices]
           .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
@@ -124,7 +134,7 @@ export default function DashboardPage() {
             pendingInvoicesCount: pendingCount,
             salesData: trendData,
             invoiceStatusData: Object.entries(statusCounts)
-              .map(([name, value]) => ({ name, value })),
+              .map(([name, value]) => ({ name: name || 'Unpaid', value })),
             topCustomers,
             topProducts,
             recentInvoices,

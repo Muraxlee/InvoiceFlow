@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -13,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { type StoredInvoice, type CompanyData } from '@/types/database';
 import { getInvoice, saveInvoice, getCompanyInfo } from '@/lib/firestore-actions';
-import { format as formatDateFns, isValid } from 'date-fns';
+import { format as formatDateFns, isValid, isPast } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -85,15 +86,30 @@ export default function InvoiceDetailPage() {
     saveMutation.mutate({ id: invoice.id, values: data });
   };
   
-  const statusVariant = (status: string | undefined) => {
-    switch (status?.toLowerCase()) {
-      case "paid": return "success";
-      case "pending": case "unpaid": return "warning";
-      case "overdue": return "destructive";
-      case "draft": return "outline";
-      default: return "secondary";
+  const { displayedStatus, statusVariant } = useMemo(() => {
+    if (!invoice) return { displayedStatus: 'Unknown', statusVariant: 'secondary' as const };
+    
+    let currentStatus = invoice.status;
+    
+    // Dynamically determine if the invoice is overdue
+    if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && (currentStatus === 'Unpaid' || currentStatus === 'Pending' || currentStatus === 'Partially Paid')) {
+      currentStatus = 'Overdue';
     }
-  };
+
+    const getVariant = (status: string) => {
+      switch (status?.toLowerCase()) {
+        case "paid": return "success" as const;
+        case "pending": return "warning" as const;
+        case "unpaid": return "warning" as const;
+        case "overdue": return "destructive" as const;
+        case "partially paid": return "info" as const;
+        case "draft": return "outline" as const;
+        default: return "secondary" as const;
+      }
+    };
+
+    return { displayedStatus: currentStatus, statusVariant: getVariant(currentStatus) };
+  }, [invoice]);
 
   const DetailItem = ({ label, value, icon, className }: { label: string; value: string | React.ReactNode; icon?: React.ElementType; className?: string }) => {
     const Icon = icon;
@@ -222,7 +238,7 @@ export default function InvoiceDetailPage() {
                   <DetailItem label="Invoice #" value={invoice.invoiceNumber} icon={FileText} />
                   <DetailItem label="Invoice Date" value={isValid(new Date(invoice.invoiceDate)) ? formatDateFns(new Date(invoice.invoiceDate), 'PP') : 'N/A'} icon={CalendarDays} />
                   <DetailItem label="Due Date" value={invoice.dueDate && isValid(new Date(invoice.dueDate)) ? formatDateFns(new Date(invoice.dueDate), 'PP') : 'N/A'} icon={CalendarDays} />
-                  <DetailItem label="Status" value={<Badge variant={statusVariant(invoice.status) as any}>{invoice.status}</Badge>} icon={Info}/>
+                  <DetailItem label="Status" value={<Badge variant={statusVariant}>{displayedStatus}</Badge>} icon={Info}/>
                   <DetailItem label="Payment Method" value={invoice.paymentMethod || 'N/A'} icon={Banknote} />
                 </dl>
               </CardContent>
@@ -355,3 +371,4 @@ export default function InvoiceDetailPage() {
     </div>
   );
 }
+

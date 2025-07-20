@@ -1,3 +1,4 @@
+
 import { db } from './firebase';
 import {
   collection,
@@ -14,7 +15,6 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement } from '@/types/database';
-import { loadFromLocalStorage, saveToLocalStorage, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY, INVOICES_STORAGE_KEY, MEASUREMENTS_STORAGE_KEY } from './localStorage';
 
 const INVOICES = 'invoices';
 const CUSTOMERS = 'customers';
@@ -50,34 +50,17 @@ const fromFirestore = <T extends { [key: string]: any }>(data: T): T => {
   return newData as T;
 };
 
-// Generic get with caching
-async function getCollectionWithCache<T extends {id: string}>(collectionPath: string, storageKey: string, orderByField: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<T[]> {
+// Generic get function
+async function getCollection<T extends {id: string}>(collectionPath: string, orderByField: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<T[]> {
     checkDb();
-    
-    // Server-side, just fetch, don't cache.
-    if (typeof window === 'undefined') {
-        const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
-    }
-
-    // Client-side logic
-    try {
-        const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
-        const querySnapshot = await getDocs(q);
-        const firestoreData = querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
-        saveToLocalStorage(storageKey, firestoreData);
-        return firestoreData;
-    } catch (error) {
-        console.warn(`Error fetching ${collectionPath} from Firestore, falling back to cache:`, error);
-        // If there's an error (e.g., offline), load from cache
-        return loadFromLocalStorage<T[]>(storageKey, []);
-    }
+    const q = query(collection(db, collectionPath), orderBy(orderByField, orderDirection));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as T));
 }
 
 // Invoice Actions
 export async function getInvoices(): Promise<StoredInvoice[]> {
-  return getCollectionWithCache<StoredInvoice>(INVOICES, INVOICES_STORAGE_KEY, 'createdAt', 'desc');
+  return getCollection<StoredInvoice>(INVOICES, 'createdAt', 'desc');
 }
 
 export async function getInvoice(id: string): Promise<StoredInvoice | null> {
@@ -105,19 +88,17 @@ export async function saveInvoice(invoiceData: Omit<StoredInvoice, 'id' | 'creat
     });
     docId = docRef.id;
   }
-  localStorage.removeItem(INVOICES_STORAGE_KEY);
   return docId;
 }
 
 export async function deleteInvoice(id: string): Promise<void> {
   checkDb();
   await deleteDoc(doc(db, INVOICES, id));
-  localStorage.removeItem(INVOICES_STORAGE_KEY);
 }
 
 // Customer Actions
 export async function getCustomers(): Promise<Customer[]> {
-  return getCollectionWithCache<Customer>(CUSTOMERS, CUSTOMERS_STORAGE_KEY, 'name');
+  return getCollection<Customer>(CUSTOMERS, 'name');
 }
 
 export async function addCustomer(customerData: Omit<Customer, 'id' | 'createdAt'>): Promise<string> {
@@ -126,25 +107,22 @@ export async function addCustomer(customerData: Omit<Customer, 'id' | 'createdAt
         ...customerData, 
         createdAt: serverTimestamp()
     });
-    localStorage.removeItem(CUSTOMERS_STORAGE_KEY);
     return docRef.id;
 }
 
 export async function updateCustomer(id: string, customerData: Partial<Omit<Customer, 'id' | 'createdAt'>>): Promise<void> {
     checkDb();
     await updateDoc(doc(db, CUSTOMERS, id), customerData);
-    localStorage.removeItem(CUSTOMERS_STORAGE_KEY);
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
     checkDb();
     await deleteDoc(doc(db, CUSTOMERS, id));
-    localStorage.removeItem(CUSTOMERS_STORAGE_KEY);
 }
 
 // Product Actions
 export async function getProducts(): Promise<Product[]> {
-    return getCollectionWithCache<Product>(PRODUCTS, PRODUCTS_STORAGE_KEY, 'name');
+    return getCollection<Product>(PRODUCTS, 'name');
 }
 
 export async function addProduct(productData: Omit<Product, 'id' | 'createdAt'>): Promise<string> {
@@ -153,25 +131,22 @@ export async function addProduct(productData: Omit<Product, 'id' | 'createdAt'>)
         ...productData,
         createdAt: serverTimestamp()
     });
-    localStorage.removeItem(PRODUCTS_STORAGE_KEY);
     return docRef.id;
 }
 
 export async function updateProduct(id: string, productData: Partial<Omit<Product, 'id' | 'createdAt'>>): Promise<void> {
     checkDb();
     await updateDoc(doc(db, PRODUCTS, id), productData);
-    localStorage.removeItem(PRODUCTS_STORAGE_KEY);
 }
 
 export async function deleteProduct(id: string): Promise<void> {
     checkDb();
     await deleteDoc(doc(db, PRODUCTS, id));
-    localStorage.removeItem(PRODUCTS_STORAGE_KEY);
 }
 
 // Measurement Actions
 export async function getMeasurements(): Promise<Measurement[]> {
-  return getCollectionWithCache<Measurement>(MEASUREMENTS, MEASUREMENTS_STORAGE_KEY, 'recordedDate', 'desc');
+  return getCollection<Measurement>(MEASUREMENTS, 'recordedDate', 'desc');
 }
 
 export async function getMeasurement(id: string): Promise<Measurement | null> {
@@ -190,20 +165,17 @@ export async function addMeasurement(measurementData: Omit<Measurement, 'id' | '
     ...measurementData,
     createdAt: serverTimestamp()
   });
-  localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
   return docRef.id;
 }
 
 export async function updateMeasurement(id: string, measurementData: Partial<Omit<Measurement, 'id' | 'createdAt'>>): Promise<void> {
   checkDb();
   await updateDoc(doc(db, MEASUREMENTS, id), measurementData);
-  localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
 }
 
 export async function deleteMeasurement(id: string): Promise<void> {
   checkDb();
   await deleteDoc(doc(db, MEASUREMENTS, id));
-  localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
 }
 
 // Company Info Actions
@@ -258,22 +230,18 @@ async function deleteCollection(collectionPath: string) {
 
 export async function clearAllCustomers(): Promise<void> {
     await deleteCollection(CUSTOMERS);
-    localStorage.removeItem(CUSTOMERS_STORAGE_KEY);
 }
 
 export async function clearAllProducts(): Promise<void> {
     await deleteCollection(PRODUCTS);
-    localStorage.removeItem(PRODUCTS_STORAGE_KEY);
 }
 
 export async function clearAllInvoices(): Promise<void> {
     await deleteCollection(INVOICES);
-    localStorage.removeItem(INVOICES_STORAGE_KEY);
 }
 
 export async function clearAllMeasurements(): Promise<void> {
     await deleteCollection(MEASUREMENTS);
-    localStorage.removeItem(MEASUREMENTS_STORAGE_KEY);
 }
 
 export async function clearAllData(): Promise<void> {
@@ -337,9 +305,4 @@ export async function seedSampleData(): Promise<void> {
     batch.set(invoiceRef, sampleInvoiceData as any); // Cast to any to handle serverTimestamp and dates
 
     await batch.commit();
-
-    // Invalidate local cache after seeding
-    localStorage.removeItem(CUSTOMERS_STORAGE_KEY);
-    localStorage.removeItem(PRODUCTS_STORAGE_KEY);
-    localStorage.removeItem(INVOICES_STORAGE_KEY);
 }

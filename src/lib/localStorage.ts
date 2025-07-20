@@ -1,3 +1,4 @@
+
 'use client';
 
 import { format as formatDateFns } from 'date-fns';
@@ -107,18 +108,7 @@ export interface CustomFont {
 // Key for storing last manual backup timestamp
 export const LAST_BACKUP_TIMESTAMP_KEY = "app_last_backup_timestamp";
 
-// Keys for individual data types
-export const CUSTOMERS_STORAGE_KEY = "app_customers";
-export const PRODUCTS_STORAGE_KEY = "app_products";
-export const INVOICES_STORAGE_KEY = "app_invoices";
-export const MEASUREMENTS_STORAGE_KEY = "app_measurements";
-
-
 export interface AllApplicationData {
-  [CUSTOMERS_STORAGE_KEY]?: any[];
-  [PRODUCTS_STORAGE_KEY]?: any[];
-  [INVOICES_STORAGE_KEY]?: any[];
-  [MEASUREMENTS_STORAGE_KEY]?: any[];
   [INVOICE_CONFIG_KEY]?: InvoiceConfig;
   [GOOGLE_AI_API_KEY_STORAGE_KEY]?: string;
   [COMPANY_NAME_STORAGE_KEY]?: string;

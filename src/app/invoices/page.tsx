@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -15,7 +16,6 @@ import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadFromLocalStorage, INVOICES_STORAGE_KEY } from "@/lib/localStorage";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -27,7 +27,6 @@ export default function InvoicesPage() {
   const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
-    initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
 
   const filteredInvoices = useMemo(() => {
@@ -134,7 +133,7 @@ export default function InvoicesPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && !invoices?.length ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
@@ -152,7 +151,7 @@ export default function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice) => (
+                {filteredInvoices?.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.customerName}</TableCell>

@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -15,7 +16,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { loadFromLocalStorage, MEASUREMENTS_STORAGE_KEY } from "@/lib/localStorage";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -27,7 +27,6 @@ export default function MeasurementsPage() {
   const { data: measurements, isLoading, error, refetch } = useQuery<Measurement[]>({
     queryKey: ['measurements'],
     queryFn: getMeasurements,
-    initialData: () => loadFromLocalStorage(MEASUREMENTS_STORAGE_KEY, []),
   });
 
   const filteredMeasurements = useMemo(() => {
@@ -123,7 +122,7 @@ export default function MeasurementsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && !measurements?.length ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
@@ -139,7 +138,7 @@ export default function MeasurementsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMeasurements.map((measurement) => (
+                {filteredMeasurements?.map((measurement) => (
                   <TableRow key={measurement.id}>
                     <TableCell className="font-mono text-xs">{measurement.uniqueId}</TableCell>
                     <TableCell className="font-medium flex items-center gap-2">

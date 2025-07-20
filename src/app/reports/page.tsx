@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,6 @@ import PageHeader from "@/components/page-header";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadFromLocalStorage, INVOICES_STORAGE_KEY, CUSTOMERS_STORAGE_KEY, PRODUCTS_STORAGE_KEY } from '@/lib/localStorage';
 
 interface ReportData {
   totalRevenue: number;
@@ -30,19 +30,16 @@ export default function ReportsPage() {
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
-    initialData: () => loadFromLocalStorage(INVOICES_STORAGE_KEY, []),
   });
   
   const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
-    initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, []),
   });
   
   const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
-    initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
 
   const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;

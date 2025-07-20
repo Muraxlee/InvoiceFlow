@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -15,7 +16,6 @@ import type { Product } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadFromLocalStorage, PRODUCTS_STORAGE_KEY } from "@/lib/localStorage";
 import { Input } from "@/components/ui/input";
 
 export default function ProductsPage() {
@@ -29,7 +29,6 @@ export default function ProductsPage() {
   const { data: products, isLoading: isDataLoading, error, refetch } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: getProducts,
-    initialData: () => loadFromLocalStorage(PRODUCTS_STORAGE_KEY, []),
   });
 
   const filteredProducts = useMemo(() => {
@@ -193,7 +192,7 @@ export default function ProductsPage() {
           </div>
         </CardHeader>
         <CardContent>
-        {isDataLoading && !products?.length ? (
+        {isDataLoading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
@@ -212,7 +211,7 @@ export default function ProductsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product, index) => (
+              {filteredProducts?.map((product, index) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{index + 1}</TableCell>
                   <TableCell>{product.name}</TableCell>

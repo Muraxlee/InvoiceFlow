@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import PageHeader from "@/components/page-header";
@@ -16,7 +17,6 @@ import type { Customer } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadFromLocalStorage, CUSTOMERS_STORAGE_KEY } from "@/lib/localStorage";
 import { Input } from "@/components/ui/input";
 
 export default function CustomersPage() {
@@ -30,7 +30,6 @@ export default function CustomersPage() {
   const { data: customers, isLoading: isDataLoading, error, refetch } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: getCustomers,
-    initialData: () => loadFromLocalStorage(CUSTOMERS_STORAGE_KEY, [])
   });
 
   const filteredCustomers = useMemo(() => {
@@ -197,7 +196,7 @@ export default function CustomersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isDataLoading && !customers?.length ? (
+          {isDataLoading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="animate-spin rounded-full h-8 w-8 text-primary" />
             </div>
@@ -214,7 +213,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer, index) => (
+                {filteredCustomers?.map((customer, index) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>{customer.name}</TableCell>

@@ -16,17 +16,26 @@ import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isPast, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 
-type StatusFilter = "all" | "paid" | "unpaid" | "overdue";
+type StatusFilter = "all" | "paid" | "unpaid" | "overdue" | "pending";
 
-export default function InvoicesPage() {
+function InvoicesPageComponent() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const initialStatusFilter = searchParams.get('status') as StatusFilter | null;
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter || "all");
+
+  useEffect(() => {
+    // This allows updating the filter if the user navigates here again with a new query param
+    setStatusFilter(initialStatusFilter || "all");
+  }, [initialStatusFilter]);
 
   const { data: invoices, isLoading, error, refetch } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
@@ -49,6 +58,8 @@ export default function InvoicesPage() {
           statusMatch = isOverdue;
         } else if (statusFilter === 'unpaid') {
           statusMatch = (invoiceStatus === 'Unpaid' || invoiceStatus === 'Pending' || invoiceStatus === 'Partially Paid') && !isOverdue;
+        } else if (statusFilter === 'pending') {
+          statusMatch = !['Paid', 'Draft'].includes(invoiceStatus);
         } else {
           statusMatch = invoiceStatus.toLowerCase() === statusFilter;
         }
@@ -166,6 +177,7 @@ export default function InvoicesPage() {
           </div>
           <div className="flex flex-wrap gap-2 pt-2">
               <Button variant={statusFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('all')}>All</Button>
+              <Button variant={statusFilter === 'pending' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('pending')}>Pending</Button>
               <Button variant={statusFilter === 'paid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('paid')}>Paid</Button>
               <Button variant={statusFilter === 'unpaid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('unpaid')}>Unpaid</Button>
               <Button variant={statusFilter === 'overdue' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('overdue')}>Overdue</Button>
@@ -254,5 +266,14 @@ export default function InvoicesPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Wrap the component in Suspense because useSearchParams requires it.
+export default function InvoicesPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InvoicesPageComponent />
+    </Suspense>
   );
 }

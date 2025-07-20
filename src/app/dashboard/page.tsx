@@ -291,7 +291,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{dashboardMetrics.pendingInvoicesCount}</div>
             <div className="flex items-center pt-1">
-              <Link href="/invoices" className="text-xs text-primary flex items-center">
+              <Link href="/invoices?status=pending" className="text-xs text-primary flex items-center">
                 View all invoices <ChevronRight className="h-3 w-3 ml-1" />
               </Link>
             </div>

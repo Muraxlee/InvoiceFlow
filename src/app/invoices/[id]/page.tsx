@@ -91,12 +91,12 @@ export default function InvoiceDetailPage() {
     saveMutation.mutate({ id: invoice.id, values: data });
   };
   
-  const { displayedStatus, statusVariant } = useMemo(() => {
+  const getStatusInfo = () => {
     if (!invoice) return { displayedStatus: 'Unknown', statusVariant: 'secondary' as const };
-    
+
     let currentStatus = invoice.status;
     
-    // Dynamically determine if the invoice is overdue only on the client
+    // Dynamically determine if the invoice is overdue only on the client to avoid hydration mismatch
     if (isClient && invoice.dueDate && isPast(new Date(invoice.dueDate)) && (currentStatus === 'Unpaid' || currentStatus === 'Pending' || currentStatus === 'Partially Paid')) {
       currentStatus = 'Overdue';
     }
@@ -114,8 +114,10 @@ export default function InvoiceDetailPage() {
     };
 
     return { displayedStatus: currentStatus, statusVariant: getVariant(currentStatus) };
-  }, [invoice, isClient]);
+  };
 
+  const { displayedStatus, statusVariant } = getStatusInfo();
+  
   const DetailItem = ({ label, value, icon, className }: { label: string; value: string | React.ReactNode; icon?: React.ElementType; className?: string }) => {
     const Icon = icon;
     return (

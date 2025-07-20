@@ -143,7 +143,7 @@ export default function DashboardPage() {
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   
-  const statusVariant = (status: string) => {
+  const statusVariant = (status?: string) => {
     switch (status?.toLowerCase()) {
       case "paid": return "success";
       case "pending": return "warning";
@@ -354,7 +354,7 @@ export default function DashboardPage() {
                       <TableCell>{invoice.customerName}</TableCell>
                       <TableCell> {format(new Date(invoice.invoiceDate), 'dd MMM yyyy')} </TableCell>
                       <TableCell>₹{(invoice.amount || 0).toLocaleString('en-IN')}</TableCell>
-                      <TableCell> <Badge variant={statusVariant(invoice.status || 'Unpaid')} className="text-xs"> {invoice.status || 'Unpaid'} </Badge> </TableCell>
+                      <TableCell> <Badge variant={statusVariant(invoice.status)} className="text-xs"> {invoice.status || 'Unpaid'} </Badge> </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

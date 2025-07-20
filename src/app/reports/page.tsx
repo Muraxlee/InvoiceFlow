@@ -52,9 +52,8 @@ export default function ReportsPage() {
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
-  const statusVariant = (status: string | undefined) => {
-    if (!status) return "outline";
-    switch (status.toLowerCase()) {
+  const statusVariant = (status?: string) => {
+    switch (status?.toLowerCase()) {
       case "paid": return "success"; 
       case "pending": return "warning"; 
       case "unpaid": return "warning";
@@ -271,7 +270,7 @@ export default function ReportsPage() {
                   reportData.paymentStatusCounts.map((status) => (
                     <TableRow key={status.name}>
                       <TableCell className="font-medium">
-                        <Badge variant={statusVariant(status.name) as any}>{status.name}</Badge>
+                        <Badge variant={statusVariant(status.name)}>{status.name}</Badge>
                       </TableCell>
                       <TableCell className="text-right">{status.value}</TableCell>
                     </TableRow>

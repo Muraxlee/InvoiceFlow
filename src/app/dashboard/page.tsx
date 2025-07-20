@@ -66,14 +66,14 @@ export default function DashboardPage() {
   };
 
   const dashboardMetrics = useMemo(() => {
-    if (!invoices || !customers || !products || !isClient) return null;
+    if (!invoices || !customers || !products) return null;
 
     let revenue = 0;
     let outstanding = 0;
     let pendingCount = 0;
     const statusCounts: Record<string, number> = {};
     const dailySales: Record<string, number> = {};
-    const today = new Date();
+    const today = new Date(); // This is safe inside useMemo that is not run on server
     const last30Days = Array.from({ length: 30 }, (_, i) => format(subDays(today, 29 - i), 'yyyy-MM-dd'));
     last30Days.forEach(date => { dailySales[date] = 0; });
     const customerSales: Record<string, number> = {};
@@ -133,7 +133,7 @@ export default function DashboardPage() {
       recentInvoices,
       revenueGrowth: growthRate,
     };
-  }, [invoices, customers, products, isClient]);
+  }, [invoices, customers, products]);
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   
@@ -206,12 +206,14 @@ export default function DashboardPage() {
     );
   }
 
-  if (!dashboardMetrics) return (
+  if (!dashboardMetrics) {
+    return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
         <Activity className="h-10 w-10 animate-spin text-primary mb-4" />
         <p className="text-lg text-muted-foreground">Preparing dashboard...</p>
       </div>
-  );
+    );
+  }
 
   return (
     <div className="space-y-6">

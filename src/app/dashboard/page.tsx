@@ -30,9 +30,23 @@ const chartConfigSales = {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2'];
 
+type DashboardMetrics = {
+    totalRevenue: number;
+    outstandingAmount: number;
+    totalCustomers: number;
+    pendingInvoicesCount: number;
+    salesData: { date: string; amount: number; }[];
+    invoiceStatusData: { name: string; value: number; }[];
+    topCustomers: { id: string; name: string; totalAmount: number; }[];
+    topProducts: { id: string; name: string; totalAmount: number; }[];
+    recentInvoices: StoredInvoice[];
+    revenueGrowth: number;
+};
+
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const [isClient, setIsClient] = useState(false);
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -59,81 +73,82 @@ export default function DashboardPage() {
   const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;
   const error = invoicesError || customersError || productsError;
 
+  useEffect(() => {
+    if (invoices && customers && products && isClient) {
+        let revenue = 0;
+        let outstanding = 0;
+        let pendingCount = 0;
+        const statusCounts: Record<string, number> = {};
+        const dailySales: Record<string, number> = {};
+        const today = new Date();
+        const last30Days = Array.from({ length: 30 }, (_, i) => format(subDays(today, 29 - i), 'yyyy-MM-dd'));
+        last30Days.forEach(date => { dailySales[date] = 0; });
+        const customerSales: Record<string, number> = {};
+        const productSales: Record<string, number> = {};
+        
+        invoices.forEach(invoice => {
+          const invDate = new Date(invoice.invoiceDate);
+          if (!isValid(invDate)) return;
+          
+          const status = invoice.status || "Unknown";
+          statusCounts[status] = (statusCounts[status] || 0) + 1;
+          
+          if (status === "Paid") {
+            revenue += invoice.amount || 0;
+            const dateStr = format(invDate, 'yyyy-MM-dd');
+            if (dailySales[dateStr] !== undefined) {
+              dailySales[dateStr] += invoice.amount || 0;
+            }
+            customerSales[invoice.customerId] = (customerSales[invoice.customerId] || 0) + (invoice.amount || 0);
+            invoice.items?.forEach(item => {
+              productSales[item.productId] = (productSales[item.productId] || 0) + (item.quantity * item.price);
+            });
+          } else if (["Pending", "Overdue", "Unpaid", "Partially Paid", "Draft"].includes(status)) {
+            outstanding += invoice.amount || 0;
+            pendingCount++;
+          }
+        });
+
+        const recentRevenue = last30Days.slice(15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
+        const previousRevenue = last30Days.slice(0, 15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
+        const growthRate = previousRevenue > 0 ? ((recentRevenue - previousRevenue) / previousRevenue) * 100 : (recentRevenue > 0 ? 100 : 0);
+
+        const topCustomers = Object.entries(customerSales)
+          .map(([id, totalAmount]) => ({ id, name: customers.find(c => c.id === id)?.name || 'Unknown', totalAmount }))
+          .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
+          
+        const topProducts = Object.entries(productSales)
+          .map(([id, totalAmount]) => ({ id, name: products.find(p => p.id === id)?.name || 'Unknown', totalAmount }))
+          .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
+          
+        const trendData = last30Days.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
+        
+        const recentInvoices = [...invoices]
+          .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
+        
+        setDashboardMetrics({
+            totalRevenue: revenue,
+            outstandingAmount: outstanding,
+            totalCustomers: customers.length,
+            pendingInvoicesCount: pendingCount,
+            salesData: trendData,
+            invoiceStatusData: Object.entries(statusCounts)
+              .map(([name, value]) => ({ name, value }))
+              .filter(item => item.value > 0),
+            topCustomers,
+            topProducts,
+            recentInvoices,
+            revenueGrowth: growthRate,
+        });
+    }
+  }, [invoices, customers, products, isClient]);
+
+
   const refetch = () => {
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
-
-  const dashboardMetrics = useMemo(() => {
-    if (!invoices || !customers || !products) return null;
-
-    let revenue = 0;
-    let outstanding = 0;
-    let pendingCount = 0;
-    const statusCounts: Record<string, number> = {};
-    const dailySales: Record<string, number> = {};
-    const today = new Date(); // This is safe inside useMemo that is not run on server
-    const last30Days = Array.from({ length: 30 }, (_, i) => format(subDays(today, 29 - i), 'yyyy-MM-dd'));
-    last30Days.forEach(date => { dailySales[date] = 0; });
-    const customerSales: Record<string, number> = {};
-    const productSales: Record<string, number> = {};
-    
-    invoices.forEach(invoice => {
-      const invDate = new Date(invoice.invoiceDate);
-      if (!isValid(invDate)) return;
-      
-      const status = invoice.status || "Unknown";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-      
-      if (status === "Paid") {
-        revenue += invoice.amount || 0;
-        const dateStr = format(invDate, 'yyyy-MM-dd');
-        if (dailySales[dateStr] !== undefined) {
-          dailySales[dateStr] += invoice.amount || 0;
-        }
-        customerSales[invoice.customerId] = (customerSales[invoice.customerId] || 0) + (invoice.amount || 0);
-        invoice.items?.forEach(item => {
-          productSales[item.productId] = (productSales[item.productId] || 0) + (item.quantity * item.price);
-        });
-      } else if (["Pending", "Overdue", "Unpaid", "Partially Paid", "Draft"].includes(status)) {
-        outstanding += invoice.amount || 0;
-        pendingCount++;
-      }
-    });
-
-    const recentRevenue = last30Days.slice(15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
-    const previousRevenue = last30Days.slice(0, 15).reduce((sum, date) => sum + (dailySales[date] || 0), 0);
-    const growthRate = previousRevenue > 0 ? ((recentRevenue - previousRevenue) / previousRevenue) * 100 : (recentRevenue > 0 ? 100 : 0);
-
-    const topCustomers = Object.entries(customerSales)
-      .map(([id, totalAmount]) => ({ id, name: customers.find(c => c.id === id)?.name || 'Unknown', totalAmount }))
-      .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
-      
-    const topProducts = Object.entries(productSales)
-      .map(([id, totalAmount]) => ({ id, name: products.find(p => p.id === id)?.name || 'Unknown', totalAmount }))
-      .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
-      
-    const trendData = last30Days.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
-    
-    const recentInvoices = [...invoices]
-      .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
-
-    return {
-      totalRevenue: revenue,
-      outstandingAmount: outstanding,
-      totalCustomers: customers.length,
-      pendingInvoicesCount: pendingCount,
-      salesData: trendData,
-      invoiceStatusData: Object.entries(statusCounts)
-        .map(([name, value]) => ({ name, value }))
-        .filter(item => item.value > 0),
-      topCustomers,
-      topProducts,
-      recentInvoices,
-      revenueGrowth: growthRate,
-    };
-  }, [invoices, customers, products]);
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   
@@ -176,7 +191,7 @@ export default function DashboardPage() {
     );
   };
   
-  if (isLoading || !isClient) {
+  if (isLoading || !dashboardMetrics) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
         <Activity className="h-10 w-10 animate-spin text-primary mb-4" />
@@ -202,15 +217,6 @@ export default function DashboardPage() {
         <Button onClick={() => refetch()} className="flex items-center gap-2">
           <RefreshCw className="h-4 w-4" /> Try Again
         </Button>
-      </div>
-    );
-  }
-
-  if (!dashboardMetrics) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
-        <Activity className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-lg text-muted-foreground">Preparing dashboard...</p>
       </div>
     );
   }

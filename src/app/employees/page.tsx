@@ -59,14 +59,14 @@ function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: strin
     const StatusBadge = ({ currentStatus, newStatus, taskId }: { currentStatus: Task['status'], newStatus: Task['status'], taskId: string }) => {
         const isActive = currentStatus === newStatus;
         const colorClasses = {
-            'Todo': 'bg-gray-200/60 text-gray-800 hover:bg-gray-300/80 dark:bg-gray-700/60 dark:text-gray-200 dark:hover:bg-gray-600/80',
-            'In Progress': 'bg-yellow-200/60 text-yellow-800 hover:bg-yellow-300/80 dark:bg-yellow-700/60 dark:text-yellow-200 dark:hover:bg-yellow-600/80',
-            'Done': 'bg-green-200/60 text-green-800 hover:bg-green-300/80 dark:bg-green-700/60 dark:text-green-200 dark:hover:bg-green-600/80',
+            'Todo': 'bg-gray-200/60 text-gray-800 hover:bg-gray-300/80 dark:bg-gray-700/60 dark:text-gray-200 dark:hover:bg-gray-600/80 opacity-70',
+            'In Progress': 'bg-yellow-200/60 text-yellow-800 hover:bg-yellow-300/80 dark:bg-yellow-700/60 dark:text-yellow-200 dark:hover:bg-yellow-600/80 opacity-70',
+            'Done': 'bg-green-200/60 text-green-800 hover:bg-green-300/80 dark:bg-green-700/60 dark:text-green-200 dark:hover:bg-green-600/80 opacity-70',
         };
         const activeColorClasses = {
-             'Todo': 'bg-gray-500 text-white',
-            'In Progress': 'bg-yellow-500 text-white',
-            'Done': 'bg-green-500 text-white',
+             'Todo': 'bg-gray-500 text-white ring-2 ring-offset-2 ring-gray-500 ring-offset-background',
+            'In Progress': 'bg-yellow-500 text-white ring-2 ring-offset-2 ring-yellow-500 ring-offset-background',
+            'Done': 'bg-green-500 text-white ring-2 ring-offset-2 ring-green-500 ring-offset-background',
         }
 
         return (

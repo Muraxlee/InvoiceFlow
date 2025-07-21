@@ -1,3 +1,4 @@
+
 // src/components/app-nav.tsx
 "use client";
 
@@ -14,7 +15,7 @@ import {
   FileText,
   Package,
   BarChart3,
-  Ruler,
+  DraftingCompass,
   Boxes,
   ClipboardUser,
 } from 'lucide-react';
@@ -38,7 +39,7 @@ const navItems: NavItem[] = [
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
   { href: '/employees', label: 'Employees', icon: ClipboardUser, tooltip: 'Manage Employees & Tasks' },
-  { href: '/measurements', label: 'Measurement', icon: Ruler, tooltip: 'Manage Measurements' },
+  { href: '/measurements', label: 'Measurement', icon: DraftingCompass, tooltip: 'Manage Measurements' },
   { href: '/inventory', label: 'Inventory', icon: Boxes, tooltip: 'Manage Stock' },
   { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & Analytics' },
 ];

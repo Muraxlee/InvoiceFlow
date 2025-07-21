@@ -78,7 +78,7 @@ function EmployeeTasks({ employeeId }: { employeeId: string }) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
-                        <TableCell>{format(new Date(task.dueDate), 'dd MMM yyyy')}</TableCell>
+                        <TableCell>{format(new Date(task.dueDate), 'dd MMM yyyy, h:mm a')}</TableCell>
                     </TableRow>
                 ))}
             </TableBody>

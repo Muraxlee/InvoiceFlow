@@ -19,6 +19,7 @@ const taskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters long."),
   description: z.string().optional(),
   dueDate: z.date({ required_error: "A due date is required." }),
+  dueTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:mm)"),
 });
 
 export type TaskFormValues = z.infer<typeof taskSchema>;
@@ -37,12 +38,19 @@ export function TaskForm({ employee, onSubmit, isLoading, onCancel }: TaskFormPr
       title: '',
       description: '',
       dueDate: new Date(),
+      dueTime: format(new Date(), "HH:mm"),
     },
   });
 
   function handleFormSubmit(data: TaskFormValues) {
+    const [hours, minutes] = data.dueTime.split(':').map(Number);
+    const finalDueDate = new Date(data.dueDate);
+    finalDueDate.setHours(hours, minutes, 0, 0);
+
     const newTask: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> = {
-      ...data,
+      title: data.title,
+      description: data.description,
+      dueDate: finalDueDate,
       employeeId: employee.id,
       employeeName: employee.name,
       status: 'Todo',
@@ -75,29 +83,44 @@ export function TaskForm({ employee, onSubmit, isLoading, onCancel }: TaskFormPr
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="dueDate"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Due Date</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="dueDate"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Due Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+           <FormField
+            control={form.control}
+            name="dueTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Due Time</FormLabel>
+                <FormControl>
+                  <Input type="time" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
             Cancel

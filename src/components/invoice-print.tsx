@@ -56,7 +56,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
     }
   }, [isOriginal, isDuplicate, isTransportBill, invoiceType, showPreview, invoice, company]);
 
-  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, totalQuantity, totalRate, roundOff, finalTotal } = useMemo(() => {
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, totalTax, total, totalQuantity, totalRate, roundOff, finalTotal, additionalChargesTotal } = useMemo(() => {
     const currentItems = invoice.items || [];
     let totalQty = 0;
     let totalRt = 0;
@@ -73,7 +73,8 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       if (item.applySgst) sgst += itemAmount * ((item.sgstRate || 0) / 100);
     });
     const tax = cgst + sgst + igst;
-    const grandTotal = sub + tax;
+    const chargesTotal = (invoice.additionalCharges || []).reduce((acc, charge) => acc + (charge.amount || 0), 0);
+    const grandTotal = sub + tax + chargesTotal;
     
     let ro = 0;
     let ft = grandTotal;
@@ -88,14 +89,15 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
       igstAmount: igst, 
       cgstAmount: cgst, 
       sgstAmount: sgst, 
-      totalTax: tax, 
+      totalTax: tax,
+      additionalChargesTotal: chargesTotal,
       total: grandTotal,
       totalQuantity: totalQty,
       totalRate: totalRt,
       roundOff: ro,
       finalTotal: ft
     };
-  }, [invoice.items, invoice.roundOffApplied]);
+  }, [invoice.items, invoice.additionalCharges, invoice.roundOffApplied]);
 
   const numberToWords = (num: number) => {
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -262,7 +264,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
             <td class="text-center">${item.applyCgst ? (item.cgstRate || 0).toFixed(1) : '-'}</td>
             <td class="text-center">${item.applySgst ? (item.sgstRate || 0).toFixed(1) : '-'}</td>
             <td class="text-center">${item.applyIgst ? (item.igstRate || 0).toFixed(1) : '-'}</td>
-            <td class="text-right">₹${totalItemAmount.toFixed(2)}</td>
+            <td class="text-right">₹${subtotal.toFixed(2)}</td>
           </tr>
         `;
       }).join('')
@@ -289,6 +291,14 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
         <div class="box-content">${invoice.termsAndConditions.replace(/\n/g, '<br />')}</div>
       </div>
     ` : '';
+    
+    const additionalChargesHtml = (invoice.additionalCharges || [])
+      .map(charge => `
+        <div class="summary-row">
+          <span class="summary-label">${charge.description}:</span> 
+          <span class="summary-value">₹${(charge.amount || 0).toFixed(2)}</span>
+        </div>
+      `).join('');
 
     return `
     <html>
@@ -427,10 +437,10 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
               <tr class="item-table-footer">
                 <td colspan="3" class="text-right">Total</td>
                 <td class="text-center">${totalQuantity}</td>
-                <td class="text-right">₹${totalRate.toFixed(2)}</td>
-                <td class="text-center">${cgstAmount > 0 ? '' : '-'}</td>
-                <td class="text-center">${sgstAmount > 0 ? '' : '-'}</td>
-                <td class="text-center">${igstAmount > 0 ? '' : '-'}</td>
+                <td class="text-right"></td>
+                <td class="text-center"></td>
+                <td class="text-center"></td>
+                <td class="text-center"></td>
                 <td class="text-right">₹${subtotal.toFixed(2)}</td>
               </tr>
             </tbody>
@@ -463,6 +473,7 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
                 ${cgstAmount > 0 ? `<div class="summary-row"><span class="summary-label">CGST:</span> <span class="summary-value">₹${cgstAmount.toFixed(2)}</span></div>` : ''}
                 ${sgstAmount > 0 ? `<div class="summary-row"><span class="summary-label">SGST:</span> <span class="summary-value">₹${sgstAmount.toFixed(2)}</span></div>` : ''}
                 ${igstAmount > 0 ? `<div class="summary-row"><span class="summary-label">IGST:</span> <span class="summary-value">₹${igstAmount.toFixed(2)}</span></div>` : ''}
+                ${additionalChargesHtml}
                 ${ invoice.roundOffApplied && roundOff !== 0 ? `<div class="summary-row"><span class="summary-label">Round Off:</span> <span class="summary-value">${roundOff >= 0 ? '+' : ''}₹${roundOff.toFixed(2)}</span></div>` : ''}
                 <div class="summary-row grand-total" style="border-top: 1px solid #000; padding-top: 1mm; margin-top:1mm;"><span class="summary-label">Grand Total:</span> <span class="summary-value">₹${finalTotal.toFixed(2)}</span></div>
               </div>

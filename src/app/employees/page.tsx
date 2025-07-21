@@ -4,24 +4,28 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Employee, Task } from "@/types/database";
-import { getEmployees, getTasks } from "@/lib/firestore-actions";
+import { getEmployees, getTasks, updateTask, deleteTask } from "@/lib/firestore-actions";
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { EmployeeForm } from "@/components/employee-form";
 import { TaskForm } from "@/components/task-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addEmployee, deleteEmployee, addTask, updateTask } from "@/lib/firestore-actions";
+import { addEmployee, deleteEmployee, addTask } from "@/lib/firestore-actions";
 import { format, isPast } from "date-fns";
-import { User, UserPlus, PlusCircle, Trash2, Calendar, Clock, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { User, UserPlus, PlusCircle, Trash2, Loader2, AlertCircle, RefreshCw, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: string }) {
     const queryClient = useQueryClient();
@@ -36,47 +40,88 @@ function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: strin
         onError: (error: any) => toast({ title: "Error", description: `Failed to update task: ${error.message}`, variant: "destructive" }),
     });
 
+    const { mutate: deleteTaskMutation } = useMutation({
+        mutationFn: deleteTask,
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          toast({ title: "Task Deleted", description: "The task has been removed." });
+        },
+        onError: (err: any) => toast({ title: "Error", description: `Failed to delete task: ${err.message}`, variant: "destructive" }),
+    });
+
     const getStatusColor = (status: Task['status'], dueDate: Date) => {
         if (status === 'Done') return 'bg-green-500/20 text-green-700 border-green-500/30';
         if (isPast(dueDate) && status !== 'Done') return 'bg-red-500/20 text-red-700 border-red-500/30';
         if (status === 'In Progress') return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/30';
         return 'bg-gray-500/20 text-gray-700 border-gray-500/30';
     };
+    
+    const StatusBadge = ({ currentStatus, newStatus, taskId }: { currentStatus: Task['status'], newStatus: Task['status'], taskId: string }) => {
+        const isActive = currentStatus === newStatus;
+        const colorClasses = {
+            'Todo': 'bg-gray-200/60 text-gray-800 hover:bg-gray-300/80 dark:bg-gray-700/60 dark:text-gray-200 dark:hover:bg-gray-600/80',
+            'In Progress': 'bg-yellow-200/60 text-yellow-800 hover:bg-yellow-300/80 dark:bg-yellow-700/60 dark:text-yellow-200 dark:hover:bg-yellow-600/80',
+            'Done': 'bg-green-200/60 text-green-800 hover:bg-green-300/80 dark:bg-green-700/60 dark:text-green-200 dark:hover:bg-green-600/80',
+        };
+        const activeColorClasses = {
+             'Todo': 'bg-gray-500 text-white',
+            'In Progress': 'bg-yellow-500 text-white',
+            'Done': 'bg-green-500 text-white',
+        }
+
+        return (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge 
+                    className={cn("cursor-pointer transition-all", isActive ? activeColorClasses[newStatus] : colorClasses[newStatus])}
+                    onClick={() => {
+                        if (!isActive) {
+                           updateStatusMutation.mutate({ taskId, status: newStatus })
+                        }
+                    }}
+                   >
+                    {newStatus}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Click to set status to {newStatus}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+        )
+    }
 
     if (tasks.length === 0) {
         return <p className="text-sm text-muted-foreground px-4 pb-4">No tasks assigned to this employee yet.</p>;
     }
 
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Due Date</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {tasks.map(task => (
-                    <TableRow key={task.id}>
-                        <TableCell className="font-medium">{task.title}</TableCell>
-                        <TableCell>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Badge className={cn("cursor-pointer", getStatusColor(task.status, new Date(task.dueDate)))}>{task.status}</Badge>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ taskId: task.id, status: 'Todo' })}>To Do</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ taskId: task.id, status: 'In Progress' })}>In Progress</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ taskId: task.id, status: 'Done' })}>Done</DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </TableCell>
-                        <TableCell>{format(new Date(task.dueDate), 'dd MMM yyyy, h:mm a')}</TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+        <div className="divide-y divide-border">
+            {tasks.map(task => (
+                <div key={task.id} className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:bg-muted/30">
+                    <div className="flex-1 space-y-1">
+                        <p className={cn("font-medium", task.status === 'Done' && 'line-through text-muted-foreground')}>{task.title}</p>
+                        <p className="text-xs text-muted-foreground">{task.description}</p>
+                        <p className={cn("text-xs", isPast(new Date(task.dueDate)) && task.status !== 'Done' ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                            Due: {format(new Date(task.dueDate), 'dd MMM yyyy, h:mm a')}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <StatusBadge currentStatus={task.status} newStatus="Todo" taskId={task.id} />
+                        <StatusBadge currentStatus={task.status} newStatus="In Progress" taskId={task.id} />
+                        <StatusBadge currentStatus={task.status} newStatus="Done" taskId={task.id} />
+                        <ConfirmDialog
+                          triggerButton={<Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/70 hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>}
+                          title={`Delete Task "${task.title}"?`}
+                          description="Are you sure? This action cannot be undone."
+                          onConfirm={() => deleteTaskMutation(task.id)}
+                          confirmText="Delete Task" confirmVariant="destructive"
+                        />
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }
 
@@ -207,7 +252,7 @@ export default function EmployeeManagementPage() {
                                     </AccordionTrigger>
                                     <AccordionContent>
                                         <EmployeeTasks 
-                                            tasks={allTasks?.filter(t => t.employeeId === employee.id) || []}
+                                            tasks={allTasks?.filter(t => t.employeeId === employee.id).sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) || []}
                                             employeeId={employee.id}
                                         />
                                     </AccordionContent>

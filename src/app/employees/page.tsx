@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Employee, Task } from "@/types/database";
-import { getEmployees, getTasksForEmployee } from "@/lib/firestore-actions";
+import { getEmployees, getTasksForEmployee, getTasks } from "@/lib/firestore-actions";
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,18 +23,14 @@ import { format, isPast } from "date-fns";
 import { User, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-function EmployeeTasks({ employeeId }: { employeeId: string }) {
+function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: string }) {
     const queryClient = useQueryClient();
     const { toast } = useToast();
-    const { data: tasks, isLoading: isLoadingTasks } = useQuery<Task[]>({
-        queryKey: ['tasks', employeeId],
-        queryFn: () => getTasksForEmployee(employeeId),
-    });
 
     const updateStatusMutation = useMutation({
         mutationFn: ({ taskId, status }: { taskId: string, status: Task['status'] }) => updateTask(taskId, { status }),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', employeeId] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast({ title: "Task Updated", description: "The task status has been updated." });
         },
         onError: (error: any) => toast({ title: "Error", description: `Failed to update task: ${error.message}`, variant: "destructive" }),
@@ -47,9 +43,7 @@ function EmployeeTasks({ employeeId }: { employeeId: string }) {
         return 'bg-gray-500/20 text-gray-700 border-gray-500/30';
     };
 
-    if (isLoadingTasks) return <div className="flex justify-center p-4"><Loader2 className="animate-spin" /></div>;
-
-    if (!tasks || tasks.length === 0) {
+    if (tasks.length === 0) {
         return <p className="text-sm text-muted-foreground px-4 pb-4">No tasks assigned to this employee yet.</p>;
     }
 
@@ -93,9 +87,14 @@ export default function EmployeeManagementPage() {
     const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-    const { data: employees, isLoading, error } = useQuery<Employee[]>({
+    const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery<Employee[]>({
         queryKey: ['employees'],
         queryFn: getEmployees,
+    });
+
+    const { data: allTasks, isLoading: isLoadingTasks, error: tasksError } = useQuery<Task[]>({
+        queryKey: ['tasks'],
+        queryFn: getTasks,
     });
     
     const { mutate: addEmployeeMutation, isPending: isAddingEmployee } = useMutation({
@@ -112,6 +111,7 @@ export default function EmployeeManagementPage() {
         mutationFn: deleteEmployee,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast({ title: "Employee Deleted", description: "The employee and their tasks have been removed." });
         },
         onError: (err: any) => toast({ title: "Error", description: `Failed to delete employee: ${err.message}`, variant: "destructive" }),
@@ -119,8 +119,8 @@ export default function EmployeeManagementPage() {
 
     const { mutate: addTaskMutation, isPending: isAddingTask } = useMutation({
         mutationFn: addTask,
-        onSuccess: (newTaskId, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', variables.employeeId] });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
             toast({ title: "Task Assigned", description: "The new task has been assigned to the employee." });
             setIsTaskFormOpen(false);
         },
@@ -132,8 +132,11 @@ export default function EmployeeManagementPage() {
         setIsTaskFormOpen(true);
     };
 
+    const isLoading = isLoadingEmployees || isLoadingTasks;
+    const error = employeesError || tasksError;
+
     if (error) {
-        return <div className="p-4"><Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>Failed to load employee data.</AlertDescription></Alert></div>;
+        return <div className="p-4"><Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>Failed to load data. Check your permissions and connection.</AlertDescription></Alert></div>;
     }
 
     return (
@@ -154,7 +157,7 @@ export default function EmployeeManagementPage() {
                 }
             />
 
-            <Dialog open={isTaskFormOpen} onOpenChange={setIsTaskFormOpen}>
+            <Dialog open={isTaskFormOpen} onOpenChange={(isOpen) => { if(!isOpen) {setSelectedEmployee(null)} setIsTaskFormOpen(isOpen) }}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Assign New Task</DialogTitle><DialogDescription>Assign a new task to {selectedEmployee?.name}.</DialogDescription></DialogHeader>
                     {selectedEmployee && <TaskForm employee={selectedEmployee} onSubmit={(values) => addTaskMutation(values)} isLoading={isAddingTask} onCancel={() => setIsTaskFormOpen(false)} />}
@@ -192,7 +195,10 @@ export default function EmployeeManagementPage() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
-                                        <EmployeeTasks employeeId={employee.id} />
+                                        <EmployeeTasks 
+                                            tasks={allTasks?.filter(t => t.employeeId === employee.id) || []}
+                                            employeeId={employee.id}
+                                        />
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}

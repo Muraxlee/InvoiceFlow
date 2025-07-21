@@ -235,6 +235,10 @@ export async function deleteEmployee(id: string): Promise<void> {
 }
 
 // Task Actions
+export async function getTasks(): Promise<Task[]> {
+    return getCollection<Task>(TASKS, 'dueDate', 'asc');
+}
+
 export async function getTasksForEmployee(employeeId: string): Promise<Task[]> {
   checkDb();
   const q = query(collection(db, TASKS), where("employeeId", "==", employeeId), orderBy('dueDate', 'asc'));

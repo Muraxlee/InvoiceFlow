@@ -74,6 +74,28 @@ export interface InventoryItem {
   updatedAt: any; // Firestore ServerTimestamp
 }
 
+export interface Employee {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  createdAt: any;
+}
+
+export interface Task {
+    id: string;
+    title: string;
+    description?: string;
+    employeeId: string;
+    employeeName: string;
+    dueDate: any; // Firestore Timestamp
+    status: 'Todo' | 'In Progress' | 'Done';
+    createdAt: any;
+    updatedAt: any;
+}
+
+
 export interface CompanyData {
   id: string; // Document ID is 'main'
   name: string;

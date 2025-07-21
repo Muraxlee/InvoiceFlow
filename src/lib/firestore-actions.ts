@@ -13,8 +13,9 @@ import {
   orderBy,
   serverTimestamp,
   writeBatch,
+  where,
 } from 'firebase/firestore';
-import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement, InventoryItem } from '@/types/database';
+import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement, InventoryItem, Employee, Task } from '@/types/database';
 
 const INVOICES = 'invoices';
 const CUSTOMERS = 'customers';
@@ -23,6 +24,9 @@ const MEASUREMENTS = 'measurements';
 const COMPANY = 'company';
 const USERS = 'users';
 const INVENTORY = 'inventory';
+const EMPLOYEES = 'employees';
+const TASKS = 'tasks';
+
 
 const checkDb = () => {
     if (!db) {
@@ -201,6 +205,61 @@ export async function updateInventoryItem(id: string, itemData: Partial<Omit<Inv
 export async function deleteInventoryItem(id: string): Promise<void> {
     checkDb();
     await deleteDoc(doc(db, INVENTORY, id));
+}
+
+// Employee Actions
+export async function getEmployees(): Promise<Employee[]> {
+  return getCollection<Employee>(EMPLOYEES, 'name');
+}
+
+export async function addEmployee(employeeData: Omit<Employee, 'id' | 'createdAt'>): Promise<string> {
+  checkDb();
+  const docRef = await addDoc(collection(db, EMPLOYEES), { ...employeeData, createdAt: serverTimestamp() });
+  return docRef.id;
+}
+
+export async function updateEmployee(id: string, employeeData: Partial<Omit<Employee, 'id' | 'createdAt'>>): Promise<void> {
+  checkDb();
+  await updateDoc(doc(db, EMPLOYEES, id), employeeData);
+}
+
+export async function deleteEmployee(id: string): Promise<void> {
+  checkDb();
+  await deleteDoc(doc(db, EMPLOYEES, id));
+  // Optional: Also delete associated tasks
+  const tasksQuery = query(collection(db, TASKS), where("employeeId", "==", id));
+  const tasksSnapshot = await getDocs(tasksQuery);
+  const batch = writeBatch(db);
+  tasksSnapshot.forEach(doc => batch.delete(doc.ref));
+  await batch.commit();
+}
+
+// Task Actions
+export async function getTasksForEmployee(employeeId: string): Promise<Task[]> {
+  checkDb();
+  const q = query(collection(db, TASKS), where("employeeId", "==", employeeId), orderBy('dueDate', 'asc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => fromFirestore({ id: doc.id, ...doc.data() } as Task));
+}
+
+export async function addTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  checkDb();
+  const docRef = await addDoc(collection(db, TASKS), {
+    ...taskData,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  return docRef.id;
+}
+
+export async function updateTask(id: string, taskData: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<void> {
+  checkDb();
+  await updateDoc(doc(db, TASKS, id), { ...taskData, updatedAt: serverTimestamp() });
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  checkDb();
+  await deleteDoc(doc(db, TASKS, id));
 }
 
 

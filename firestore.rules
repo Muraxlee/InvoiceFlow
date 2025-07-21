@@ -32,6 +32,16 @@ service cloud.firestore {
     match /inventory/{document=**} {
       allow read, write: if request.auth != null;
     }
+    
+    // Authenticated users can read/write employee data
+    match /employees/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Authenticated users can read/write task data
+    match /tasks/{document=**} {
+      allow read, write: if request.auth != null;
+    }
 
     // Company data is publicly readable, but only authenticated users can modify
     match /company/{document=**} {

@@ -17,7 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem, getProducts } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
@@ -200,13 +200,14 @@ export default function InventoryPage() {
               <TableBody>
                 {filteredItems?.map((item) => {
                   const product = productMap.get(item.productId);
+                  const updatedAtDate = item.updatedAt ? new Date(item.updatedAt.seconds * 1000) : null;
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.productName}</TableCell>
                       <TableCell>{product?.hsn || '-'}</TableCell>
                       <TableCell>{product?.category || '-'}</TableCell>
                       <TableCell className="text-center">{item.stock}</TableCell>
-                      <TableCell>{item.updatedAt && item.updatedAt.seconds ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
+                      <TableCell>{updatedAtDate && isValid(updatedAtDate) ? format(updatedAtDate, 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

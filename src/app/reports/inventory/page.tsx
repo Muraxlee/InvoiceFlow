@@ -3,8 +3,8 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getInventoryItems } from '@/lib/firestore-actions';
-import type { InventoryItem } from '@/types/database';
+import { getInventoryItems, getProducts } from '@/lib/firestore-actions';
+import type { InventoryItem, Product } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,12 +26,23 @@ export default function InventoryReportPage() {
         queryKey: ['inventory'],
         queryFn: getInventoryItems,
     });
+    
+    const { data: products } = useQuery<Product[]>({
+        queryKey: ['products'],
+        queryFn: getProducts,
+    });
+    
+    const productMap = useMemo(() => {
+        if (!products) return new Map<string, Product>();
+        return new Map(products.map(p => [p.id, p]));
+    }, [products]);
 
     const filteredData = useMemo(() => {
         if (!inventoryItems) return [];
         return inventoryItems.filter(item => {
+            const product = productMap.get(item.productId);
             const lowercasedTerm = searchTerm.toLowerCase();
-            if (lowercasedTerm && !item.name.toLowerCase().includes(lowercasedTerm) && !item.sku.toLowerCase().includes(lowercasedTerm) && !item.category.toLowerCase().includes(lowercasedTerm)) {
+            if (lowercasedTerm && !item.productName.toLowerCase().includes(lowercasedTerm) && !product?.hsn?.toLowerCase().includes(lowercasedTerm) && !product?.category?.toLowerCase().includes(lowercasedTerm)) {
                 return false;
             }
             const min = parseInt(minStock);
@@ -39,34 +50,40 @@ export default function InventoryReportPage() {
             if (!isNaN(min) && item.stock < min) return false;
             if (!isNaN(max) && item.stock > max) return false;
             return true;
-        }).sort((a, b) => a.name.localeCompare(b.name));
-    }, [inventoryItems, searchTerm, minStock, maxStock]);
+        }).sort((a, b) => a.productName.localeCompare(b.productName));
+    }, [inventoryItems, searchTerm, minStock, maxStock, productMap]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF();
         doc.text("Inventory Stock Report", 14, 16);
         autoTable(doc, {
             head: [['Item Name', 'SKU', 'Category', 'Current Stock', 'Last Updated']],
-            body: filteredData.map(item => [
-                item.name,
-                item.sku,
-                item.category,
-                item.stock,
-                item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy, HH:mm') : 'N/A'
-            ]),
+            body: filteredData.map(item => {
+                const product = productMap.get(item.productId);
+                return [
+                    item.productName,
+                    product?.hsn || '-',
+                    product?.category || '-',
+                    item.stock,
+                    item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
+                ]
+            }),
             startY: 20
         });
         doc.save('inventory_report.pdf');
     };
 
     const handleExportExcel = () => {
-        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(item => ({
-            'Item Name': item.name,
-            'SKU': item.sku,
-            'Category': item.category,
-            'Current Stock': item.stock,
-            'Last Updated': item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy, HH:mm') : 'N/A'
-        })));
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(item => {
+            const product = productMap.get(item.productId);
+            return {
+                'Item Name': item.productName,
+                'SKU': product?.hsn || '-',
+                'Category': product?.category || '-',
+                'Current Stock': item.stock,
+                'Last Updated': item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
+            }
+        }));
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory");
         XLSX.writeFile(workbook, "inventory_report.xlsx");
@@ -133,21 +150,24 @@ export default function InventoryReportPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Item Name</TableHead>
+                                    <TableHead>Product Name</TableHead>
                                     <TableHead>SKU</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead className="text-center">Current Stock</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredData.length > 0 ? filteredData.map(item => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{item.name}</TableCell>
-                                        <TableCell>{item.sku}</TableCell>
-                                        <TableCell>{item.category}</TableCell>
-                                        <TableCell className="text-center font-bold">{item.stock}</TableCell>
-                                    </TableRow>
-                                )) : (
+                                {filteredData.length > 0 ? filteredData.map(item => {
+                                    const product = productMap.get(item.productId);
+                                    return (
+                                        <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.productName}</TableCell>
+                                            <TableCell>{product?.hsn || '-'}</TableCell>
+                                            <TableCell>{product?.category || '-'}</TableCell>
+                                            <TableCell className="text-center font-bold">{item.stock}</TableCell>
+                                        </TableRow>
+                                    )
+                                }) : (
                                     <TableRow><TableCell colSpan={4} className="text-center h-24">No inventory items match your criteria.</TableCell></TableRow>
                                 )}
                             </TableBody>

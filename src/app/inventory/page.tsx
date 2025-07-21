@@ -12,9 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { InventoryForm, type InventoryFormValues } from "@/components/inventory-form";
-import type { InventoryItem } from "@/types/database";
+import type { InventoryItem, Product } from "@/types/database";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem } from "@/lib/firestore-actions";
+import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem, getProducts } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { format } from 'date-fns';
@@ -31,18 +31,29 @@ export default function InventoryPage() {
     queryFn: getInventoryItems,
   });
 
+  const { data: products, isLoading: isLoadingProducts } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: getProducts,
+  });
+
+  const productMap = useMemo(() => {
+    if (!products) return new Map<string, Product>();
+    return new Map(products.map(p => [p.id, p]));
+  }, [products]);
+
   const filteredItems = useMemo(() => {
     if (!inventoryItems) return [];
     const lowercasedTerm = searchTerm.toLowerCase();
-    return inventoryItems.filter(item => 
-      item.name.toLowerCase().includes(lowercasedTerm) ||
-      item.sku.toLowerCase().includes(lowercasedTerm) ||
-      item.category.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [inventoryItems, searchTerm]);
+    return inventoryItems.filter(item => {
+      const product = productMap.get(item.productId);
+      return item.productName.toLowerCase().includes(lowercasedTerm) ||
+             product?.sku?.toLowerCase().includes(lowercasedTerm) ||
+             product?.category?.toLowerCase().includes(lowercasedTerm);
+    });
+  }, [inventoryItems, searchTerm, productMap]);
 
   const addMutation = useMutation({
-    mutationFn: (data: Omit<InventoryItem, 'id' | 'updatedAt'>) => addInventoryItem(data),
+    mutationFn: (data: InventoryFormValues) => addInventoryItem(data),
     onSuccess: () => {
       toast({ title: "Item Added", description: "The new inventory item has been added." });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -104,20 +115,22 @@ export default function InventoryPage() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogTrigger asChild>
           <Button onClick={handleAddNewClick}>
-            <Boxes className="mr-2 h-4 w-4" /> Add New Item
+            <Boxes className="mr-2 h-4 w-4" /> Add Inventory
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle>{currentItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+            <DialogTitle>{currentItem ? 'Edit Stock' : 'Add New Inventory'}</DialogTitle>
             <DialogDescription>
-              {currentItem ? 'Update the details of this inventory item.' : 'Fill in the details to add a new item to your inventory.'}
+              {currentItem ? 'Update the stock level for this product.' : 'Select a product to add to your inventory.'}
             </DialogDescription>
           </DialogHeader>
           <InventoryForm 
+            products={products || []}
+            inventoryItems={inventoryItems || []}
             onSubmit={handleFormSubmit}
             defaultValues={currentItem ?? undefined}
-            isLoading={addMutation.isPending || updateMutation.isPending}
+            isLoading={addMutation.isPending || updateMutation.isPending || isLoadingProducts}
             onCancel={() => { setIsFormOpen(false); setCurrentItem(null); }}
           />
         </DialogContent>
@@ -148,14 +161,14 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <PageHeader 
         title="Inventory Management" 
-        description="Track stock levels for your items."
+        description="Track stock levels for your products."
         actions={pageActions}
       />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>Stock List</CardTitle>
-            <CardDescription>A list of all items in your inventory.</CardDescription>
+            <CardDescription>A list of all products in your inventory.</CardDescription>
           </div>
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -176,7 +189,7 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
+                  <TableHead>Product Name</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-center">Stock</TableHead>
@@ -185,42 +198,45 @@ export default function InventoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems?.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.sku}</TableCell>
-                    <TableCell>{item.category}</TableCell>
-                    <TableCell className="text-center">{item.stock}</TableCell>
-                    <TableCell>{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditClick(item)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <ConfirmDialog
-                            triggerButton={
-                              <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full" onSelect={(e) => e.preventDefault()}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            }
-                            title={`Delete ${item.name}`}
-                            description="Are you sure you want to delete this inventory item? This action cannot be undone."
-                            onConfirm={() => deleteMutation.mutate(item.id)}
-                            confirmText="Yes, Delete"
-                            confirmVariant="destructive"
-                          />
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredItems?.map((item) => {
+                  const product = productMap.get(item.productId);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.productName}</TableCell>
+                      <TableCell>{product?.hsn || '-'}</TableCell>
+                      <TableCell>{product?.category || '-'}</TableCell>
+                      <TableCell className="text-center">{item.stock}</TableCell>
+                      <TableCell>{item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(item)}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit Stock
+                            </DropdownMenuItem>
+                            <ConfirmDialog
+                              triggerButton={
+                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 w-full" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                              }
+                              title={`Delete ${item.productName} from inventory`}
+                              description="Are you sure you want to delete this inventory item? This will not delete the product itself."
+                              onConfirm={() => deleteMutation.mutate(item.id)}
+                              confirmText="Yes, Delete"
+                              confirmVariant="destructive"
+                            />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

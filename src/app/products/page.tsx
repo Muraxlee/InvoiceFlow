@@ -202,10 +202,8 @@ export default function ProductsPage() {
               <TableRow>
                 <TableHead className="w-[50px]">#</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>HSN/SAC</TableHead>
-                <TableHead className="text-center">CGST %</TableHead>
-                <TableHead className="text-center">SGST %</TableHead>
-                <TableHead className="text-center">IGST %</TableHead>
+                <TableHead>SKU/HSN</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -216,9 +214,7 @@ export default function ProductsPage() {
                   <TableCell className="font-medium">{index + 1}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.hsn || '-'}</TableCell>
-                  <TableCell className="text-center">{product.cgstRate}%</TableCell>
-                  <TableCell className="text-center">{product.sgstRate}%</TableCell>
-                  <TableCell className="text-center">{product.igstRate}%</TableCell>
+                  <TableCell>{product.category || '-'}</TableCell>
                   <TableCell className="text-right">₹{(product.price || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

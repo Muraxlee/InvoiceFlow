@@ -35,7 +35,8 @@ const productSchema = z.object({
   id: z.string(), // ID is handled by Firestore, but kept in form for edit mode
   name: z.string().min(1, "Product name is required"),
   price: z.coerce.number().min(0, "Price cannot be negative"),
-  hsn: z.string().min(1, "HSN/SAC code is required"),
+  hsn: z.string().optional(), // SKU is now HSN
+  category: z.string().optional(),
   igstRate: z.coerce.number().min(0).default(18),
   cgstRate: z.coerce.number().min(0).default(9),
   sgstRate: z.coerce.number().min(0).default(9),
@@ -58,6 +59,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
       name: defaultValues?.name || "",
       price: defaultValues?.price || 0,
       hsn: defaultValues?.hsn || "",
+      category: defaultValues?.category || "",
       igstRate: defaultValues?.igstRate || 18,
       cgstRate: defaultValues?.cgstRate || 9,
       sgstRate: defaultValues?.sgstRate || 9,
@@ -65,7 +67,16 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
   });
 
   useEffect(() => {
-    form.reset(defaultValues);
+    form.reset({
+      id: defaultValues?.id || "",
+      name: defaultValues?.name || "",
+      price: defaultValues?.price || 0,
+      hsn: defaultValues?.hsn || "",
+      category: defaultValues?.category || "",
+      igstRate: defaultValues?.igstRate || 18,
+      cgstRate: defaultValues?.cgstRate || 9,
+      sgstRate: defaultValues?.sgstRate || 9,
+    });
   }, [defaultValues, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
@@ -131,15 +142,25 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
                 <FormControl>
                   <Input placeholder="e.g., 8471" {...field} />
                 </FormControl>
-                <FormDescription>
-                  Harmonized System code for GST classification
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        <div className="border p-4 rounded-md bg-gray-50/50">
+        <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Category</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Fabrics, Accessories" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        <div className="border p-4 rounded-md bg-muted/20">
           <h3 className="text-sm font-medium mb-3">GST Rates</h3>
           <div className="grid grid-cols-3 gap-4">
             <FormField

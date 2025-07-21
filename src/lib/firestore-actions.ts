@@ -185,11 +185,18 @@ export async function deleteMeasurement(id: string): Promise<void> {
 
 // Inventory Actions
 export async function getInventoryItems(): Promise<InventoryItem[]> {
-  return getCollection<InventoryItem>(INVENTORY, 'name');
+  return getCollection<InventoryItem>(INVENTORY, 'productName');
 }
 
 export async function addInventoryItem(itemData: Omit<InventoryItem, 'id' | 'updatedAt'>): Promise<string> {
     checkDb();
+    // Check if an inventory item for this product already exists
+    const q = query(collection(db, INVENTORY), where("productId", "==", itemData.productId));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        throw new Error("Inventory item for this product already exists. Please edit the existing item.");
+    }
+    
     const docRef = await addDoc(collection(db, INVENTORY), {
         ...itemData,
         updatedAt: serverTimestamp()

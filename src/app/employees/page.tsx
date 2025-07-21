@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Employee, Task } from "@/types/database";
-import { getEmployees, getTasksForEmployee, getTasks } from "@/lib/firestore-actions";
+import { getEmployees, getTasks } from "@/lib/firestore-actions";
 import PageHeader from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addEmployee, updateEmployee, deleteEmployee, addTask, updateTask, deleteTask } from "@/lib/firestore-actions";
 import { format, isPast } from "date-fns";
-import { User, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail } from "lucide-react";
+import { User, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: string }) {
@@ -87,12 +87,12 @@ export default function EmployeeManagementPage() {
     const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
-    const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery<Employee[]>({
+    const { data: employees, isLoading: isLoadingEmployees, error: employeesError, refetch: refetchEmployees } = useQuery<Employee[]>({
         queryKey: ['employees'],
         queryFn: getEmployees,
     });
 
-    const { data: allTasks, isLoading: isLoadingTasks, error: tasksError } = useQuery<Task[]>({
+    const { data: allTasks, isLoading: isLoadingTasks, error: tasksError, refetch: refetchTasks } = useQuery<Task[]>({
         queryKey: ['tasks'],
         queryFn: getTasks,
     });
@@ -126,6 +126,12 @@ export default function EmployeeManagementPage() {
         },
         onError: (err: any) => toast({ title: "Error", description: `Failed to assign task: ${err.message}`, variant: "destructive" }),
     });
+    
+    const handleRefresh = () => {
+      refetchEmployees();
+      refetchTasks();
+      toast({ title: "Data Refreshed", description: "Employee and task data has been updated." });
+    };
 
     const openTaskForm = (employee: Employee) => {
         setSelectedEmployee(employee);
@@ -145,6 +151,10 @@ export default function EmployeeManagementPage() {
                 title="Employee Management"
                 description="Manage your employees and their assigned tasks."
                 actions={
+                  <div className="flex items-center gap-2">
+                    <Button onClick={handleRefresh} variant="outline" size="sm" className="hidden sm:flex">
+                      <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+                    </Button>
                     <Dialog open={isEmployeeFormOpen} onOpenChange={setIsEmployeeFormOpen}>
                         <DialogTrigger asChild>
                             <Button><UserPlus className="mr-2 h-4 w-4" /> Add Employee</Button>
@@ -154,6 +164,7 @@ export default function EmployeeManagementPage() {
                             <EmployeeForm onSubmit={(values) => addEmployeeMutation(values)} isLoading={isAddingEmployee} onCancel={() => setIsEmployeeFormOpen(false)} />
                         </DialogContent>
                     </Dialog>
+                  </div>
                 }
             />
 

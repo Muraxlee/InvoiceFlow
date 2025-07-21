@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addEmployee, updateEmployee, deleteEmployee, addTask, updateTask, deleteTask } from "@/lib/firestore-actions";
 import { format, isPast } from "date-fns";
-import { ClipboardUser, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail } from "lucide-react";
+import { User, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function EmployeeTasks({ employeeId }: { employeeId: string }) {
@@ -173,7 +173,7 @@ export default function EmployeeManagementPage() {
                                     <AccordionTrigger className="hover:bg-muted/50 px-4">
                                         <div className="flex items-center justify-between w-full">
                                             <div className="flex items-center gap-4">
-                                                <div className="p-2 bg-muted rounded-full"><ClipboardUser className="h-5 w-5 text-muted-foreground" /></div>
+                                                <div className="p-2 bg-muted rounded-full"><User className="h-5 w-5 text-muted-foreground" /></div>
                                                 <div>
                                                     <h3 className="font-semibold text-base">{employee.name}</h3>
                                                     <p className="text-sm text-muted-foreground">{employee.role}</p>
@@ -207,5 +207,3 @@ export default function EmployeeManagementPage() {
         </div>
     );
 }
-
-    

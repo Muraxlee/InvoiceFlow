@@ -36,7 +36,8 @@ export default function ProductsPage() {
     const lowercasedTerm = searchTerm.toLowerCase();
     return products.filter(product => 
       product.name.toLowerCase().includes(lowercasedTerm) ||
-      product.hsn?.toLowerCase().includes(lowercasedTerm)
+      product.hsn?.toLowerCase().includes(lowercasedTerm) ||
+      product.category?.toLowerCase().includes(lowercasedTerm)
     );
   }, [products, searchTerm]);
 

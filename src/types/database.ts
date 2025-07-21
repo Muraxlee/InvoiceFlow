@@ -39,6 +39,7 @@ export interface Product {
   description: string;
   price: number;
   hsn?: string;
+  category?: string;
   igstRate: number;
   cgstRate: number;
   sgstRate: number;

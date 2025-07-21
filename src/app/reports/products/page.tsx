@@ -64,7 +64,8 @@ export default function ProductReportPage() {
         const lowercasedTerm = searchTerm.toLowerCase();
         return sortedData.filter(p => 
             p.name.toLowerCase().includes(lowercasedTerm) || 
-            p.hsn?.toLowerCase().includes(lowercasedTerm)
+            p.hsn?.toLowerCase().includes(lowercasedTerm) ||
+            p.category?.toLowerCase().includes(lowercasedTerm)
         );
     }, [reportData, searchTerm]);
 
@@ -72,10 +73,11 @@ export default function ProductReportPage() {
         const doc = new jsPDF();
         doc.text("Product Sales Report", 14, 16);
         autoTable(doc, {
-            head: [['Product', 'HSN/SAC', 'Units Sold', 'Total Revenue (₹)']],
+            head: [['Product', 'Category', 'HSN/SAC', 'Units Sold', 'Total Revenue (₹)']],
             body: filteredData.map(p => [
                 p.name,
-                p.hsn,
+                p.category || '-',
+                p.hsn || '-',
                 p.unitsSold,
                 p.totalRevenue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
             ]),
@@ -87,7 +89,8 @@ export default function ProductReportPage() {
     const handleExportExcel = () => {
         const worksheet = XLSX.utils.json_to_sheet(filteredData.map(p => ({
             'Product': p.name,
-            'HSN/SAC': p.hsn,
+            'Category': p.category || '-',
+            'HSN/SAC': p.hsn || '-',
             'Units Sold': p.unitsSold,
             'Total Revenue (INR)': p.totalRevenue
         })));
@@ -122,7 +125,7 @@ export default function ProductReportPage() {
                 <CardContent className="flex gap-4">
                     <div className="relative flex-grow">
                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                       <Input placeholder="Search by Product Name or HSN/SAC" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                       <Input placeholder="Search by Product, Category, or HSN/SAC" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
                     </div>
                     <Button onClick={() => setSearchTerm('')} variant="ghost" size="sm"><X className="mr-2 h-4 w-4" />Clear</Button>
                 </CardContent>
@@ -147,6 +150,7 @@ export default function ProductReportPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Product</TableHead>
+                                    <TableHead>Category</TableHead>
                                     <TableHead>HSN/SAC</TableHead>
                                     <TableHead className="text-center">Units Sold</TableHead>
                                     <TableHead className="text-right">Total Revenue</TableHead>
@@ -156,12 +160,13 @@ export default function ProductReportPage() {
                                 {filteredData.length > 0 ? filteredData.map(product => (
                                     <TableRow key={product.id}>
                                         <TableCell className="font-medium">{product.name}</TableCell>
+                                        <TableCell>{product.category || '-'}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell className="text-center">{product.unitsSold}</TableCell>
                                         <TableCell className="text-right">₹{product.totalRevenue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={4} className="text-center h-24">No products found.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No products found.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

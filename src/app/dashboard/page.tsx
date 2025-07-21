@@ -10,7 +10,7 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid, isAfter, startOfDay } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -99,7 +99,7 @@ export default function DashboardPage() {
           if (!isValid(invDate)) return;
 
           let status = invoice.status || "Unpaid";
-          if (isAfter(today, new Date(invoice.dueDate || 0)) && (status === 'Unpaid' || status === 'Partially Paid')) {
+          if (isPast(new Date(invoice.dueDate || 0)) && (status === 'Unpaid' || status === 'Partially Paid' || status === 'Pending')) {
             status = 'Overdue';
           }
           statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -175,8 +175,13 @@ export default function DashboardPage() {
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   
-  const statusVariant = (status?: string) => {
-    switch (status?.toLowerCase()) {
+  const statusVariant = (invoiceStatus?: string, dueDate?: Date | string | null) => {
+    let status = invoiceStatus?.toLowerCase() || 'unpaid';
+    if (dueDate && isPast(new Date(dueDate)) && (status === 'unpaid' || status === 'pending' || status === 'partially paid')) {
+      status = 'overdue';
+    }
+    
+    switch (status) {
       case "paid": return "success";
       case "pending": return "warning";
       case "overdue": return "destructive";
@@ -410,15 +415,18 @@ export default function DashboardPage() {
               <Table>
                 <TableHeader> <TableRow> <TableHead>Invoice</TableHead> <TableHead>Customer</TableHead> <TableHead>Date</TableHead> <TableHead>Amount</TableHead> <TableHead>Status</TableHead> </TableRow> </TableHeader>
                 <TableBody>
-                  {dashboardMetrics.recentInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="font-medium"> <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary"> {invoice.invoiceNumber} </Link> </TableCell>
-                      <TableCell>{invoice.customerName}</TableCell>
-                      <TableCell> {format(new Date(invoice.invoiceDate), 'dd MMM yyyy')} </TableCell>
-                      <TableCell>₹{(invoice.amount || 0).toLocaleString('en-IN')}</TableCell>
-                      <TableCell> <Badge variant={statusVariant(invoice.status)} className="text-xs"> {invoice.status || 'Unpaid'} </Badge> </TableCell>
-                    </TableRow>
-                  ))}
+                  {dashboardMetrics.recentInvoices.map((invoice) => {
+                    const status = invoice.dueDate && isPast(new Date(invoice.dueDate)) && invoice.status !== 'Paid' ? 'Overdue' : invoice.status;
+                    return (
+                      <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="font-medium"> <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary"> {invoice.invoiceNumber} </Link> </TableCell>
+                        <TableCell>{invoice.customerName}</TableCell>
+                        <TableCell> {format(new Date(invoice.invoiceDate), 'dd MMM yyyy')} </TableCell>
+                        <TableCell>₹{(invoice.amount || 0).toLocaleString('en-IN')}</TableCell>
+                        <TableCell> <Badge variant={statusVariant(status, new Date(invoice.dueDate || ''))} className="text-xs"> {status || 'Unpaid'} </Badge> </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (

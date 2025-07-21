@@ -2,44 +2,51 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices } from '@/lib/firestore-actions';
 import type { StoredInvoice } from '@/types/database';
 import { format, isPast, startOfDay } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 type StatusFilter = "all" | "paid" | "unpaid" | "pending" | "overdue";
 
 export default function InvoiceReportPage() {
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
 
-    const { data: invoices, isLoading } = useQuery<StoredInvoice[]>({
+    const { data: invoices, isLoading, refetch } = useQuery<StoredInvoice[]>({
         queryKey: ['invoices'],
         queryFn: getInvoices,
     });
 
+    const getInvoiceStatus = (invoice: StoredInvoice) => {
+        let status = invoice.status || 'Unpaid';
+        if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && (status === 'Unpaid' || status === 'Pending' || status === 'Partially Paid')) {
+            return 'Overdue';
+        }
+        if(status === 'Unpaid' || status === 'Partially Paid') {
+            return 'Pending';
+        }
+        return status;
+    }
+
     const filteredInvoices = useMemo(() => {
         if (!invoices) return [];
-        const today = startOfDay(new Date());
-
         return invoices.filter(invoice => {
-            let status = invoice.status || 'Unpaid';
-            if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && ['Unpaid', 'Pending', 'Partially Paid'].includes(status)) {
-                status = 'Overdue';
-            }
-
-            if (statusFilter !== 'all' && status.toLowerCase() !== statusFilter) {
+            const currentStatus = getInvoiceStatus(invoice).toLowerCase();
+            
+            if (statusFilter !== 'all' && currentStatus !== statusFilter) {
                 return false;
             }
 
@@ -58,15 +65,10 @@ export default function InvoiceReportPage() {
     }, [invoices, searchTerm, statusFilter, minAmount, maxAmount]);
 
     const getStatusBadge = (invoice: StoredInvoice) => {
-        let status = invoice.status || 'Unpaid';
-        if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && ['Unpaid', 'Pending', 'Partially Paid'].includes(status)) {
-            status = 'Overdue';
-        }
-
+        const status = getInvoiceStatus(invoice);
         const variant = status.toLowerCase() === 'paid' ? 'success' :
                         status.toLowerCase() === 'overdue' ? 'destructive' :
-                        status.toLowerCase() === 'pending' || status.toLowerCase() === 'unpaid' ? 'warning' :
-                        status.toLowerCase() === 'partially paid' ? 'info' :
+                        status.toLowerCase() === 'pending' ? 'warning' :
                         'outline';
         return <Badge variant={variant as any}>{status}</Badge>;
     };
@@ -80,7 +82,18 @@ export default function InvoiceReportPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Invoice Report" description="Filter and analyze your invoices." />
+            <PageHeader 
+                title="Invoice Report" 
+                description="Filter and analyze your invoices."
+                actions={
+                  <div className="flex items-center gap-2">
+                    <Link href="/reports">
+                      <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                    </Link>
+                    <Button onClick={() => refetch()} variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+                  </div>
+                }
+            />
             <Card>
                 <CardHeader>
                     <CardTitle>Filters & Search</CardTitle>
@@ -102,7 +115,6 @@ export default function InvoiceReportPage() {
                                <SelectContent>
                                    <SelectItem value="all">All</SelectItem>
                                    <SelectItem value="paid">Paid</SelectItem>
-                                   <SelectItem value="unpaid">Unpaid</SelectItem>
                                    <SelectItem value="pending">Pending</SelectItem>
                                    <SelectItem value="overdue">Overdue</SelectItem>
                                </SelectContent>

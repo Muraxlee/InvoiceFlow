@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCustomers, getInvoices } from '@/lib/firestore-actions';
 import type { Customer, StoredInvoice } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,9 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isPast, startOfDay } from 'date-fns';
+import Link from 'next/link';
 
 type CustomerReportData = Customer & {
     totalValue: number;
@@ -25,16 +26,17 @@ type CustomerReportData = Customer & {
 };
 
 export default function CustomerReportPage() {
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
 
-    const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
+    const { data: customers, isLoading: isLoadingCustomers, refetch: refetchCustomers } = useQuery<Customer[]>({
         queryKey: ['customers'],
         queryFn: getCustomers,
     });
 
-    const { data: invoices, isLoading: isLoadingInvoices } = useQuery<StoredInvoice[]>({
+    const { data: invoices, isLoading: isLoadingInvoices, refetch: refetchInvoices } = useQuery<StoredInvoice[]>({
         queryKey: ['invoices'],
         queryFn: getInvoices,
     });
@@ -94,9 +96,25 @@ export default function CustomerReportPage() {
         setMaxAmount('');
     };
 
+    const handleRefresh = () => {
+        refetchCustomers();
+        refetchInvoices();
+    }
+
     return (
         <div className="space-y-6">
-            <PageHeader title="Customer Report" description="Analyze customer value and invoice history." />
+            <PageHeader
+              title="Customer Report"
+              description="Analyze customer value and invoice history."
+              actions={
+                <div className="flex items-center gap-2">
+                  <Link href="/reports">
+                    <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                  </Link>
+                  <Button onClick={handleRefresh} variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+                </div>
+              }
+            />
             <Card>
                 <CardHeader>
                     <CardTitle>Filters & Search</CardTitle>
@@ -149,7 +167,7 @@ export default function CustomerReportPage() {
                                         <TableCell>
                                             <div className="flex flex-wrap gap-1">
                                                 <Badge variant="success">{customer.invoiceCounts.paid} Paid</Badge>
-                                                <Badge variant="warning">{customer.invoiceCounts.pending} Pending</Badge>
+                                                <Badge variant="warning">{customer.invoiceCounts.unpaid + customer.invoiceCounts.pending} Pending</Badge>
                                                 <Badge variant="destructive">{customer.invoiceCounts.overdue} Overdue</Badge>
                                             </div>
                                         </TableCell>

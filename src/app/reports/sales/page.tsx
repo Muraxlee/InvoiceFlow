@@ -9,8 +9,10 @@ import { format, subMonths, startOfDay, isPast } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import PageHeader from "@/components/page-header";
-import { Loader2, DollarSign, FileText, AlertTriangle, BarChartHorizontalBig } from "lucide-react";
+import PageHeader from '@/components/page-header';
+import { Loader2, DollarSign, FileText, AlertTriangle, BarChartHorizontalBig, RefreshCw, ArrowLeft } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 interface SalesReportData {
   totalRevenue: number;
@@ -21,7 +23,7 @@ interface SalesReportData {
 }
 
 export default function SalesReportPage() {
-    const { data: invoices, isLoading } = useQuery<StoredInvoice[]>({
+    const { data: invoices, isLoading, refetch } = useQuery<StoredInvoice[]>({
         queryKey: ['invoices'],
         queryFn: getInvoices,
     });
@@ -91,7 +93,18 @@ export default function SalesReportPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Sales Report" description="Analyze your revenue and sales trends over time." />
+            <PageHeader
+                title="Sales Report"
+                description="Analyze your revenue and sales trends over time."
+                actions={
+                  <div className="flex items-center gap-2">
+                    <Link href="/reports">
+                      <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                    </Link>
+                    <Button onClick={() => refetch()} variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+                  </div>
+                }
+            />
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>

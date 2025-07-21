@@ -7,7 +7,7 @@ import { Download, Loader2, DollarSign, FileText, AlertTriangle, Users, Package,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMemo } from "react";
 import type { StoredInvoice, Customer, Product } from "@/types/database";
-import { format, subMonths } from 'date-fns';
+import { format, isPast, startOfDay, subMonths } from 'date-fns';
 import PageHeader from "@/components/page-header";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
@@ -52,18 +52,6 @@ export default function ReportsPage() {
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
-  const statusVariant = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "paid": return "success"; 
-      case "pending": return "warning"; 
-      case "unpaid": return "warning";
-      case "overdue": return "destructive";
-      case "draft": return "outline";
-      case "partially paid": return "info";
-      default: return "outline";
-    }
-  };
-
   const reportData = useMemo<ReportData | null>(() => {
     if (!invoices || !customers || !products) return null;
     
@@ -71,18 +59,26 @@ export default function ReportsPage() {
     let totalUnpaid = 0;
     const paymentStatusCounts: { [key: string]: number } = {};
     const monthlySales: { [key: string]: number } = {};
+    const today = startOfDay(new Date());
 
     invoices.forEach(inv => {
       const invoiceDate = new Date(inv.invoiceDate);
-      const status = inv.status || "Unpaid";
+      let status = inv.status || "Unpaid";
+
+      // Dynamically determine overdue status
+      const isOverdue = inv.dueDate && isPast(new Date(inv.dueDate)) && (status === 'Unpaid' || status === 'Partially Paid' || status === 'Pending');
+      if (isOverdue) {
+        status = 'Overdue';
+      }
+
       paymentStatusCounts[status] = (paymentStatusCounts[status] || 0) + 1;
 
       if (inv.status === "Paid") {
-        totalRevenue += inv.amount;
+        totalRevenue += inv.amount || 0;
         const monthKey = format(invoiceDate, "yyyy-MM");
-        monthlySales[monthKey] = (monthlySales[monthKey] || 0) + inv.amount;
-      } else if (["Pending", "Unpaid", "Overdue", "Draft"].includes(inv.status)) {
-        totalUnpaid += inv.amount;
+        monthlySales[monthKey] = (monthlySales[monthKey] || 0) + (inv.amount || 0);
+      } else if (["Pending", "Unpaid", "Overdue", "Draft", "Partially Paid"].includes(status)) {
+        totalUnpaid += inv.amount || 0;
       }
     });
 
@@ -104,7 +100,7 @@ export default function ReportsPage() {
     const customerSales: { [id: string]: number } = {};
     invoices.forEach(inv => {
       if (inv.status === "Paid") {
-        customerSales[inv.customerId] = (customerSales[inv.customerId] || 0) + inv.amount;
+        customerSales[inv.customerId] = (customerSales[inv.customerId] || 0) + (inv.amount || 0);
       }
     });
     const topCustomers = Object.entries(customerSales)
@@ -143,6 +139,18 @@ export default function ReportsPage() {
       topProducts,
     };
   }, [invoices, customers, products]);
+
+  const statusVariant = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case "paid": return "success";
+      case "pending": return "warning";
+      case "unpaid": return "warning";
+      case "overdue": return "destructive";
+      case "draft": return "outline";
+      case "partially paid": return "info";
+      default: return "outline";
+    }
+  };
 
   if (isLoading) {
     return (

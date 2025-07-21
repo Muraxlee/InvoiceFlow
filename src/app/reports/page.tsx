@@ -200,14 +200,6 @@ export default function ReportsPage() {
       <PageHeader
         title="Business Reports & Analytics"
         description="Comprehensive insights into your business performance and finances."
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.print()}>
-              <Download className="mr-2 h-4 w-4" />
-              Print Page
-            </Button>
-          </div>
-        }
       />
       
       {/* KPI Cards */}

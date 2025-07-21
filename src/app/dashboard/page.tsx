@@ -17,10 +17,11 @@ import {
   DollarSign, Users, FileWarning, Activity, ShoppingBag,
   Clock, LineChart as LineChartIcon, RefreshCw, AlertCircle,
   ArrowRight, ArrowUp, ArrowDown, PieChart as PieChartIcon, 
-  CircleDollarSign, Receipt, Package, ChevronRight, BarChart3
+  CircleDollarSign, Receipt, Package, ChevronRight, BarChart3,
+  Boxes, DraftingCompass
 } from "lucide-react";
-import type { StoredInvoice, Customer, Product } from '@/types/database';
-import { getInvoices, getCustomers, getProducts } from '@/lib/firestore-actions';
+import type { StoredInvoice, Customer, Product, Employee, InventoryItem } from '@/types/database';
+import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems } from '@/lib/firestore-actions';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -33,6 +34,8 @@ type DashboardMetrics = {
     totalRevenue: number;
     outstandingAmount: number;
     totalCustomers: number;
+    totalEmployees: number;
+    totalInventoryItems: number;
     pendingInvoicesCount: number;
     salesData: { date: string; amount: number; }[];
     invoiceStatusData: { name: string; value: number; }[];
@@ -60,16 +63,26 @@ export default function DashboardPage() {
     queryKey: ['products'],
     queryFn: getProducts,
   });
+
+  const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery<Employee[]>({
+    queryKey: ['employees'],
+    queryFn: getEmployees,
+  });
+
+  const { data: inventoryItems, isLoading: isLoadingInventory, error: inventoryError } = useQuery<InventoryItem[]>({
+    queryKey: ['inventory'],
+    queryFn: getInventoryItems,
+  });
   
-  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts;
-  const error = invoicesError || customersError || productsError;
+  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts || isLoadingEmployees || isLoadingInventory;
+  const error = invoicesError || customersError || productsError || employeesError || inventoryError;
 
   useEffect(() => {
-    if (invoices && customers && products) {
+    if (invoices && customers && products && employees && inventoryItems) {
         let revenue = 0;
         let outstanding = 0;
         let pendingCount = 0;
-        const statusCounts: Record<string, number> = {};
+        const statusCounts: Record<string, number> = { "Paid": 0, "Pending": 0, "Overdue": 0, "Draft": 0, "Unpaid": 0, "Partially Paid": 0 };
         const customerSales: Record<string, number> = {};
         const productSales: Record<string, number> = {};
         
@@ -85,7 +98,10 @@ export default function DashboardPage() {
           const invDate = new Date(invoice.invoiceDate);
           if (!isValid(invDate)) return;
 
-          const status = invoice.status || "Unpaid";
+          let status = invoice.status || "Unpaid";
+          if (isAfter(today, new Date(invoice.dueDate || 0)) && (status === 'Unpaid' || status === 'Partially Paid')) {
+            status = 'Overdue';
+          }
           statusCounts[status] = (statusCounts[status] || 0) + 1;
           
           if (status === "Paid") {
@@ -100,7 +116,9 @@ export default function DashboardPage() {
             });
           } else if (["Pending", "Overdue", "Unpaid", "Partially Paid", "Draft"].includes(status)) {
             outstanding += invoice.amount || 0;
-            pendingCount++;
+            if (status !== 'Draft') {
+              pendingCount++;
+            }
           }
         });
 
@@ -131,9 +149,12 @@ export default function DashboardPage() {
             totalRevenue: revenue,
             outstandingAmount: outstanding,
             totalCustomers: customers.length,
+            totalEmployees: employees.length,
+            totalInventoryItems: inventoryItems.reduce((acc, item) => acc + item.stock, 0),
             pendingInvoicesCount: pendingCount,
             salesData: trendData,
             invoiceStatusData: Object.entries(statusCounts)
+              .filter(([,value]) => value > 0)
               .map(([name, value]) => ({ name: name || 'Unpaid', value })),
             topCustomers,
             topProducts,
@@ -141,13 +162,15 @@ export default function DashboardPage() {
             revenueGrowth: growthRate,
         });
     }
-  }, [invoices, customers, products]);
+  }, [invoices, customers, products, employees, inventoryItems]);
 
 
   const refetch = () => {
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
   };
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
@@ -231,7 +254,7 @@ export default function DashboardPage() {
         actions={ <Button onClick={() => refetch()} variant="outline" size="sm" className="flex items-center gap-2"> <RefreshCw className="h-4 w-4" /> Refresh Data </Button> }
       />
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue (Paid)</CardTitle>
@@ -257,7 +280,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">₹{dashboardMetrics.outstandingAmount.toLocaleString('en-IN')}</div>
             <div className="flex items-center pt-1">
-              <span className="text-xs text-muted-foreground">From {dashboardMetrics.pendingInvoicesCount} pending invoices</span>
+              <span className="text-xs text-muted-foreground">From {dashboardMetrics.pendingInvoicesCount} invoices</span>
             </div>
           </CardContent>
         </Card>
@@ -270,7 +293,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{dashboardMetrics.totalCustomers}</div>
             <div className="flex items-center pt-1">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground truncate">
                 {
                   dashboardMetrics.totalCustomers === 0
                     ? 'No customers yet'
@@ -282,7 +305,37 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        
+
+        <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+            <div className="rounded-full bg-indigo-500/10 p-2 text-indigo-500"> <DraftingCompass className="h-5 w-5" /> </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardMetrics.totalEmployees}</div>
+            <div className="flex items-center pt-1">
+              <Link href="/employees" className="text-xs text-primary flex items-center">
+                Manage employees <ChevronRight className="h-3 w-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Stock Items</CardTitle>
+            <div className="rounded-full bg-teal-500/10 p-2 text-teal-500"> <Boxes className="h-5 w-5" /> </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardMetrics.totalInventoryItems}</div>
+            <div className="flex items-center pt-1">
+              <Link href="/inventory" className="text-xs text-primary flex items-center">
+                Manage inventory <ChevronRight className="h-3 w-3 ml-1" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
@@ -381,43 +434,30 @@ export default function DashboardPage() {
         <Card className="shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between">
             <div> <CardTitle className="flex items-center"> <BarChart3 className="h-5 w-5 mr-2 text-primary" /> Top Revenue Sources </CardTitle> <CardDescription>Your best performing products and customers</CardDescription> </div>
+            <Link href="/reports" passHref> <Button variant="outline" size="sm" className="flex items-center gap-2"> Full Report <ArrowRight className="h-4 w-4" /> </Button> </Link>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center"> <Package className="h-4 w-4 mr-2" /> Top Products </h4>
-                {dashboardMetrics.topProducts.length > 0 ? (
-                  <div className="space-y-2">
-                    {dashboardMetrics.topProducts.map((product, index) => (
-                      <div key={product.id} className="flex items-center justify-between">
-                        <div className="flex items-center"> <div className="w-6 text-muted-foreground text-sm">{index + 1}.</div> <div className="font-medium">{product.name}</div> </div>
-                        <div className="font-mono">₹{product.totalAmount.toLocaleString('en-IN')}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : ( <p className="text-sm text-muted-foreground">No product data available</p> )}
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center"> <Users className="h-4 w-4 mr-2" /> Top Customers </h4>
-                {dashboardMetrics.topCustomers.length > 0 ? (
-                  <div className="space-y-2">
-                    {dashboardMetrics.topCustomers.map((customer, index) => (
-                      <div key={customer.id} className="flex items-center justify-between">
-                        <div className="flex items-center"> <div className="w-6 text-muted-foreground text-sm">{index + 1}.</div> <div className="font-medium">{customer.name}</div> </div>
-                        <div className="font-mono">₹{customer.totalAmount.toLocaleString('en-IN')}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : ( <p className="text-sm text-muted-foreground">No customer data available</p> )}
-              </div>
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="font-semibold text-sm mb-2">Top Customers</h4>
+              {dashboardMetrics.topCustomers.length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {dashboardMetrics.topCustomers.map(c => (
+                    <li key={c.id} className="flex justify-between items-center"><span>{c.name}</span><span className="font-medium text-foreground">₹{c.totalAmount.toLocaleString('en-IN')}</span></li>
+                  ))}
+                </ul>
+              ) : (<p className="text-sm text-muted-foreground text-center py-2">No customer sales data</p>)}
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm mb-2">Top Products</h4>
+              {dashboardMetrics.topProducts.length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {dashboardMetrics.topProducts.map(p => (
+                    <li key={p.id} className="flex justify-between items-center"><span>{p.name}</span><span className="font-medium text-foreground">₹{p.totalAmount.toLocaleString('en-IN')}</span></li>
+                  ))}
+                </ul>
+              ) : (<p className="text-sm text-muted-foreground text-center py-2">No product sales data</p>)}
             </div>
           </CardContent>
-          <CardFooter className="border-t pt-4">
-            <div className="flex justify-between w-full text-sm">
-              <Link href="/customers" className="text-primary flex items-center"> View all customers <ChevronRight className="h-3 w-3 ml-1" /> </Link>
-              <Link href="/products" className="text-primary flex items-center"> View all products <ChevronRight className="h-3 w-3 ml-1" /> </Link>
-            </div>
-          </CardFooter>
         </Card>
       </div>
     </div>

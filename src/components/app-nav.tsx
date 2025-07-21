@@ -17,7 +17,7 @@ import {
   BarChart3,
   DraftingCompass,
   Boxes,
-  ClipboardUser,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
   { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
-  { href: '/employees', label: 'Employees', icon: ClipboardUser, tooltip: 'Manage Employees & Tasks' },
+  { href: '/employees', label: 'Employees', icon: Users, tooltip: 'Manage Employees & Tasks' },
   { href: '/measurements', label: 'Measurement', icon: DraftingCompass, tooltip: 'Manage Measurements' },
   { href: '/inventory', label: 'Inventory', icon: Boxes, tooltip: 'Manage Stock' },
   { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & Analytics' },

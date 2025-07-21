@@ -10,7 +10,7 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid, isPast, startOfDay } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {

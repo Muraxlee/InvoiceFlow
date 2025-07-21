@@ -15,18 +15,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CalendarIcon, PlusCircle, Trash2, Check, ChevronDown, Barcode } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, CalendarIcon, PlusCircle, Trash2, Barcode } from "lucide-react";
+import { useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Customer } from "@/types/database";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
-import { useQuery } from "@tanstack/react-query";
-import { getCustomers } from "@/lib/firestore-actions";
 
 const measurementValueSchema = z.object({
   name: z.string().min(1, "Field name is required"),
@@ -37,7 +33,7 @@ const measurementValueSchema = z.object({
 const measurementSchema = z.object({
   id: z.string().optional(),
   uniqueId: z.string().min(1, "Unique ID is required."),
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(),
   customerName: z.string().min(1, "Customer name is required"),
   type: z.string().min(1, "Garment type is required"),
   customType: z.string().optional(),
@@ -68,13 +64,7 @@ interface MeasurementFormProps {
 }
 
 export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }: MeasurementFormProps) {
-  const { data: customers, isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ['customers'],
-    queryFn: getCustomers
-  });
   
-  const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
-
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
     defaultValues: {
@@ -106,45 +96,15 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
+           <FormField
             control={form.control}
-            name="customerId"
+            name="customerName"
             render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Customer</FormLabel>
-                <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
-                        {field.value
-                          ? customers?.find(c => c.id === field.value)?.name || "Select customer"
-                          : "Select customer"}
-                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search customers..." />
-                      <CommandList>
-                        {customersLoading && <div className="p-4 text-center text-sm">Loading...</div>}
-                        <CommandEmpty>No customers found.</CommandEmpty>
-                        <CommandGroup>
-                          {customers?.map((customer) => (
-                            <CommandItem value={customer.name} key={customer.id} onSelect={() => {
-                              form.setValue("customerId", customer.id, { shouldValidate: true });
-                              form.setValue("customerName", customer.name, { shouldValidate: true });
-                              setIsCustomerPopoverOpen(false);
-                            }}>
-                              <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
-                              {customer.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+              <FormItem>
+                <FormLabel>Customer Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter customer's name" {...field} />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

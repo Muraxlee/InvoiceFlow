@@ -23,7 +23,7 @@ const defaultNewMeasurement: Partial<MeasurementFormValues> = {
   values: [{ name: "Chest", value: 0, unit: "in" }],
   type: "Shirt",
   notes: "",
-  customerId: ""
+  customerName: "",
 };
 
 export default function CreateMeasurementPage() {
@@ -73,6 +73,7 @@ export default function CreateMeasurementPage() {
       ...measurementData,
       notes: measurementData.notes || '',
       customType: measurementData.customType || '',
+      customerId: measurementData.customerId || '',
     };
     
     createMutation.mutate(finalData as Omit<Measurement, 'id' | 'createdAt'>);

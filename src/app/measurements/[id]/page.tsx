@@ -68,6 +68,7 @@ export default function MeasurementDetailPage() {
         ...updateData,
         notes: updateData.notes || '',
         customType: updateData.customType || '',
+        customerId: updateData.customerId || '',
     };
     saveMutation.mutate({ id: measurement.id, values: finalData });
   };

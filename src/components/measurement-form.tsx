@@ -56,6 +56,12 @@ export type MeasurementFormValues = z.infer<typeof measurementSchema>;
 const garmentTypes = ["Shirt", "Pant", "Kurta", "Blouse", "Suit", "Coat", "Custom"];
 const defaultUnits = ["in", "cm"];
 
+// Predefined list of common measurement names for autocomplete
+const measurementSuggestions = [
+  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Neck", 
+  "Inseam", "Thigh", "Knee", "Bottom", "Armhole", "Bicep", "Cuff", "Front Cross", "Back Cross"
+];
+
 interface MeasurementFormProps {
   onSubmit: (data: MeasurementFormValues) => void;
   defaultValues?: Partial<MeasurementFormValues>;
@@ -208,11 +214,16 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
         
         <div>
           <Label>Measurement Values</Label>
+          <datalist id="measurement-suggestions">
+            {measurementSuggestions.map(suggestion => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
           <div className="space-y-3 mt-2">
             {fields.map((field, index) => (
               <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
                 <FormField control={form.control} name={`values.${index}.name`} render={({ field }) => (
-                  <FormItem className="col-span-5"><FormControl><Input placeholder="e.g., Chest" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="col-span-5"><FormControl><Input placeholder="e.g., Chest" {...field} list="measurement-suggestions" /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name={`values.${index}.value`} render={({ field }) => (
                   <FormItem className="col-span-3"><FormControl><Input type="number" step="0.1" placeholder="Value" {...field} /></FormControl><FormMessage /></FormItem>

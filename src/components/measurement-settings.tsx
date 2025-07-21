@@ -6,7 +6,14 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { loadFromLocalStorage, saveToLocalStorage, CUSTOM_GARMENT_TYPES_STORAGE_KEY, CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY } from "@/lib/localStorage";
+import { 
+  loadFromLocalStorage, 
+  saveToLocalStorage, 
+  CUSTOM_GARMENT_TYPES_STORAGE_KEY, 
+  CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY,
+  DEFAULT_GARMENT_TYPES,
+  DEFAULT_MEASUREMENT_FIELDS,
+} from "@/lib/localStorage";
 import { PlusCircle, Trash2 } from "lucide-react";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -20,17 +27,32 @@ export function MeasurementSettings() {
   const [newMeasurementField, setNewMeasurementField] = useState("");
 
   useEffect(() => {
-    setCustomGarmentTypes(loadFromLocalStorage<string[]>(CUSTOM_GARMENT_TYPES_STORAGE_KEY, []));
-    setCustomMeasurementFields(loadFromLocalStorage<string[]>(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, []));
+    // On first load, if localStorage is empty, populate it with defaults.
+    const storedGarmentTypes = loadFromLocalStorage<string[]>(CUSTOM_GARMENT_TYPES_STORAGE_KEY, null);
+    if (storedGarmentTypes === null) {
+        saveToLocalStorage(CUSTOM_GARMENT_TYPES_STORAGE_KEY, DEFAULT_GARMENT_TYPES);
+        setCustomGarmentTypes(DEFAULT_GARMENT_TYPES);
+    } else {
+        setCustomGarmentTypes(storedGarmentTypes);
+    }
+
+    const storedMeasurementFields = loadFromLocalStorage<string[]>(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, null);
+    if (storedMeasurementFields === null) {
+        saveToLocalStorage(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, DEFAULT_MEASUREMENT_FIELDS);
+        setCustomMeasurementFields(DEFAULT_MEASUREMENT_FIELDS);
+    } else {
+        setCustomMeasurementFields(storedMeasurementFields);
+    }
   }, []);
 
   const handleAddGarmentType = () => {
-    if (newGarmentType.trim() === "") return;
-    if (customGarmentTypes.includes(newGarmentType.trim())) {
+    const trimmedType = newGarmentType.trim();
+    if (trimmedType === "") return;
+    if (customGarmentTypes.includes(trimmedType)) {
       toast({ title: "Duplicate", description: "This garment type already exists.", variant: "destructive" });
       return;
     }
-    const updatedTypes = [...customGarmentTypes, newGarmentType.trim()];
+    const updatedTypes = [...customGarmentTypes, trimmedType];
     setCustomGarmentTypes(updatedTypes);
     saveToLocalStorage(CUSTOM_GARMENT_TYPES_STORAGE_KEY, updatedTypes);
     window.dispatchEvent(new StorageEvent('storage', { key: CUSTOM_GARMENT_TYPES_STORAGE_KEY, newValue: JSON.stringify(updatedTypes) }));
@@ -47,12 +69,13 @@ export function MeasurementSettings() {
   };
 
   const handleAddMeasurementField = () => {
-    if (newMeasurementField.trim() === "") return;
-    if (customMeasurementFields.includes(newMeasurementField.trim())) {
+    const trimmedField = newMeasurementField.trim();
+    if (trimmedField === "") return;
+    if (customMeasurementFields.includes(trimmedField)) {
       toast({ title: "Duplicate", description: "This measurement field already exists.", variant: "destructive" });
       return;
     }
-    const updatedFields = [...customMeasurementFields, newMeasurementField.trim()];
+    const updatedFields = [...customMeasurementFields, trimmedField];
     setCustomMeasurementFields(updatedFields);
     saveToLocalStorage(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, updatedFields);
     window.dispatchEvent(new StorageEvent('storage', { key: CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, newValue: JSON.stringify(updatedFields) }));

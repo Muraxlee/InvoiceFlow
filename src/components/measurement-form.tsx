@@ -26,8 +26,6 @@ import { Label } from "@/components/ui/label";
 import { 
   CUSTOM_GARMENT_TYPES_STORAGE_KEY, 
   CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY,
-  DEFAULT_GARMENT_TYPES,
-  DEFAULT_MEASUREMENT_FIELDS,
   loadFromLocalStorage
 } from '@/lib/localStorage';
 
@@ -71,25 +69,25 @@ interface MeasurementFormProps {
 
 export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }: MeasurementFormProps) {
   
-  const [availableGarmentTypes, setAvailableGarmentTypes] = useState(DEFAULT_GARMENT_TYPES);
-  const [measurementSuggestions, setMeasurementSuggestions] = useState(DEFAULT_MEASUREMENT_FIELDS);
+  const [availableGarmentTypes, setAvailableGarmentTypes] = useState<string[]>([]);
+  const [measurementSuggestions, setMeasurementSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
-    // Load custom values from localStorage on mount
+    // Load custom values from localStorage on mount, using empty arrays as fallback
     const customGarmentTypes = loadFromLocalStorage<string[]>(CUSTOM_GARMENT_TYPES_STORAGE_KEY, []);
-    setAvailableGarmentTypes([...DEFAULT_GARMENT_TYPES, ...customGarmentTypes]);
+    setAvailableGarmentTypes(customGarmentTypes);
 
     const customMeasurementFields = loadFromLocalStorage<string[]>(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, []);
-    setMeasurementSuggestions([...DEFAULT_MEASUREMENT_FIELDS, ...customMeasurementFields]);
+    setMeasurementSuggestions(customMeasurementFields);
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === CUSTOM_GARMENT_TYPES_STORAGE_KEY) {
         const newTypes = JSON.parse(event.newValue || '[]');
-        setAvailableGarmentTypes([...DEFAULT_GARMENT_TYPES, ...newTypes]);
+        setAvailableGarmentTypes(newTypes);
       }
       if (event.key === CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY) {
         const newFields = JSON.parse(event.newValue || '[]');
-        setMeasurementSuggestions([...DEFAULT_MEASUREMENT_FIELDS, ...newFields]);
+        setMeasurementSuggestions(newFields);
       }
     };
     
@@ -100,7 +98,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
     defaultValues: {
-      values: [{ name: "Chest", value: 0, unit: "in" }],
+      values: [{ name: "", value: 0, unit: "in" }],
       ...defaultValues,
     },
   });
@@ -171,6 +169,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                     {availableGarmentTypes.map(type => (
                       <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
+                     <SelectItem value="Custom">Custom...</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

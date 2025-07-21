@@ -94,10 +94,12 @@ export default function CustomerReportPage() {
         const doc = new jsPDF();
         doc.text("Customer Report", 14, 16);
         autoTable(doc, {
-            head: [['Customer', 'Email', 'Paid', 'Pending', 'Overdue', 'Total Value (₹)']],
+            head: [['Customer', 'Email', 'Phone', 'Address', 'Paid', 'Pending', 'Overdue', 'Total Value (₹)']],
             body: filteredData.map(c => [
                 c.name,
                 c.email,
+                c.phone,
+                c.address.replace(/\n/g, ', '), // Replace newlines for better PDF formatting
                 c.invoiceCounts.paid,
                 c.invoiceCounts.unpaid + c.invoiceCounts.pending,
                 c.invoiceCounts.overdue,
@@ -112,6 +114,8 @@ export default function CustomerReportPage() {
         const worksheet = XLSX.utils.json_to_sheet(filteredData.map(c => ({
             'Customer': c.name,
             'Email': c.email,
+            'Phone': c.phone,
+            'Address': c.address,
             'Paid Invoices': c.invoiceCounts.paid,
             'Pending Invoices': c.invoiceCounts.unpaid + c.invoiceCounts.pending,
             'Overdue Invoices': c.invoiceCounts.overdue,
@@ -191,6 +195,8 @@ export default function CustomerReportPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Customer</TableHead>
+                                    <TableHead>Phone</TableHead>
+                                    <TableHead>Address</TableHead>
                                     <TableHead>Invoice Counts</TableHead>
                                     <TableHead className="text-right">Total Value (Paid)</TableHead>
                                 </TableRow>
@@ -202,6 +208,8 @@ export default function CustomerReportPage() {
                                             <div>{customer.name}</div>
                                             <div className="text-xs text-muted-foreground">{customer.email}</div>
                                         </TableCell>
+                                        <TableCell className="text-sm">{customer.phone}</TableCell>
+                                        <TableCell className="text-sm max-w-xs truncate">{customer.address}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-wrap gap-1">
                                                 <Badge variant="success">{customer.invoiceCounts.paid} Paid</Badge>
@@ -212,7 +220,7 @@ export default function CustomerReportPage() {
                                         <TableCell className="text-right">₹{customer.totalValue.toLocaleString('en-IN')}</TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={3} className="text-center h-24">No customers match your criteria.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No customers match your criteria.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

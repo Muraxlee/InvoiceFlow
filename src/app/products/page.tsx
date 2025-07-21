@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore-actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function ProductsPage() {
   const queryClient = useQueryClient();
@@ -24,6 +25,7 @@ export default function ProductsPage() {
   const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const { toast } = useToast();
   
   const { data: products, isLoading: isDataLoading, error, refetch } = useQuery<Product[]>({
@@ -31,15 +33,26 @@ export default function ProductsPage() {
     queryFn: getProducts,
   });
 
+  const categories = useMemo(() => {
+    if (!products) return ["all"];
+    const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean));
+    return ["all", ...Array.from(uniqueCategories)];
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return products.filter(product => 
-      product.name.toLowerCase().includes(lowercasedTerm) ||
-      product.hsn?.toLowerCase().includes(lowercasedTerm) ||
-      product.category?.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [products, searchTerm]);
+    
+    return products.filter(product => {
+      const lowercasedTerm = searchTerm.toLowerCase();
+      const searchMatch = 
+        product.name.toLowerCase().includes(lowercasedTerm) ||
+        product.hsn?.toLowerCase().includes(lowercasedTerm);
+
+      const categoryMatch = categoryFilter === 'all' || product.category === categoryFilter;
+
+      return searchMatch && categoryMatch;
+    });
+  }, [products, searchTerm, categoryFilter]);
 
   const addMutation = useMutation({
     mutationFn: (data: Omit<Product, 'id' | 'createdAt'>) => addProduct(data),
@@ -177,19 +190,33 @@ export default function ProductsPage() {
       </Dialog>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex-1">
             <CardTitle>Product List</CardTitle>
             <CardDescription>A list of all products.</CardDescription>
           </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search products..." 
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by name or HSN..." 
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category === 'all' ? 'All Categories' : category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -254,7 +281,7 @@ export default function ProductsPage() {
           )}
            {!isDataLoading && (!filteredProducts || filteredProducts.length === 0) && (
              <p className="py-4 text-center text-muted-foreground">
-              {searchTerm ? `No products found for "${searchTerm}".` : "No products found. Add a new product to get started."}
+              {searchTerm || categoryFilter !== 'all' ? `No products found for the current filters.` : "No products found. Add a new product to get started."}
             </p>
           )}
         </CardContent>

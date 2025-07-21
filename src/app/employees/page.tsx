@@ -123,7 +123,6 @@ export default function EmployeeManagementPage() {
             queryClient.invalidateQueries({ queryKey: ['tasks', variables.employeeId] });
             toast({ title: "Task Assigned", description: "The new task has been assigned to the employee." });
             setIsTaskFormOpen(false);
-            setSelectedEmployee(null);
         },
         onError: (err: any) => toast({ title: "Error", description: `Failed to assign task: ${err.message}`, variant: "destructive" }),
     });

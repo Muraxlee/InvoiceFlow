@@ -228,7 +228,7 @@ export default function EmployeeManagementPage() {
                         <Accordion type="single" collapsible className="w-full">
                             {employees.map(employee => (
                                 <AccordionItem value={employee.id} key={employee.id}>
-                                    <AccordionTrigger className="hover:bg-muted/50 px-4 group">
+                                    <AccordionTrigger className="hover:bg-muted/50 px-4 group hover:no-underline">
                                         <div className="flex items-center justify-between w-full">
                                             <div className="flex items-center gap-4">
                                                 <div className="p-2 bg-muted rounded-full"><User className="h-5 w-5 text-muted-foreground" /></div>

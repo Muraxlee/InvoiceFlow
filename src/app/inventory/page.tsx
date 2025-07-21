@@ -18,12 +18,14 @@ import { getInventoryItems, addInventoryItem, updateInventoryItem, deleteInvento
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { format, isValid } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const { toast } = useToast();
   
   const { data: inventoryItems, isLoading, error, refetch } = useQuery<InventoryItem[]>({
@@ -40,17 +42,28 @@ export default function InventoryPage() {
     if (!products) return new Map<string, Product>();
     return new Map(products.map(p => [p.id, p]));
   }, [products]);
+  
+  const categories = useMemo(() => {
+    if (!products) return ["all"];
+    const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean));
+    return ["all", ...Array.from(uniqueCategories)];
+  }, [products]);
 
   const filteredItems = useMemo(() => {
     if (!inventoryItems) return [];
-    const lowercasedTerm = searchTerm.toLowerCase();
     return inventoryItems.filter(item => {
       const product = productMap.get(item.productId);
-      return item.productName.toLowerCase().includes(lowercasedTerm) ||
-             product?.hsn?.toLowerCase().includes(lowercasedTerm) ||
-             product?.category?.toLowerCase().includes(lowercasedTerm);
+      
+      const lowercasedTerm = searchTerm.toLowerCase();
+      const searchMatch = 
+        item.productName.toLowerCase().includes(lowercasedTerm) ||
+        product?.hsn?.toLowerCase().includes(lowercasedTerm);
+
+      const categoryMatch = categoryFilter === 'all' || product?.category === categoryFilter;
+      
+      return searchMatch && categoryMatch;
     });
-  }, [inventoryItems, searchTerm, productMap]);
+  }, [inventoryItems, searchTerm, productMap, categoryFilter]);
 
   const addMutation = useMutation({
     mutationFn: (data: InventoryFormValues) => addInventoryItem(data),
@@ -165,19 +178,33 @@ export default function InventoryPage() {
         actions={pageActions}
       />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex-1">
             <CardTitle>Stock List</CardTitle>
             <CardDescription>A list of all products in your inventory.</CardDescription>
           </div>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search by name, SKU, or category..." 
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+           <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by name or HSN..." 
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category === 'all' ? 'All Categories' : category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -243,7 +270,7 @@ export default function InventoryPage() {
           )}
            {!isLoading && (!filteredItems || filteredItems.length === 0) && (
             <p className="py-4 text-center text-muted-foreground">
-              {searchTerm ? `No items found for "${searchTerm}".` : "No inventory items found. Add a new item to get started."}
+              {searchTerm || categoryFilter !== 'all' ? `No items found for the current filters.` : "No inventory items found. Add an item to get started."}
             </p>
           )}
         </CardContent>

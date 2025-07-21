@@ -96,6 +96,11 @@ export async function saveInvoice(invoiceData: Omit<StoredInvoice, 'id' | 'creat
   return docId;
 }
 
+export async function updateInvoiceStatus(id: string, status: StoredInvoice['status']): Promise<void> {
+  checkDb();
+  await updateDoc(doc(db, INVOICES, id), { status, updatedAt: serverTimestamp() });
+}
+
 export async function deleteInvoice(id: string): Promise<void> {
   checkDb();
   await deleteDoc(doc(db, INVOICES, id));

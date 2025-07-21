@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { FilePlus2, MoreHorizontal, Printer, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { type StoredInvoice } from "@/types/database";
-import { getInvoices, deleteInvoice } from "@/lib/firestore-actions";
+import { getInvoices, deleteInvoice, updateInvoiceStatus } from "@/lib/firestore-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isPast, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -78,6 +78,26 @@ function InvoicesPageComponent() {
       );
     });
   }, [invoices, searchTerm, statusFilter]);
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ invoiceId, status }: { invoiceId: string; status: StoredInvoice['status'] }) => updateInvoiceStatus(invoiceId, status),
+    onSuccess: (_, { invoiceId }) => {
+      toast({
+        title: "Status Updated",
+        description: `Invoice has been marked as Paid.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // Also invalidate single invoice query if it's cached
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Updating Status",
+        description: "Failed to update the invoice status.",
+        variant: "destructive",
+      });
+    }
+  });
 
   const deleteMutation = useMutation({
     mutationFn: deleteInvoice,
@@ -230,11 +250,17 @@ function InvoicesPageComponent() {
                               <Edit className="mr-2 h-4 w-4" /> View & Edit
                             </DropdownMenuItem>
                           </Link>
+                          {invoice.status !== 'Paid' && (
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ invoiceId: invoice.id, status: 'Paid' })}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Paid
+                            </DropdownMenuItem>
+                          )}
                           <Link href={`/invoices/${invoice.id}?tab=print`} passHref>
                             <DropdownMenuItem>
                               <Printer className="mr-2 h-4 w-4" /> Print Invoice
                             </DropdownMenuItem>
                           </Link>
+                          <DropdownMenuSeparator />
                           <ConfirmDialog
                             triggerButton={
                               <DropdownMenuItem 

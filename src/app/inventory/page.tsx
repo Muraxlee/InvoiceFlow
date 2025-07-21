@@ -47,7 +47,7 @@ export default function InventoryPage() {
     return inventoryItems.filter(item => {
       const product = productMap.get(item.productId);
       return item.productName.toLowerCase().includes(lowercasedTerm) ||
-             product?.sku?.toLowerCase().includes(lowercasedTerm) ||
+             product?.hsn?.toLowerCase().includes(lowercasedTerm) ||
              product?.category?.toLowerCase().includes(lowercasedTerm);
     });
   }, [inventoryItems, searchTerm, productMap]);
@@ -206,7 +206,7 @@ export default function InventoryPage() {
                       <TableCell>{product?.hsn || '-'}</TableCell>
                       <TableCell>{product?.category || '-'}</TableCell>
                       <TableCell className="text-center">{item.stock}</TableCell>
-                      <TableCell>{item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
+                      <TableCell>{item.updatedAt && item.updatedAt.seconds ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

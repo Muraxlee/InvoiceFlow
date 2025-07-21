@@ -65,7 +65,7 @@ export default function InventoryReportPage() {
                     product?.hsn || '-',
                     product?.category || '-',
                     item.stock,
-                    item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
+                    item.updatedAt && item.updatedAt.seconds ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
                 ]
             }),
             startY: 20
@@ -81,7 +81,7 @@ export default function InventoryReportPage() {
                 'SKU': product?.hsn || '-',
                 'Category': product?.category || '-',
                 'Current Stock': item.stock,
-                'Last Updated': item.updatedAt ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
+                'Last Updated': item.updatedAt && item.updatedAt.seconds ? format(new Date(item.updatedAt.seconds * 1000), 'dd MMM yyyy, HH:mm') : 'N/A'
             }
         }));
         const workbook = XLSX.utils.book_new();

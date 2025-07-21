@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getInvoices, getProducts } from '@/lib/firestore-actions';
 import type { Product, StoredInvoice } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 type ProductReportData = Product & {
     unitsSold: number;
@@ -18,14 +19,15 @@ type ProductReportData = Product & {
 };
 
 export default function ProductReportPage() {
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
 
-    const { data: products, isLoading: isLoadingProducts } = useQuery<Product[]>({
+    const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts } = useQuery<Product[]>({
         queryKey: ['products'],
         queryFn: getProducts,
     });
 
-    const { data: invoices, isLoading: isLoadingInvoices } = useQuery<StoredInvoice[]>({
+    const { data: invoices, isLoading: isLoadingInvoices, refetch: refetchInvoices } = useQuery<StoredInvoice[]>({
         queryKey: ['invoices'],
         queryFn: getInvoices,
     });
@@ -64,17 +66,33 @@ export default function ProductReportPage() {
         );
     }, [reportData, searchTerm]);
 
+    const handleRefresh = () => {
+        refetchProducts();
+        refetchInvoices();
+    }
+
     return (
         <div className="space-y-6">
-            <PageHeader title="Product Sales Report" description="Analyze the performance of your products and services." />
+            <PageHeader 
+                title="Product Sales Report" 
+                description="Analyze the performance of your products and services."
+                actions={
+                  <div className="flex items-center gap-2">
+                    <Link href="/reports">
+                      <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+                    </Link>
+                    <Button onClick={handleRefresh} variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
+                  </div>
+                }
+            />
             <Card>
                 <CardHeader>
-                    <CardTitle>Search Products</CardTitle>
+                    <CardTitle>Search & Filter</CardTitle>
                 </CardHeader>
                 <CardContent className="flex gap-4">
                     <div className="relative flex-grow">
                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                       <Input placeholder="Product Name or HSN/SAC" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                       <Input placeholder="Search by Product Name or HSN/SAC" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
                     </div>
                     <Button onClick={() => setSearchTerm('')} variant="ghost" size="sm"><X className="mr-2 h-4 w-4" />Clear</Button>
                 </CardContent>
@@ -104,7 +122,7 @@ export default function ProductReportPage() {
                                         <TableCell className="font-medium">{product.name}</TableCell>
                                         <TableCell>{product.hsn}</TableCell>
                                         <TableCell className="text-center">{product.unitsSold}</TableCell>
-                                        <TableCell className="text-right">₹{product.totalRevenue.toLocaleString('en-IN')}</TableCell>
+                                        <TableCell className="text-right">₹{product.totalRevenue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                     </TableRow>
                                 )) : (
                                     <TableRow><TableCell colSpan={4} className="text-center h-24">No products found.</TableCell></TableRow>
@@ -117,4 +135,3 @@ export default function ProductReportPage() {
         </div>
     );
 }
-

@@ -119,7 +119,7 @@ export default function EmployeeManagementPage() {
 
     const { mutate: addTaskMutation, isPending: isAddingTask } = useMutation({
         mutationFn: addTask,
-        onSuccess: (_, variables) => {
+        onSuccess: (newTaskId, variables) => {
             queryClient.invalidateQueries({ queryKey: ['tasks', variables.employeeId] });
             toast({ title: "Task Assigned", description: "The new task has been assigned to the employee." });
             setIsTaskFormOpen(false);
@@ -180,7 +180,7 @@ export default function EmployeeManagementPage() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4 mr-4">
-                                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); openTaskForm(employee); }}><PlusCircle className="mr-2 h-4 w-4"/> Assign Task</Button>
+                                                <Button size="sm" variant="outline" className="w-[120px]" onClick={(e) => { e.stopPropagation(); openTaskForm(employee); }}><PlusCircle className="mr-2 h-4 w-4"/> Assign Task</Button>
                                                 <ConfirmDialog
                                                     triggerButton={<Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4"/></Button>}
                                                     title={`Delete ${employee.name}?`}

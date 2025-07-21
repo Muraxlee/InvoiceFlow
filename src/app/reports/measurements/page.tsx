@@ -6,14 +6,17 @@ import { useQuery } from '@tanstack/react-query';
 import { getMeasurements } from '@/lib/firestore-actions';
 import type { Measurement } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 export default function MeasurementsReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +37,36 @@ export default function MeasurementsReportPage() {
                    (item.customType || '').toLowerCase().includes(lowercasedTerm);
         }).sort((a, b) => new Date(b.recordedDate).getTime() - new Date(a.recordedDate).getTime());
     }, [measurements, searchTerm]);
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Measurement Records Report", 14, 16);
+        autoTable(doc, {
+            head: [['Record ID', 'Customer', 'Garment Type', 'Date Recorded', 'Fields']],
+            body: filteredData.map(item => [
+                item.uniqueId,
+                item.customerName,
+                item.type === 'Custom' ? item.customType : item.type,
+                format(new Date(item.recordedDate), 'dd MMM yyyy'),
+                item.values.length.toString()
+            ]),
+            startY: 20
+        });
+        doc.save('measurement_records_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(item => ({
+            'Record ID': item.uniqueId,
+            'Customer': item.customerName,
+            'Garment Type': item.type === 'Custom' ? item.customType : item.type,
+            'Date Recorded': format(new Date(item.recordedDate), 'dd MMM yyyy'),
+            'Field Count': item.values.length
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Measurements");
+        XLSX.writeFile(workbook, "measurement_records_report.xlsx");
+    };
 
     return (
         <div className="space-y-6">
@@ -63,8 +96,12 @@ export default function MeasurementsReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row justify-between items-center">
                     <CardTitle>Measurement Records ({filteredData.length})</CardTitle>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (

@@ -10,8 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
 
 export default function InventoryReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +41,36 @@ export default function InventoryReportPage() {
             return true;
         }).sort((a, b) => a.name.localeCompare(b.name));
     }, [inventoryItems, searchTerm, minStock, maxStock]);
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Inventory Stock Report", 14, 16);
+        autoTable(doc, {
+            head: [['Item Name', 'SKU', 'Category', 'Current Stock', 'Last Updated']],
+            body: filteredData.map(item => [
+                item.name,
+                item.sku,
+                item.category,
+                item.stock,
+                item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy, HH:mm') : 'N/A'
+            ]),
+            startY: 20
+        });
+        doc.save('inventory_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(item => ({
+            'Item Name': item.name,
+            'SKU': item.sku,
+            'Category': item.category,
+            'Current Stock': item.stock,
+            'Last Updated': item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy, HH:mm') : 'N/A'
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory");
+        XLSX.writeFile(workbook, "inventory_report.xlsx");
+    };
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -85,8 +119,12 @@ export default function InventoryReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row justify-between items-center">
                     <CardTitle>Inventory Items ({filteredData.length})</CardTitle>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (

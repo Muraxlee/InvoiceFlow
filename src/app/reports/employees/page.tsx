@@ -10,9 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 type EmployeeReportData = Employee & {
     taskCounts: {
@@ -62,6 +65,38 @@ export default function EmployeeReportPage() {
         }).sort((a, b) => a.name.localeCompare(b.name));
     }, [reportData, searchTerm]);
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Employee Task Report", 14, 16);
+        autoTable(doc, {
+            head: [['Employee', 'Role', 'To Do', 'In Progress', 'Done', 'Total Tasks']],
+            body: filteredData.map(e => [
+                e.name,
+                e.role,
+                e.taskCounts.todo,
+                e.taskCounts.inProgress,
+                e.taskCounts.done,
+                e.taskCounts.total
+            ]),
+            startY: 20
+        });
+        doc.save('employee_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(e => ({
+            'Employee': e.name,
+            'Role': e.role,
+            'To Do': e.taskCounts.todo,
+            'In Progress': e.taskCounts.inProgress,
+            'Done': e.taskCounts.done,
+            'Total Tasks': e.taskCounts.total
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+        XLSX.writeFile(workbook, "employee_report.xlsx");
+    };
+
     const handleRefresh = () => {
         refetchEmployees();
         refetchTasks();
@@ -95,8 +130,12 @@ export default function EmployeeReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row justify-between items-center">
                     <CardTitle>Employee Task Summary ({filteredData.length})</CardTitle>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {(isLoadingEmployees || isLoadingTasks) ? (

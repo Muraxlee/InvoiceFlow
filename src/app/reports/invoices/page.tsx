@@ -2,24 +2,26 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getInvoices } from '@/lib/firestore-actions';
 import type { StoredInvoice } from '@/types/database';
-import { format, isPast, startOfDay } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 type StatusFilter = "all" | "paid" | "unpaid" | "pending" | "overdue";
 
 export default function InvoiceReportPage() {
-    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [minAmount, setMinAmount] = useState('');
@@ -71,6 +73,36 @@ export default function InvoiceReportPage() {
                         status.toLowerCase() === 'pending' ? 'warning' :
                         'outline';
         return <Badge variant={variant as any}>{status}</Badge>;
+    };
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Invoice Report", 14, 16);
+        autoTable(doc, {
+            head: [['Invoice #', 'Customer', 'Date', 'Status', 'Amount (₹)']],
+            body: filteredInvoices.map(inv => [
+                inv.invoiceNumber,
+                inv.customerName,
+                format(new Date(inv.invoiceDate), 'dd MMM yyyy'),
+                getInvoiceStatus(inv),
+                inv.amount.toLocaleString('en-IN')
+            ]),
+            startY: 20
+        });
+        doc.save('invoice_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredInvoices.map(inv => ({
+            'Invoice #': inv.invoiceNumber,
+            'Customer': inv.customerName,
+            'Date': format(new Date(inv.invoiceDate), 'dd MMM yyyy'),
+            'Status': getInvoiceStatus(inv),
+            'Amount (INR)': inv.amount
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
+        XLSX.writeFile(workbook, "invoice_report.xlsx");
     };
     
     const clearFilters = () => {
@@ -134,8 +166,14 @@ export default function InvoiceReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Filtered Invoices ({filteredInvoices.length})</CardTitle>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Filtered Invoices ({filteredInvoices.length})</CardTitle>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {isLoading ? (

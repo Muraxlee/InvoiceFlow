@@ -2,18 +2,21 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getCustomers, getInvoices } from '@/lib/firestore-actions';
 import type { Customer, StoredInvoice } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { isPast, startOfDay } from 'date-fns';
+import { isPast } from 'date-fns';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 type CustomerReportData = Customer & {
     totalValue: number;
@@ -26,7 +29,6 @@ type CustomerReportData = Customer & {
 };
 
 export default function CustomerReportPage() {
-    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
@@ -43,8 +45,6 @@ export default function CustomerReportPage() {
 
     const reportData = useMemo<CustomerReportData[]>(() => {
         if (!customers || !invoices) return [];
-        const today = startOfDay(new Date());
-
         return customers.map(customer => {
             const customerInvoices = invoices.filter(inv => inv.customerId === customer.id);
             const report: CustomerReportData = {
@@ -62,7 +62,7 @@ export default function CustomerReportPage() {
                 if (status === 'Paid') {
                     report.invoiceCounts.paid++;
                     report.totalValue += inv.amount;
-                } else if (status === 'Unpaid') {
+                } else if (status === 'Unpaid' || status === 'Partially Paid') {
                     report.invoiceCounts.unpaid++;
                 } else if (status === 'Pending') {
                     report.invoiceCounts.pending++;
@@ -89,6 +89,38 @@ export default function CustomerReportPage() {
             return true;
         }).sort((a, b) => b.totalValue - a.totalValue);
     }, [reportData, searchTerm, minAmount, maxAmount]);
+
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Customer Report", 14, 16);
+        autoTable(doc, {
+            head: [['Customer', 'Email', 'Paid', 'Pending', 'Overdue', 'Total Value (₹)']],
+            body: filteredData.map(c => [
+                c.name,
+                c.email,
+                c.invoiceCounts.paid,
+                c.invoiceCounts.unpaid + c.invoiceCounts.pending,
+                c.invoiceCounts.overdue,
+                c.totalValue.toLocaleString('en-IN')
+            ]),
+            startY: 20
+        });
+        doc.save('customer_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(c => ({
+            'Customer': c.name,
+            'Email': c.email,
+            'Paid Invoices': c.invoiceCounts.paid,
+            'Pending Invoices': c.invoiceCounts.unpaid + c.invoiceCounts.pending,
+            'Overdue Invoices': c.invoiceCounts.overdue,
+            'Total Value (INR)': c.totalValue
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Customers");
+        XLSX.writeFile(workbook, "customer_report.xlsx");
+    };
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -142,8 +174,14 @@ export default function CustomerReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Customer Data ({filteredData.length})</CardTitle>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Customer Data ({filteredData.length})</CardTitle>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {(isLoadingCustomers || isLoadingInvoices) ? (

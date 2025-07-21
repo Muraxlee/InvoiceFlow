@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getInvoices, getProducts } from '@/lib/firestore-actions';
 import type { Product, StoredInvoice } from '@/types/database';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,8 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
 import Link from 'next/link';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 type ProductReportData = Product & {
     unitsSold: number;
@@ -19,7 +22,6 @@ type ProductReportData = Product & {
 };
 
 export default function ProductReportPage() {
-    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
 
     const { data: products, isLoading: isLoadingProducts, refetch: refetchProducts } = useQuery<Product[]>({
@@ -66,6 +68,34 @@ export default function ProductReportPage() {
         );
     }, [reportData, searchTerm]);
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Product Sales Report", 14, 16);
+        autoTable(doc, {
+            head: [['Product', 'HSN/SAC', 'Units Sold', 'Total Revenue (₹)']],
+            body: filteredData.map(p => [
+                p.name,
+                p.hsn,
+                p.unitsSold,
+                p.totalRevenue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            ]),
+            startY: 20
+        });
+        doc.save('product_sales_report.pdf');
+    };
+
+    const handleExportExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredData.map(p => ({
+            'Product': p.name,
+            'HSN/SAC': p.hsn,
+            'Units Sold': p.unitsSold,
+            'Total Revenue (INR)': p.totalRevenue
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+        XLSX.writeFile(workbook, "product_sales_report.xlsx");
+    };
+
     const handleRefresh = () => {
         refetchProducts();
         refetchInvoices();
@@ -99,9 +129,15 @@ export default function ProductReportPage() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Product Performance</CardTitle>
-                    <CardDescription>Products sorted by total revenue generated from paid invoices.</CardDescription>
+                <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                        <CardTitle>Product Performance</CardTitle>
+                        <CardDescription>Products sorted by total revenue generated from paid invoices.</CardDescription>
+                    </div>
+                     <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
+                        <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {(isLoadingProducts || isLoadingInvoices) ? (

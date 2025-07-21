@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Employee, Task } from "@/types/database";
 import { getEmployees, getTasks } from "@/lib/firestore-actions";
@@ -18,9 +18,9 @@ import { TaskForm } from "@/components/task-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addEmployee, updateEmployee, deleteEmployee, addTask, updateTask, deleteTask } from "@/lib/firestore-actions";
+import { addEmployee, deleteEmployee, addTask, updateTask } from "@/lib/firestore-actions";
 import { format, isPast } from "date-fns";
-import { User, UserPlus, PlusCircle, MoreHorizontal, Edit, Trash2, Calendar, Clock, Loader2, AlertCircle, Phone, Mail, RefreshCw } from "lucide-react";
+import { User, UserPlus, PlusCircle, Trash2, Calendar, Clock, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function EmployeeTasks({ tasks, employeeId }: { tasks: Task[], employeeId: string }) {

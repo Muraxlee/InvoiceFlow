@@ -65,6 +65,14 @@ export interface Measurement {
   createdAt: any; // Firestore ServerTimestamp
 }
 
+export interface InventoryItem {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  stock: number;
+  updatedAt: any; // Firestore ServerTimestamp
+}
 
 export interface CompanyData {
   id: string; // Document ID is 'main'

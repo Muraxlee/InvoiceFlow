@@ -15,6 +15,7 @@ import {
   Package,
   BarChart3,
   Ruler,
+  Boxes,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
   { href: '/measurements', label: 'Measurement', icon: Ruler, tooltip: 'Manage Measurements' },
+  { href: '/inventory', label: 'Inventory', icon: Boxes, tooltip: 'Manage Stock' },
   { href: '/reports', label: 'Reports', icon: BarChart3, tooltip: 'View Reports & Analytics' },
 ];
 

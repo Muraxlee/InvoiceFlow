@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore';
-import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement } from '@/types/database';
+import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement, InventoryItem } from '@/types/database';
 
 const INVOICES = 'invoices';
 const CUSTOMERS = 'customers';
@@ -22,6 +22,7 @@ const PRODUCTS = 'products';
 const MEASUREMENTS = 'measurements';
 const COMPANY = 'company';
 const USERS = 'users';
+const INVENTORY = 'inventory';
 
 const checkDb = () => {
     if (!db) {
@@ -177,6 +178,31 @@ export async function deleteMeasurement(id: string): Promise<void> {
   checkDb();
   await deleteDoc(doc(db, MEASUREMENTS, id));
 }
+
+// Inventory Actions
+export async function getInventoryItems(): Promise<InventoryItem[]> {
+  return getCollection<InventoryItem>(INVENTORY, 'name');
+}
+
+export async function addInventoryItem(itemData: Omit<InventoryItem, 'id' | 'updatedAt'>): Promise<string> {
+    checkDb();
+    const docRef = await addDoc(collection(db, INVENTORY), {
+        ...itemData,
+        updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+}
+
+export async function updateInventoryItem(id: string, itemData: Partial<Omit<InventoryItem, 'id'>>): Promise<void> {
+    checkDb();
+    await updateDoc(doc(db, INVENTORY, id), { ...itemData, updatedAt: serverTimestamp() });
+}
+
+export async function deleteInventoryItem(id: string): Promise<void> {
+    checkDb();
+    await deleteDoc(doc(db, INVENTORY, id));
+}
+
 
 // Company Info Actions
 export async function getCompanyInfo(): Promise<CompanyData | null> {

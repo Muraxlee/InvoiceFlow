@@ -130,8 +130,8 @@ export default function InvoiceDetailPage() {
     );
   };
   
-  const { subtotal, igstAmount, cgstAmount, sgstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
-    if (!invoice) return { subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, total: 0, roundOffDifference: 0, finalTotal: 0 };
+  const { subtotal, igstAmount, cgstAmount, sgstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
+    if (!invoice) return { subtotal: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, total: 0, additionalChargesTotal: 0, roundOffDifference: 0, finalTotal: 0 };
     
     const currentItems = invoice.items || [];
     const sub = currentItems.reduce((acc: number, item: any) => acc + (item.quantity || 0) * (item.price || 0), 0);
@@ -144,7 +144,9 @@ export default function InvoiceDetailPage() {
       if (item.applySgst) sgst += itemAmount * ((item.sgstRate || 0) / 100);
     });
     
-    const grandTotal = sub + igst + cgst + sgst;
+    const chargesTotal = (invoice.additionalCharges || []).reduce((acc, charge) => acc + (charge.amount || 0), 0);
+    
+    const grandTotal = sub + igst + cgst + sgst + chargesTotal;
     
     const useRounding = invoice.roundOffApplied ?? false;
     const finalAmount = useRounding ? Math.round(grandTotal) : grandTotal;
@@ -156,6 +158,7 @@ export default function InvoiceDetailPage() {
       cgstAmount: cgst, 
       sgstAmount: sgst,
       total: grandTotal,
+      additionalChargesTotal: chargesTotal,
       roundOffDifference: diff,
       finalTotal: finalAmount
     };
@@ -330,6 +333,12 @@ export default function InvoiceDetailPage() {
                         {igstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IGST:</span> <span>₹{igstAmount.toFixed(2)}</span></div>}
                         {cgstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">CGST:</span> <span>₹{cgstAmount.toFixed(2)}</span></div>}
                         {sgstAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">SGST:</span> <span>₹{sgstAmount.toFixed(2)}</span></div>}
+                        {invoice.additionalCharges && invoice.additionalCharges.map((charge, index) => (
+                          <div key={index} className="flex justify-between">
+                            <span className="text-muted-foreground">{charge.description}:</span> 
+                            <span>₹{(charge.amount || 0).toFixed(2)}</span>
+                          </div>
+                        ))}
                         <div className="flex justify-between text-md font-semibold border-t pt-1 mt-1"><span>Total Before Round Off:</span> <span>₹{total.toFixed(2)}</span></div>
                         {invoice.roundOffApplied && roundOffDifference !== 0 && (
                           <div className="flex justify-between"><span className="text-muted-foreground">Round Off:</span> <span>{roundOffDifference >= 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>

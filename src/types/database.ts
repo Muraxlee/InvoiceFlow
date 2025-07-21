@@ -17,6 +17,7 @@ export interface StoredInvoice extends InvoiceFormValues {
   amount: number;
   dueDate: Date | null;
   roundOffApplied?: boolean;
+  additionalCharges?: { description: string; amount: number }[];
   createdAt: any; // Firestore ServerTimestamp
   updatedAt: any; // Firestore ServerTimestamp
 }

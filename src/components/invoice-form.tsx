@@ -59,6 +59,11 @@ const invoiceItemSchema = z.object({
   productName: z.string().optional(), // Added for display
 });
 
+const additionalChargeSchema = z.object({
+  description: z.string().min(1, "Description is required."),
+  amount: z.coerce.number().min(0, "Amount cannot be negative."),
+});
+
 const invoiceSchema = z.object({
   id: z.string().optional(),
   roundOffApplied: z.boolean().default(false),
@@ -74,6 +79,7 @@ const invoiceSchema = z.object({
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   dueDate: z.date().optional().nullable(),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required."),
+  additionalCharges: z.array(additionalChargeSchema).optional(),
   notes: z.string().optional(),
   termsAndConditions: z.string().optional(),
   paymentStatus: z.enum(["Paid", "Unpaid", "Partially Paid", "Draft", "Pending", "Overdue"]).default("Unpaid"),
@@ -129,19 +135,26 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         productId: "", description: "", quantity: 1, price: 0,
         applyIgst: true, applyCgst: false, applySgst: false, igstRate: 18, cgstRate: 9, sgstRate: 9
       }],
+      additionalCharges: [],
       ...defaultValuesProp,
       customerPhone: defaultValuesProp?.customerPhone || '',
     }, 
   });
   
-  const { getValues, setValue, watch, reset } = form;
+  const { getValues, setValue, watch, reset, control } = form;
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
   });
   
+  const { fields: chargeFields, append: appendCharge, remove: removeCharge } = useFieldArray({
+    control,
+    name: "additionalCharges",
+  });
+
   const watchItems = watch("items");
+  const watchAdditionalCharges = watch("additionalCharges");
   const watchInvoiceDate = watch("invoiceDate");
   const customerId = watch("customerId");
 
@@ -200,7 +213,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       ...defaultValuesProp,
       invoiceNumber: initialInvoiceNumber,
       invoiceDate: initialInvoiceDate || new Date(),
-      dueDate: initialDueDate, 
+      dueDate: initialDueDate,
+      additionalCharges: defaultValuesProp?.additionalCharges || [],
     });
 
   }, [defaultValuesProp, reset]);
@@ -225,7 +239,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   }, [sameAsBilling, customerId, customers, setValue]);
 
-  const { subtotal, cgstAmount, sgstAmount, igstAmount, total, roundOffDifference, finalTotal } = useMemo(() => {
+  const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
     const currentItems = watchItems || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
     let cgst = 0; let sgst = 0; let igst = 0;
@@ -235,7 +249,10 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       if (item.applyCgst) cgst += itemAmount * ((Number(item.cgstRate) || 0) / 100);
       if (item.applySgst) sgst += itemAmount * ((Number(item.sgstRate) || 0) / 100);
     });
-    const grandTotal = sub + cgst + sgst + igst;
+
+    const chargesTotal = (watchAdditionalCharges || []).reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
+    
+    const grandTotal = sub + cgst + sgst + igst + chargesTotal;
     let calculatedFinalTotal = grandTotal;
     let diff = 0;
     if (applyRoundOff) {
@@ -244,9 +261,9 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
     return {
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
-      total: grandTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
+      total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchItems, applyRoundOff]);
+  }, [watchItems, watchAdditionalCharges, applyRoundOff]);
 
   useEffect(() => {
     setValue('amount', finalTotal);
@@ -600,6 +617,61 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
           </CardFooter>
         </Card>
 
+        {/* Additional Charges Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Charges</CardTitle>
+            <CardDescription>Add charges like shipping, handling, etc. These are not subject to GST.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {chargeFields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-2">
+                  <FormField
+                    control={form.control}
+                    name={`additionalCharges.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Charge Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Shipping & Handling" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={`additionalCharges.${index}.amount`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount (₹)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="e.g., 250.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => removeCharge(index)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => appendCharge({ description: "", amount: 0 })}
+              disabled={chargeFields.length >= 3}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Additional Charge
+            </Button>
+          </CardFooter>
+        </Card>
+
         {/* Totals Section */}
         <Card>
             <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
@@ -609,6 +681,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     {igstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">IGST</span><span>₹{igstAmount.toFixed(2)}</span></div>}
                     {cgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">CGST</span><span>₹{cgstAmount.toFixed(2)}</span></div>}
                     {sgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">SGST</span><span>₹{sgstAmount.toFixed(2)}</span></div>}
+                    {additionalChargesTotal > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Additional Charges</span><span>₹{additionalChargesTotal.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-sm font-medium border-t pt-2 mt-1"><span className="text-muted-foreground">Total Before Round Off</span><span>₹{total.toFixed(2)}</span></div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="round-off" className="flex items-center gap-2">Round Off Total

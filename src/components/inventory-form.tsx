@@ -80,7 +80,7 @@ export function InventoryForm({ onSubmit, defaultValues, isLoading, onCancel }: 
             name="sku"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>SKU</FormLabel>
+                <FormLabel>SKU (Stock Keeping Unit)</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g., FAB-COT-001" {...field} />
                 </FormControl>

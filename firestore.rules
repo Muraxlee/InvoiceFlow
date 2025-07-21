@@ -28,6 +28,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Authenticated users can read/write inventory data
+    match /inventory/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
     // Company data is publicly readable, but only authenticated users can modify
     match /company/{document=**} {
       allow read: if true;

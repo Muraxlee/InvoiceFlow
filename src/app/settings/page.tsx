@@ -1,3 +1,4 @@
+
 "use client";
 
 import PageHeader from "@/components/page-header";
@@ -23,6 +24,7 @@ import { CompanySettingsForm } from "@/components/company-settings-form";
 import type { CompanyInfo } from "@/types/database";
 import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
+import MeasurementSettings from "@/components/measurement-settings";
 
 const initialCompanyInfo: CompanyInfo = {
   name: '', address: '', phone: '', phone2: '', email: '', gstin: '',
@@ -327,6 +329,7 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+           <MeasurementSettings />
         </TabsContent>
         
         <TabsContent value="data" className="space-y-6">

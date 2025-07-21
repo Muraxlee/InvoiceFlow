@@ -105,6 +105,17 @@ export interface CustomFont {
   url: string;
 }
 
+// Measurement Settings
+export const CUSTOM_GARMENT_TYPES_STORAGE_KEY = "app_custom_garment_types";
+export const CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY = "app_custom_measurement_fields";
+
+export const DEFAULT_GARMENT_TYPES = ["Shirt", "Pant", "Kurta", "Blouse", "Suit", "Coat", "Custom"];
+export const DEFAULT_MEASUREMENT_FIELDS = [
+  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Neck", 
+  "Inseam", "Thigh", "Knee", "Bottom", "Armhole", "Bicep", "Cuff", "Front Cross", "Back Cross"
+];
+
+
 // Key for storing last manual backup timestamp
 export const LAST_BACKUP_TIMESTAMP_KEY = "app_last_backup_timestamp";
 

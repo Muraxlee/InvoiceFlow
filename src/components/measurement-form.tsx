@@ -16,13 +16,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CalendarIcon, PlusCircle, Trash2, Barcode } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { 
+  CUSTOM_GARMENT_TYPES_STORAGE_KEY, 
+  CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY,
+  DEFAULT_GARMENT_TYPES,
+  DEFAULT_MEASUREMENT_FIELDS,
+  loadFromLocalStorage
+} from '@/lib/localStorage';
 
 const measurementValueSchema = z.object({
   name: z.string().min(1, "Field name is required"),
@@ -53,14 +60,7 @@ const measurementSchema = z.object({
 
 export type MeasurementFormValues = z.infer<typeof measurementSchema>;
 
-const garmentTypes = ["Shirt", "Pant", "Kurta", "Blouse", "Suit", "Coat", "Custom"];
 const defaultUnits = ["in", "cm"];
-
-// Predefined list of common measurement names for autocomplete
-const measurementSuggestions = [
-  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Neck", 
-  "Inseam", "Thigh", "Knee", "Bottom", "Armhole", "Bicep", "Cuff", "Front Cross", "Back Cross"
-];
 
 interface MeasurementFormProps {
   onSubmit: (data: MeasurementFormValues) => void;
@@ -70,6 +70,32 @@ interface MeasurementFormProps {
 }
 
 export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }: MeasurementFormProps) {
+  
+  const [availableGarmentTypes, setAvailableGarmentTypes] = useState(DEFAULT_GARMENT_TYPES);
+  const [measurementSuggestions, setMeasurementSuggestions] = useState(DEFAULT_MEASUREMENT_FIELDS);
+
+  useEffect(() => {
+    // Load custom values from localStorage on mount
+    const customGarmentTypes = loadFromLocalStorage<string[]>(CUSTOM_GARMENT_TYPES_STORAGE_KEY, []);
+    setAvailableGarmentTypes([...DEFAULT_GARMENT_TYPES, ...customGarmentTypes]);
+
+    const customMeasurementFields = loadFromLocalStorage<string[]>(CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY, []);
+    setMeasurementSuggestions([...DEFAULT_MEASUREMENT_FIELDS, ...customMeasurementFields]);
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === CUSTOM_GARMENT_TYPES_STORAGE_KEY) {
+        const newTypes = JSON.parse(event.newValue || '[]');
+        setAvailableGarmentTypes([...DEFAULT_GARMENT_TYPES, ...newTypes]);
+      }
+      if (event.key === CUSTOM_MEASUREMENT_FIELDS_STORAGE_KEY) {
+        const newFields = JSON.parse(event.newValue || '[]');
+        setMeasurementSuggestions([...DEFAULT_MEASUREMENT_FIELDS, ...newFields]);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
   
   const form = useForm<MeasurementFormValues>({
     resolver: zodResolver(measurementSchema),
@@ -142,7 +168,7 @@ export function MeasurementForm({ onSubmit, defaultValues, isLoading, onCancel }
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Select a garment type" /></SelectTrigger></FormControl>
                   <SelectContent>
-                    {garmentTypes.map(type => (
+                    {availableGarmentTypes.map(type => (
                       <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
                   </SelectContent>

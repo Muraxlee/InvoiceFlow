@@ -1,0 +1,9 @@
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - core-js
+  - electron
+  - electron-winstaller
+  - protobufjs
+  - re2
+  - sharp
+  - unrs-resolver

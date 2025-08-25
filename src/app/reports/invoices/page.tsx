@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getInvoices } from '@/lib/firestore-actions';
 import type { StoredInvoice } from '@/types/database';
-import { format, isPast } from 'date-fns';
+import { format, isPast, startOfDay, endOfDay } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,11 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown, CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 type StatusFilter = "all" | "paid" | "unpaid" | "pending" | "overdue";
 
@@ -26,6 +29,8 @@ export default function InvoiceReportPage() {
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
+    const [startDate, setStartDate] = useState<Date | undefined>();
+    const [endDate, setEndDate] = useState<Date | undefined>();
 
     const { data: invoices, isLoading, refetch } = useQuery<StoredInvoice[]>({
         queryKey: ['invoices'],
@@ -62,9 +67,13 @@ export default function InvoiceReportPage() {
             if (!isNaN(min) && invoice.amount < min) return false;
             if (!isNaN(max) && invoice.amount > max) return false;
 
+            const invoiceDate = new Date(invoice.invoiceDate);
+            if (startDate && invoiceDate < startOfDay(startDate)) return false;
+            if (endDate && invoiceDate > endOfDay(endDate)) return false;
+
             return true;
         });
-    }, [invoices, searchTerm, statusFilter, minAmount, maxAmount]);
+    }, [invoices, searchTerm, statusFilter, minAmount, maxAmount, startDate, endDate]);
 
     const getStatusBadge = (invoice: StoredInvoice) => {
         const status = getInvoiceStatus(invoice);
@@ -110,6 +119,8 @@ export default function InvoiceReportPage() {
         setStatusFilter('all');
         setMinAmount('');
         setMaxAmount('');
+        setStartDate(undefined);
+        setEndDate(undefined);
     };
 
     return (
@@ -132,7 +143,7 @@ export default function InvoiceReportPage() {
                     <CardDescription>Use the controls below to refine the invoice list.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
                            <label className="text-sm font-medium">Search</label>
                            <div className="relative">
@@ -151,6 +162,34 @@ export default function InvoiceReportPage() {
                                    <SelectItem value="overdue">Overdue</SelectItem>
                                </SelectContent>
                            </Select>
+                        </div>
+                         <div className="space-y-2">
+                           <label className="text-sm font-medium">Start Date</label>
+                           <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {startDate ? format(startDate, "PPP") : <span>Pick a start date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                            </PopoverContent>
+                           </Popover>
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-sm font-medium">End Date</label>
+                           <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {endDate ? format(endDate, "PPP") : <span>Pick an end date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                            </PopoverContent>
+                           </Popover>
                         </div>
                         <div className="space-y-2">
                            <label className="text-sm font-medium">Min Amount (₹)</label>

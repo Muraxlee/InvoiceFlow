@@ -10,13 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/page-header';
-import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown } from 'lucide-react';
+import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown, CalendarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { isPast } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { isPast, format, startOfDay, endOfDay } from 'date-fns';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { cn } from '@/lib/utils';
 
 type CustomerReportData = Customer & {
     totalValue: number;
@@ -32,6 +35,8 @@ export default function CustomerReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
+    const [startDate, setStartDate] = useState<Date | undefined>();
+    const [endDate, setEndDate] = useState<Date | undefined>();
 
     const { data: customers, isLoading: isLoadingCustomers, refetch: refetchCustomers } = useQuery<Customer[]>({
         queryKey: ['customers'],
@@ -45,8 +50,16 @@ export default function CustomerReportPage() {
 
     const reportData = useMemo<CustomerReportData[]>(() => {
         if (!customers || !invoices) return [];
+        
+        const filteredInvoices = invoices.filter(inv => {
+            const invoiceDate = new Date(inv.invoiceDate);
+            if (startDate && invoiceDate < startOfDay(startDate)) return false;
+            if (endDate && invoiceDate > endOfDay(endDate)) return false;
+            return true;
+        });
+
         return customers.map(customer => {
-            const customerInvoices = invoices.filter(inv => inv.customerId === customer.id);
+            const customerInvoices = filteredInvoices.filter(inv => inv.customerId === customer.id);
             const report: CustomerReportData = {
                 ...customer,
                 totalValue: 0,
@@ -72,7 +85,7 @@ export default function CustomerReportPage() {
             });
             return report;
         });
-    }, [customers, invoices]);
+    }, [customers, invoices, startDate, endDate]);
 
     const filteredData = useMemo(() => {
         return reportData.filter(customer => {
@@ -130,6 +143,8 @@ export default function CustomerReportPage() {
         setSearchTerm('');
         setMinAmount('');
         setMaxAmount('');
+        setStartDate(undefined);
+        setEndDate(undefined);
     };
 
     const handleRefresh = () => {
@@ -156,7 +171,7 @@ export default function CustomerReportPage() {
                     <CardTitle>Filters & Search</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         <div className="space-y-2">
                            <label className="text-sm font-medium">Search Customer</label>
                            <div className="relative">
@@ -165,10 +180,38 @@ export default function CustomerReportPage() {
                            </div>
                         </div>
                         <div className="space-y-2">
+                           <label className="text-sm font-medium">Start Date</label>
+                           <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {startDate ? format(startDate, "PPP") : <span>Pick a start date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                            </PopoverContent>
+                           </Popover>
+                        </div>
+                        <div className="space-y-2">
+                           <label className="text-sm font-medium">End Date</label>
+                           <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {endDate ? format(endDate, "PPP") : <span>Pick an end date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                            </PopoverContent>
+                           </Popover>
+                        </div>
+                        <div className="space-y-2">
                            <label className="text-sm font-medium">Min Total Value (₹)</label>
                            <Input type="number" placeholder="e.g., 5000" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-2 xl:col-start-2">
                            <label className="text-sm font-medium">Max Total Value (₹)</label>
                            <Input type="number" placeholder="e.g., 50000" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} />
                         </div>

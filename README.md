@@ -1,5 +1,5 @@
 
-# InvoiceFlow by Firebase Studio
+# InvoiceFlow
 
 This is a Next.js web application for managing invoices, customers, and products, built with Firebase.
 

@@ -20,12 +20,6 @@ const reportsList = [
     icon: UsersRound,
   },
   {
-    title: "Sales Report",
-    description: "Track sales trends, monthly revenue, and overall performance.",
-    href: "/reports/sales",
-    icon: BarChart3,
-  },
-  {
     title: "Product Sales Report",
     description: "Analyze product performance based on units sold and total revenue.",
     href: "/reports/products",

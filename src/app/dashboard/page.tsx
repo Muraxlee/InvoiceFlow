@@ -10,7 +10,7 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, addDays } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -20,8 +20,8 @@ import {
   CircleDollarSign, Receipt, Package, ChevronRight, BarChart3,
   Boxes, DraftingCompass
 } from "lucide-react";
-import type { StoredInvoice, Customer, Product, Employee, InventoryItem } from '@/types/database';
-import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems } from '@/lib/firestore-actions';
+import type { StoredInvoice, Customer, Product, Employee, InventoryItem, Measurement } from '@/types/database';
+import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems, getMeasurements } from '@/lib/firestore-actions';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -37,6 +37,7 @@ type DashboardMetrics = {
     totalEmployees: number;
     totalInventoryItems: number;
     pendingInvoicesCount: number;
+    measurementsDueCount: number;
     salesData: { date: string; amount: number; }[];
     invoiceStatusData: { name: string; value: number; }[];
     topCustomers: { id: string; name: string; totalAmount: number; }[];
@@ -73,12 +74,17 @@ export default function DashboardPage() {
     queryKey: ['inventory'],
     queryFn: getInventoryItems,
   });
+
+  const { data: measurements, isLoading: isLoadingMeasurements, error: measurementsError } = useQuery<Measurement[]>({
+    queryKey: ['measurements'],
+    queryFn: getMeasurements,
+  });
   
-  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts || isLoadingEmployees || isLoadingInventory;
-  const error = invoicesError || customersError || productsError || employeesError || inventoryError;
+  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts || isLoadingEmployees || isLoadingInventory || isLoadingMeasurements;
+  const error = invoicesError || customersError || productsError || employeesError || inventoryError || measurementsError;
 
   useEffect(() => {
-    if (invoices && customers && products && employees && inventoryItems) {
+    if (invoices && customers && products && employees && inventoryItems && measurements) {
         let revenue = 0;
         let outstanding = 0;
         let pendingCount = 0;
@@ -144,6 +150,13 @@ export default function DashboardPage() {
         
         const recentInvoices = [...invoices]
           .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
+
+        const sevenDaysFromNow = addDays(today, 7);
+        const measurementsDueCount = measurements.filter(m => {
+          if (!m.deliveryDate) return false;
+          const deliveryDate = new Date(m.deliveryDate);
+          return isValid(deliveryDate) && deliveryDate >= today && deliveryDate <= sevenDaysFromNow;
+        }).length;
         
         setDashboardMetrics({
             totalRevenue: revenue,
@@ -152,6 +165,7 @@ export default function DashboardPage() {
             totalEmployees: employees.length,
             totalInventoryItems: inventoryItems.reduce((acc, item) => acc + item.stock, 0),
             pendingInvoicesCount: pendingCount,
+            measurementsDueCount,
             salesData: trendData,
             invoiceStatusData: Object.entries(statusCounts)
               .filter(([,value]) => value > 0)
@@ -162,7 +176,7 @@ export default function DashboardPage() {
             revenueGrowth: growthRate,
         });
     }
-  }, [invoices, customers, products, employees, inventoryItems]);
+  }, [invoices, customers, products, employees, inventoryItems, measurements]);
 
 
   const refetch = () => {
@@ -171,6 +185,7 @@ export default function DashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['products'] });
     queryClient.invalidateQueries({ queryKey: ['employees'] });
     queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['measurements'] });
   };
 
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
@@ -259,7 +274,7 @@ export default function DashboardPage() {
         actions={ <Button onClick={() => refetch()} variant="outline" size="sm" className="flex items-center gap-2"> <RefreshCw className="h-4 w-4" /> Refresh Data </Button> }
       />
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue (Paid)</CardTitle>
@@ -286,6 +301,19 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">₹{dashboardMetrics.outstandingAmount.toLocaleString('en-IN')}</div>
             <div className="flex items-center pt-1">
               <span className="text-xs text-muted-foreground">From {dashboardMetrics.pendingInvoicesCount} invoices</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Measurements Due</CardTitle>
+            <div className="rounded-full bg-orange-500/10 p-2 text-orange-500"> <DraftingCompass className="h-5 w-5" /> </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardMetrics.measurementsDueCount}</div>
+            <div className="flex items-center pt-1">
+              <span className="text-xs text-muted-foreground">in the next 7 days</span>
             </div>
           </CardContent>
         </Card>

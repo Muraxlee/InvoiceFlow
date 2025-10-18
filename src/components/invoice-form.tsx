@@ -114,6 +114,72 @@ interface InvoiceFormProps {
   onCancel?: () => void;
 }
 
+function ProductSelector({ products, onSelectProduct, selectedProductId }: { products: Product[], onSelectProduct: (product: Product) => void, selectedProductId: string }) {
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [subcategoryFilter, setSubcategoryFilter] = useState('all');
+
+    const categories = useMemo(() => {
+        if (!products) return [];
+        const uniqueCategories = new Set(products.map(p => p.category).filter(Boolean));
+        return ['all', ...Array.from(uniqueCategories)];
+    }, [products]);
+
+    const subcategories = useMemo(() => {
+        if (!products || categoryFilter === 'all') return ['all'];
+        const uniqueSubcategories = new Set(
+            products
+                .filter(p => p.category === categoryFilter && p.subcategory)
+                .map(p => p.subcategory!)
+        );
+        return ['all', ...Array.from(uniqueSubcategories)];
+    }, [products, categoryFilter]);
+    
+    useEffect(() => {
+        setSubcategoryFilter('all');
+    }, [categoryFilter]);
+
+    const filteredProducts = useMemo(() => {
+        return (products || []).filter(product => {
+            const categoryMatch = categoryFilter === 'all' || product.category === categoryFilter;
+            const subcategoryMatch = subcategoryFilter === 'all' || product.subcategory === subcategoryFilter;
+            return categoryMatch && subcategoryMatch;
+        });
+    }, [products, categoryFilter, subcategoryFilter]);
+
+
+    return (
+        <Command>
+            <div className="flex gap-2 p-2 border-b">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-1/2 h-8 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+                    <SelectContent>
+                        {categories.map(cat => <SelectItem key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                 <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter} disabled={categoryFilter === 'all' || subcategories.length <= 1}>
+                    <SelectTrigger className="w-1/2 h-8 text-xs"><SelectValue placeholder="Subcategory" /></SelectTrigger>
+                    <SelectContent>
+                         {subcategories.map(sub => <SelectItem key={sub} value={sub}>{sub === 'all' ? 'All Subcategories' : sub}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <CommandInput placeholder="Search products..." />
+            <CommandList>
+                <CommandEmpty>No products found.</CommandEmpty>
+                <CommandGroup>
+                    {filteredProducts.map(product => (
+                        <CommandItem value={product.id} key={product.id} onSelect={() => onSelectProduct(product)}>
+                            <Check className={cn("mr-2 h-4 w-4", product.id === selectedProductId ? "opacity-100" : "opacity-0")} />
+                            {product.name}
+                        </CommandItem>
+                    ))}
+                </CommandGroup>
+            </CommandList>
+        </Command>
+    );
+}
+
+
 export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoading: formSubmitLoading, onCancel }: InvoiceFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -516,33 +582,26 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                   <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
                                 </Button>
                             </FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
-                                <CommandInput placeholder="Search products..." />
-                                <CommandList><CommandEmpty>No products found.</CommandEmpty>
-                                  <CommandGroup>{products?.map(p => (
-                                    <CommandItem value={p.id} key={p.id} onSelect={(currentValue) => {
-                                        productField.onChange(currentValue);
-                                        const product = products?.find(prod => prod.id === currentValue);
-                                        if (product) {
-                                            setValue(`items.${index}.description`, product.description || product.name);
-                                            setValue(`items.${index}.price`, product.price);
-                                            setValue(`items.${index}.productName`, product.name);
-                                            setValue(`items.${index}.gstCategory`, product.hsn || "");
-                                            setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
-                                            setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
-                                            setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
-                                            setValue(`items.${index}.applyIgst`, true);
-                                            setValue(`items.${index}.applyCgst`, false);
-                                            setValue(`items.${index}.applySgst`, false);
-                                        }
-                                        setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
-                                    }}>
-                                      <Check className={cn("mr-2 h-4 w-4", p.id === productField.value ? "opacity-100" : "opacity-0")} />
-                                      {p.name}
-                                    </CommandItem>
-                                  ))}</CommandGroup>
-                                </CommandList>
-                            </Command></PopoverContent>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <ProductSelector
+                                  products={products || []}
+                                  selectedProductId={productField.value}
+                                  onSelectProduct={(product) => {
+                                    productField.onChange(product.id);
+                                    setValue(`items.${index}.description`, product.description || product.name);
+                                    setValue(`items.${index}.price`, product.price);
+                                    setValue(`items.${index}.productName`, product.name);
+                                    setValue(`items.${index}.gstCategory`, product.hsn || "");
+                                    setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+                                    setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+                                    setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+                                    setValue(`items.${index}.applyIgst`, true);
+                                    setValue(`items.${index}.applyCgst`, false);
+                                    setValue(`items.${index}.applySgst`, false);
+                                    setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
+                                  }}
+                                />
+                            </PopoverContent>
                           </Popover><FormMessage />
                         </FormItem>
                       )}/>

@@ -15,7 +15,7 @@ import {
   writeBatch,
   where,
 } from 'firebase/firestore';
-import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement, InventoryItem, Employee, Task } from '@/types/database';
+import type { StoredInvoice, CompanyData, Customer, Product, User, Measurement, InventoryItem, Employee, Task, PurchaseInvoice } from '@/types/database';
 
 const INVOICES = 'invoices';
 const CUSTOMERS = 'customers';
@@ -26,6 +26,7 @@ const USERS = 'users';
 const INVENTORY = 'inventory';
 const EMPLOYEES = 'employees';
 const TASKS = 'tasks';
+const PURCHASES = 'purchases';
 
 
 const checkDb = () => {
@@ -104,6 +105,41 @@ export async function updateInvoiceStatus(id: string, status: StoredInvoice['sta
 export async function deleteInvoice(id: string): Promise<void> {
   checkDb();
   await deleteDoc(doc(db, INVOICES, id));
+}
+
+// Purchase Invoice Actions
+export async function getPurchaseInvoices(): Promise<PurchaseInvoice[]> {
+  return getCollection<PurchaseInvoice>(PURCHASES, 'date', 'desc');
+}
+
+export async function getPurchaseInvoice(id: string): Promise<PurchaseInvoice | null> {
+    checkDb();
+    const docRef = doc(db, PURCHASES, id);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return fromFirestore({ id: docSnap.id, ...docSnap.data() } as PurchaseInvoice);
+    }
+    return null;
+}
+
+export async function addPurchaseInvoice(invoiceData: Omit<PurchaseInvoice, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    checkDb();
+    const docRef = await addDoc(collection(db, PURCHASES), {
+        ...invoiceData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+    });
+    return docRef.id;
+}
+
+export async function updatePurchaseInvoice(id: string, invoiceData: Partial<Omit<PurchaseInvoice, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
+    checkDb();
+    await updateDoc(doc(db, PURCHASES, id), { ...invoiceData, updatedAt: serverTimestamp() });
+}
+
+export async function deletePurchaseInvoice(id: string): Promise<void> {
+    checkDb();
+    await deleteDoc(doc(db, PURCHASES, id));
 }
 
 // Customer Actions
@@ -353,6 +389,7 @@ export async function clearAllData(): Promise<void> {
         clearAllProducts(),
         clearAllInvoices(),
         clearAllMeasurements(),
+        deleteCollection(PURCHASES),
         deleteDoc(doc(db, COMPANY, 'main')).catch(() => {}) // Ignore error if it doesn't exist
     ]);
 }

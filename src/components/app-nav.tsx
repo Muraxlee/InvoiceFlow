@@ -18,6 +18,7 @@ import {
   DraftingCompass,
   Boxes,
   Users,
+  ShoppingCart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Business Overview' },
   { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
+  { href: '/purchases', label: 'Purchases', icon: ShoppingCart, tooltip: 'Manage Purchases' },
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
   { href: '/employees', label: 'Employees', icon: Users, tooltip: 'Manage Employees & Tasks' },

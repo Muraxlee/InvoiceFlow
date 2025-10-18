@@ -18,10 +18,10 @@ import {
   Clock, LineChart as LineChartIcon, RefreshCw, AlertCircle,
   ArrowRight, ArrowUp, ArrowDown, PieChart as PieChartIcon, 
   CircleDollarSign, Receipt, Package, ChevronRight, BarChart3,
-  Boxes, DraftingCompass
+  Boxes, DraftingCompass, ShoppingCart
 } from "lucide-react";
-import type { StoredInvoice, Customer, Product, Employee, InventoryItem, Measurement } from '@/types/database';
-import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems, getMeasurements } from '@/lib/firestore-actions';
+import type { StoredInvoice, Customer, Product, Employee, InventoryItem, Measurement, PurchaseInvoice } from '@/types/database';
+import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems, getMeasurements, getPurchaseInvoices } from '@/lib/firestore-actions';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -32,6 +32,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2'
 
 type DashboardMetrics = {
     totalRevenue: number;
+    totalPurchases: number;
     outstandingAmount: number;
     totalCustomers: number;
     totalEmployees: number;
@@ -53,6 +54,11 @@ export default function DashboardPage() {
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
     queryFn: getInvoices,
+  });
+
+  const { data: purchaseInvoices, isLoading: isLoadingPurchases, error: purchasesError } = useQuery<PurchaseInvoice[]>({
+    queryKey: ['purchaseInvoices'],
+    queryFn: getPurchaseInvoices,
   });
 
   const { data: customers, isLoading: isLoadingCustomers, error: customersError } = useQuery<Customer[]>({
@@ -80,11 +86,11 @@ export default function DashboardPage() {
     queryFn: getMeasurements,
   });
   
-  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts || isLoadingEmployees || isLoadingInventory || isLoadingMeasurements;
-  const error = invoicesError || customersError || productsError || employeesError || inventoryError || measurementsError;
+  const isLoading = isLoadingInvoices || isLoadingCustomers || isLoadingProducts || isLoadingEmployees || isLoadingInventory || isLoadingMeasurements || isLoadingPurchases;
+  const error = invoicesError || customersError || productsError || employeesError || inventoryError || measurementsError || purchasesError;
 
   useEffect(() => {
-    if (invoices && customers && products && employees && inventoryItems && measurements) {
+    if (invoices && customers && products && employees && inventoryItems && measurements && purchaseInvoices) {
         let revenue = 0;
         let outstanding = 0;
         let pendingCount = 0;
@@ -128,6 +134,10 @@ export default function DashboardPage() {
           }
         });
 
+        const totalPurchases = purchaseInvoices
+          .filter(p => p.status === 'Paid')
+          .reduce((sum, p) => sum + p.amount, 0);
+
         const recentRevenue = Object.entries(dailySales)
             .filter(([date]) => isAfter(parseISO(date), fifteenDaysAgo))
             .reduce((sum, [, amount]) => sum + amount, 0);
@@ -159,6 +169,7 @@ export default function DashboardPage() {
         
         setDashboardMetrics({
             totalRevenue: revenue,
+            totalPurchases,
             outstandingAmount: outstanding,
             totalCustomers: customers.length,
             totalEmployees: employees.length,
@@ -175,11 +186,12 @@ export default function DashboardPage() {
             revenueGrowth: growthRate,
         });
     }
-  }, [invoices, customers, products, employees, inventoryItems, measurements]);
+  }, [invoices, customers, products, employees, inventoryItems, measurements, purchaseInvoices]);
 
 
   const refetch = () => {
     queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['purchaseInvoices'] });
     queryClient.invalidateQueries({ queryKey: ['customers'] });
     queryClient.invalidateQueries({ queryKey: ['products'] });
     queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -291,6 +303,19 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
+        <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+            <div className="rounded-full bg-red-500/10 p-2 text-red-500"> <ShoppingCart className="h-5 w-5" /> </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{dashboardMetrics.totalPurchases.toLocaleString('en-IN')}</div>
+            <div className="flex items-center pt-1">
+              <span className="text-xs text-muted-foreground">From all paid purchases</span>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Outstanding Amount</CardTitle>
@@ -498,5 +523,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

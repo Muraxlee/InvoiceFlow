@@ -23,6 +23,19 @@ export interface StoredInvoice extends InvoiceFormValues {
   updatedAt: any; // Firestore ServerTimestamp
 }
 
+export interface PurchaseInvoice {
+  id: string;
+  invoiceId: string;
+  vendor: string;
+  date: any; // Firestore Timestamp
+  dueDate?: any; // Firestore Timestamp
+  amount: number;
+  status: 'Paid' | 'Unpaid' | 'Pending' | 'Overdue';
+  createdAt: any;
+  updatedAt: any;
+}
+
+
 export interface Customer {
   id: string; 
   name: string; 

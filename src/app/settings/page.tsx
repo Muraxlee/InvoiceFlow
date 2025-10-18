@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
 import type { CompanyInfo } from "@/types/database";
-import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements } from "@/lib/firestore-actions"; 
+import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements, clearAllPurchases } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 import MeasurementSettings from "@/components/measurement-settings";
 
@@ -114,12 +114,13 @@ export default function SettingsPage() {
   };
   
   const { mutate: dataClearMutation, isPending: isDataClearing } = useMutation({
-    mutationFn: async (dataType: 'customers' | 'products' | 'invoices' | 'measurements' | 'allData' | 'settings') => {
+    mutationFn: async (dataType: 'customers' | 'products' | 'invoices' | 'measurements' | 'allData' | 'settings' | 'purchases') => {
       switch (dataType) {
         case 'customers': return clearAllCustomers();
         case 'products': return clearAllProducts();
         case 'invoices': return clearAllInvoices();
         case 'measurements': return clearAllMeasurements();
+        case 'purchases': return clearAllPurchases();
         case 'allData': return clearAllData();
         case 'settings':
             const keysToClear = [
@@ -138,6 +139,7 @@ export default function SettingsPage() {
         products: "Clear Product Data",
         invoices: "Clear Invoice Data",
         measurements: "Clear Measurement Data",
+        purchases: "Clear Purchase Data",
         allData: "Factory Reset",
         settings: "Settings Reset",
       }[dataType];
@@ -152,6 +154,7 @@ export default function SettingsPage() {
       if (dataType === 'products' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['products'] });
       if (dataType === 'invoices' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['invoices'] });
       if (dataType === 'measurements' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['measurements'] });
+      if (dataType === 'purchases' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['purchaseInvoices'] });
       if (dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['companyInfo'] });
 
       // If settings are reset, or all data is cleared, reload the page
@@ -225,6 +228,7 @@ export default function SettingsPage() {
   const dataManagementActions = [
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from the database.", dataType: 'customers' as const },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from the database.", dataType: 'products' as const },
+    { id: "clearPurchases", label: "Clear Purchase Data", description: "Permanently delete all purchase invoices from the database.", dataType: 'purchases' as const },
     { id: "factoryReset", label: "Factory Reset Application", description: "Reset all database data and clear local storage settings. Requires app restart.", dataType: 'allData' as const },
   ];
 

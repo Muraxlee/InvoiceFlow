@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday, startOfMonth } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday, startOfMonth, endOfDay } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -340,6 +340,7 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Row 1: Financials */}
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue (Paid)</CardTitle>
@@ -385,17 +386,20 @@ export default function DashboardPage() {
 
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Measurements Due</CardTitle>
-            <div className="rounded-full bg-orange-500/10 p-2 text-orange-500"> <DraftingCompass className="h-5 w-5" /> </div>
+            <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
+            <div className="rounded-full bg-yellow-500/10 p-2 text-yellow-500"> <Clock className="h-5 w-5" /> </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardMetrics.measurementsDueCount}</div>
+            <div className="text-2xl font-bold">{dashboardMetrics.pendingInvoicesCount}</div>
             <div className="flex items-center pt-1">
-              <span className="text-xs text-muted-foreground">due for delivery today</span>
+              <Link href="/invoices?status=pending" className="text-xs text-primary flex items-center">
+                View all invoices <ChevronRight className="h-3 w-3 ml-1" />
+              </Link>
             </div>
           </CardContent>
         </Card>
-        
+
+        {/* Row 2: Operational Stats */}
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
@@ -446,21 +450,20 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
-            <div className="rounded-full bg-yellow-500/10 p-2 text-yellow-500"> <Clock className="h-5 w-5" /> </div>
+            <CardTitle className="text-sm font-medium">Measurements Due</CardTitle>
+            <div className="rounded-full bg-orange-500/10 p-2 text-orange-500"> <DraftingCompass className="h-5 w-5" /> </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardMetrics.pendingInvoicesCount}</div>
+            <div className="text-2xl font-bold">{dashboardMetrics.measurementsDueCount}</div>
             <div className="flex items-center pt-1">
-              <Link href="/invoices?status=pending" className="text-xs text-primary flex items-center">
-                View all invoices <ChevronRight className="h-3 w-3 ml-1" />
-              </Link>
+              <span className="text-xs text-muted-foreground">due for delivery today</span>
             </div>
           </CardContent>
         </Card>
+
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

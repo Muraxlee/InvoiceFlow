@@ -232,6 +232,7 @@ export default function ProductsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>SKU/HSN</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Sub Category</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -243,6 +244,7 @@ export default function ProductsPage() {
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.hsn || '-'}</TableCell>
                   <TableCell>{product.category || '-'}</TableCell>
+                  <TableCell>{product.subcategory || '-'}</TableCell>
                   <TableCell className="text-right">₹{(product.price || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

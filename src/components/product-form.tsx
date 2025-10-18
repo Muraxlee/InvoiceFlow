@@ -37,6 +37,7 @@ const productSchema = z.object({
   price: z.coerce.number().min(0, "Price cannot be negative"),
   hsn: z.string().optional(), // SKU is now HSN
   category: z.string().optional(),
+  subcategory: z.string().optional(),
   igstRate: z.coerce.number().min(0).default(18),
   cgstRate: z.coerce.number().min(0).default(9),
   sgstRate: z.coerce.number().min(0).default(9),
@@ -60,6 +61,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
       price: defaultValues?.price || 0,
       hsn: defaultValues?.hsn || "",
       category: defaultValues?.category || "",
+      subcategory: defaultValues?.subcategory || "",
       igstRate: defaultValues?.igstRate || 18,
       cgstRate: defaultValues?.cgstRate || 9,
       sgstRate: defaultValues?.sgstRate || 9,
@@ -73,6 +75,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
       price: defaultValues?.price || 0,
       hsn: defaultValues?.hsn || "",
       category: defaultValues?.category || "",
+      subcategory: defaultValues?.subcategory || "",
       igstRate: defaultValues?.igstRate || 18,
       cgstRate: defaultValues?.cgstRate || 9,
       sgstRate: defaultValues?.sgstRate || 9,
@@ -147,19 +150,34 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
             )}
           />
         </div>
-        <FormField
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Fabrics, Accessories" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          <FormField
             control={form.control}
-            name="category"
+            name="subcategory"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category</FormLabel>
+                <FormLabel>Sub Category</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Fabrics, Accessories" {...field} />
+                  <Input placeholder="e.g., Cotton, Silk" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        </div>
         <div className="border p-4 rounded-md bg-muted/20">
           <h3 className="text-sm font-medium mb-3">GST Rates</h3>
           <div className="grid grid-cols-3 gap-4">

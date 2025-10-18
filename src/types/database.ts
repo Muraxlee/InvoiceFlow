@@ -1,3 +1,4 @@
+
 // This file serves as the single source of truth for our data models.
 // It is safe to import from any component, client-side or server-side.
 
@@ -41,6 +42,7 @@ export interface Product {
   price: number;
   hsn?: string;
   category?: string;
+  subcategory?: string;
   igstRate: number;
   cgstRate: number;
   sgstRate: number;

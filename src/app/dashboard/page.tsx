@@ -10,7 +10,7 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, addDays } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -151,11 +151,10 @@ export default function DashboardPage() {
         const recentInvoices = [...invoices]
           .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
 
-        const sevenDaysFromNow = addDays(today, 7);
         const measurementsDueCount = measurements.filter(m => {
           if (!m.deliveryDate) return false;
           const deliveryDate = new Date(m.deliveryDate);
-          return isValid(deliveryDate) && deliveryDate >= today && deliveryDate <= sevenDaysFromNow;
+          return isValid(deliveryDate) && isToday(deliveryDate);
         }).length;
         
         setDashboardMetrics({
@@ -313,7 +312,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{dashboardMetrics.measurementsDueCount}</div>
             <div className="flex items-center pt-1">
-              <span className="text-xs text-muted-foreground">in the next 7 days</span>
+              <span className="text-xs text-muted-foreground">due for delivery today</span>
             </div>
           </CardContent>
         </Card>
@@ -499,3 +498,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

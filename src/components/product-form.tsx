@@ -68,6 +68,16 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
     },
   });
 
+  const watchedIgstRate = form.watch('igstRate');
+
+  useEffect(() => {
+    const rate = Number(watchedIgstRate);
+    if (!isNaN(rate)) {
+      form.setValue('cgstRate', rate / 2);
+      form.setValue('sgstRate', rate / 2);
+    }
+  }, [watchedIgstRate, form.setValue]);
+
   useEffect(() => {
     form.reset({
       id: defaultValues?.id || "",
@@ -240,7 +250,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
                       </Tooltip>
                     </TooltipProvider>
                   </FormLabel>
-                  <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
+                  <Select onValueChange={(value) => field.onChange(parseFloat(value))} value={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="%" />
@@ -280,7 +290,7 @@ export function ProductForm({ onSubmit, defaultValues, isLoading, onCancel }: Pr
                       </Tooltip>
                     </TooltipProvider>
                   </FormLabel>
-                  <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
+                  <Select onValueChange={(value) => field.onChange(parseFloat(value))} value={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="%" />

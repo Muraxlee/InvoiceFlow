@@ -12,7 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 
 const purchaseInvoiceSchema = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required"),
@@ -75,7 +75,7 @@ export function PurchaseInvoiceForm({ onSubmit, defaultValues, isLoading, onCanc
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant="outline" className={cn(!field.value && "text-muted-foreground")}>
-                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                        {field.value && isValid(new Date(field.value)) ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
@@ -98,7 +98,7 @@ export function PurchaseInvoiceForm({ onSubmit, defaultValues, isLoading, onCanc
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant="outline" className={cn(!field.value && "text-muted-foreground")}>
-                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                        {field.value && isValid(new Date(field.value)) ? format(new Date(field.value), "PPP") : <span>Pick a date</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>

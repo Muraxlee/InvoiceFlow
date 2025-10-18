@@ -25,6 +25,7 @@ import {
 import type { StoredInvoice, Customer, Product, Employee, InventoryItem, Measurement, PurchaseInvoice } from '@/types/database';
 import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems, getMeasurements, getPurchaseInvoices } from '@/lib/firestore-actions';
 import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -100,14 +101,14 @@ export default function DashboardPage() {
         const filteredInvoices = invoices.filter(inv => {
             const invoiceDate = new Date(inv.invoiceDate);
             if(startDate && invoiceDate < startOfDay(startDate)) return false;
-            if(endDate && invoiceDate > startOfDay(endDate)) return false;
+            if(endDate && invoiceDate > endOfDay(endDate)) return false;
             return true;
         });
         
         const filteredPurchases = purchaseInvoices.filter(p => {
             const purchaseDate = new Date(p.date);
             if(startDate && purchaseDate < startOfDay(startDate)) return false;
-            if(endDate && purchaseDate > startOfDay(endDate)) return false;
+            if(endDate && purchaseDate > endOfDay(endDate)) return false;
             return true;
         });
 

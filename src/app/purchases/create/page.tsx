@@ -30,8 +30,12 @@ export default function CreatePurchaseInvoicePage() {
       queryClient.invalidateQueries({ queryKey: ['purchaseInvoices'] });
       router.push('/purchases');
     },
-    onError: (error) => {
-      toast({ title: "Error", description: "Failed to add invoice.", variant: "destructive" });
+    onError: (error: any) => {
+      let errorMessage = "Failed to add invoice. Please check your connection and try again.";
+      if (error.message?.includes('permission-denied') || error.message?.includes('insufficient permissions')) {
+        errorMessage = "Creation failed due to a permissions issue. Please ensure your Firestore security rules allow writing to the 'purchases' collection.";
+      }
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 

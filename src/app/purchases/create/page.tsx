@@ -13,7 +13,7 @@ const defaultValues: Partial<PurchaseInvoiceFormValues> = {
   invoiceId: "",
   vendor: "",
   date: new Date(),
-  dueDate: undefined,
+  dueDate: new Date(),
   amount: 0,
   status: "Unpaid",
 };

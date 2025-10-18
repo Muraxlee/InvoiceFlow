@@ -1,10 +1,11 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isPast, startOfDay } from 'date-fns';
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,11 +19,22 @@ import type { PurchaseInvoice } from "@/types/database";
 import { getPurchaseInvoices, deletePurchaseInvoice, updatePurchaseInvoiceStatus } from "@/lib/firestore-actions";
 import { FilePlus2, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search, CheckCircle2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
-export default function PurchasesPage() {
+type StatusFilter = "all" | "paid" | "unpaid" | "overdue";
+
+function PurchasesPageComponent() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const initialStatusFilter = searchParams.get('status') as StatusFilter | null;
+
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter || "all");
+  
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter || "all");
+  }, [initialStatusFilter]);
 
   const { data: purchaseInvoices, isLoading, error, refetch } = useQuery<PurchaseInvoice[]>({
     queryKey: ['purchaseInvoices'],
@@ -31,12 +43,38 @@ export default function PurchasesPage() {
 
   const filteredInvoices = useMemo(() => {
     if (!purchaseInvoices) return [];
+    
+    const today = startOfDay(new Date());
+
     return purchaseInvoices.filter(invoice => {
+      // Status Filtering
+      const invoiceStatus = invoice.status || "Unpaid";
+      const isOverdue = invoice.dueDate && isPast(new Date(invoice.dueDate)) && (invoiceStatus === 'Unpaid' || invoiceStatus === 'Pending');
+
+      let statusMatch = true;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'overdue') {
+          statusMatch = isOverdue;
+        } else if (statusFilter === 'unpaid') {
+          statusMatch = (invoiceStatus === 'Unpaid' || invoiceStatus === 'Pending') && !isOverdue;
+        } else {
+          statusMatch = invoiceStatus.toLowerCase() === statusFilter;
+        }
+      }
+
+      // Search Term Filtering
+      if (!statusMatch) return false;
+      
       const lowercasedTerm = searchTerm.toLowerCase();
-      return invoice.invoiceId.toLowerCase().includes(lowercasedTerm) ||
-             invoice.vendor.toLowerCase().includes(lowercasedTerm);
+      if (!lowercasedTerm) return true;
+
+      return (
+        invoice.invoiceId.toLowerCase().includes(lowercasedTerm) ||
+        invoice.vendor.toLowerCase().includes(lowercasedTerm) ||
+        (isOverdue ? "overdue".includes(lowercasedTerm) : invoiceStatus.toLowerCase().includes(lowercasedTerm))
+      );
     });
-  }, [purchaseInvoices, searchTerm]);
+  }, [purchaseInvoices, searchTerm, statusFilter]);
   
   const updateStatusMutation = useMutation({
     mutationFn: ({ invoiceId, status }: { invoiceId: string; status: PurchaseInvoice['status'] }) => updatePurchaseInvoiceStatus(invoiceId, status),
@@ -106,10 +144,11 @@ export default function PurchasesPage() {
     <div className="space-y-6">
       <PageHeader title="Manage Purchases" description="Track all your purchase invoices." actions={pageActions} />
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex-col items-start gap-4">
+          <div className="flex items-center justify-between w-full">
             <div>
-                <CardTitle>Purchase Invoice List</CardTitle>
-                <CardDescription>A list of all your purchase invoices.</CardDescription>
+              <CardTitle>Purchase Invoice List</CardTitle>
+              <CardDescription>A list of all your purchase invoices.</CardDescription>
             </div>
             <div className="relative w-full max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -120,6 +159,13 @@ export default function PurchasesPage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+              <Button variant={statusFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('all')}>All</Button>
+              <Button variant={statusFilter === 'paid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('paid')}>Paid</Button>
+              <Button variant={statusFilter === 'unpaid' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('unpaid')}>Unpaid</Button>
+              <Button variant={statusFilter === 'overdue' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('overdue')}>Overdue</Button>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -187,5 +233,13 @@ export default function PurchasesPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function PurchasesPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PurchasesPageComponent />
+    </Suspense>
   );
 }

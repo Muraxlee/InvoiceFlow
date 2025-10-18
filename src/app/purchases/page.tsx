@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { PurchaseInvoice } from "@/types/database";
 import { getPurchaseInvoices, deletePurchaseInvoice } from "@/lib/firestore-actions";
 import { FilePlus2, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export default function PurchasesPage() {
   const queryClient = useQueryClient();

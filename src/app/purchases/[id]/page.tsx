@@ -12,6 +12,7 @@ import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { isValid } from 'date-fns';
 
 export default function PurchaseInvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -64,8 +65,8 @@ export default function PurchaseInvoiceDetailPage() {
   
   const defaultValues = {
     ...invoice,
-    date: invoice.date ? new Date(invoice.date.seconds * 1000) : new Date(),
-    dueDate: invoice.dueDate ? new Date(invoice.dueDate.seconds * 1000) : undefined,
+    date: invoice.date && isValid(new Date(invoice.date)) ? new Date(invoice.date) : new Date(),
+    dueDate: invoice.dueDate && isValid(new Date(invoice.dueDate)) ? new Date(invoice.dueDate) : undefined,
   };
 
   return (

@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/page-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { PurchaseInvoice } from "@/types/database";
-import { getPurchaseInvoices, deletePurchaseInvoice } from "@/lib/firestore-actions";
-import { FilePlus2, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search } from "lucide-react";
+import { getPurchaseInvoices, deletePurchaseInvoice, updatePurchaseInvoiceStatus } from "@/lib/firestore-actions";
+import { FilePlus2, MoreHorizontal, Edit, Trash2, Loader2, AlertCircle, RefreshCw, Search, CheckCircle2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export default function PurchasesPage() {
@@ -37,6 +37,25 @@ export default function PurchasesPage() {
              invoice.vendor.toLowerCase().includes(lowercasedTerm);
     });
   }, [purchaseInvoices, searchTerm]);
+  
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ invoiceId, status }: { invoiceId: string; status: PurchaseInvoice['status'] }) => updatePurchaseInvoiceStatus(invoiceId, status),
+    onSuccess: (_, { invoiceId }) => {
+      toast({
+        title: "Status Updated",
+        description: `Invoice has been marked as Paid.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['purchaseInvoices'] });
+      queryClient.invalidateQueries({ queryKey: ['purchaseInvoice', invoiceId] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error Updating Status",
+        description: "Failed to update the invoice status.",
+        variant: "destructive",
+      });
+    }
+  });
 
   const deleteMutation = useMutation({
     mutationFn: deletePurchaseInvoice,
@@ -136,6 +155,12 @@ export default function PurchasesPage() {
                           <Link href={`/purchases/${invoice.id}`}>
                             <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> View & Edit</DropdownMenuItem>
                           </Link>
+                          {invoice.status !== 'Paid' && (
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ invoiceId: invoice.id, status: 'Paid' })}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Paid
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
                            <ConfirmDialog
                             triggerButton={
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>

@@ -137,6 +137,12 @@ export async function updatePurchaseInvoice(id: string, invoiceData: Partial<Omi
     await updateDoc(doc(db, PURCHASES, id), { ...invoiceData, updatedAt: serverTimestamp() });
 }
 
+export async function updatePurchaseInvoiceStatus(id: string, status: PurchaseInvoice['status']): Promise<void> {
+  checkDb();
+  await updateDoc(doc(db, PURCHASES, id), { status, updatedAt: serverTimestamp() });
+}
+
+
 export async function deletePurchaseInvoice(id: string): Promise<void> {
     checkDb();
     await deleteDoc(doc(db, PURCHASES, id));

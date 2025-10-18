@@ -18,7 +18,7 @@ const purchaseInvoiceSchema = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required"),
   vendor: z.string().min(1, "Vendor name is required"),
   date: z.date({ required_error: "Invoice date is required" }),
-  dueDate: z.date().optional(),
+  dueDate: z.date().optional().nullable(),
   amount: z.coerce.number().min(0, "Amount must be a positive number"),
   status: z.enum(["Paid", "Unpaid", "Pending", "Overdue"]),
 });
@@ -104,7 +104,7 @@ export function PurchaseInvoiceForm({ onSubmit, defaultValues, isLoading, onCanc
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} />
+                    <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />

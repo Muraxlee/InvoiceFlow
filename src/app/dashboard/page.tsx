@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday, startOfMonth, endOfDay } from 'date-fns';
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday, startOfMonth, endOfDay, eachDayOfInterval } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -123,9 +123,14 @@ export default function DashboardPage() {
         const thirtyDaysAgo = subDays(today, 29);
         const fifteenDaysAgo = subDays(today, 14);
 
-        const last30DaysDates = Array.from({ length: 30 }, (_, i) => format(subDays(today, i), 'yyyy-MM-dd')).reverse();
+        const chartDateRange = (startDate && endDate && isAfter(endDate, startDate)) 
+            ? eachDayOfInterval({ start: startDate, end: endDate }) 
+            : eachDayOfInterval({ start: thirtyDaysAgo, end: today });
+        
+        const dateStringsInRange = chartDateRange.map(d => format(d, 'yyyy-MM-dd'));
+
         const dailySales: Record<string, number> = {};
-        last30DaysDates.forEach(date => { dailySales[date] = 0; });
+        dateStringsInRange.forEach(date => { dailySales[date] = 0; });
         
         filteredInvoices.forEach(invoice => {
           const invDate = new Date(invoice.invoiceDate);
@@ -177,7 +182,7 @@ export default function DashboardPage() {
           .map(([id, totalAmount]) => ({ id, name: products.find(p => p.id === id)?.name || 'Unknown', totalAmount }))
           .sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 5);
           
-        const trendData = last30DaysDates.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
+        const trendData = dateStringsInRange.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
         
         const recentInvoices = [...invoices]
           .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
@@ -348,12 +353,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₹{dashboardMetrics.totalRevenue.toLocaleString('en-IN')}</div>
-            <div className="flex items-center pt-1">
+             <div className="flex items-center pt-1">
               <Badge variant={dashboardMetrics.revenueGrowth >= 0 ? "success" : "destructive"} className="text-xs">
                 {dashboardMetrics.revenueGrowth >= 0 ? <ArrowUp className="h-3 w-3 mr-1" /> : <ArrowDown className="h-3 w-3 mr-1" />}
                 {Math.abs(dashboardMetrics.revenueGrowth).toFixed(1)}%
               </Badge>
-              <span className="text-xs text-muted-foreground ml-2">vs. prior 15 days (30-day trend)</span>
+              <span className="text-xs text-muted-foreground ml-2">vs. prior 15 days</span>
             </div>
           </CardContent>
         </Card>
@@ -469,7 +474,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between">
-            <div> <CardTitle className="flex items-center"> <LineChartIcon className="h-5 w-5 mr-2 text-primary" /> Revenue Trend </CardTitle> <CardDescription>Daily revenue for the past 30 days</CardDescription> </div>
+             <div> 
+                <CardTitle className="flex items-center"> <LineChartIcon className="h-5 w-5 mr-2 text-primary" /> Revenue Trend </CardTitle> 
+                <CardDescription>
+                    Daily revenue for {startDate ? format(startDate, 'LLL dd, y') : '...'} - {endDate ? format(endDate, 'LLL dd, y') : '...'}
+                </CardDescription> 
+            </div>
           </CardHeader>
           <CardContent className="h-[350px] p-2">
             <ChartContainer config={chartConfigSales} className="w-full h-full">
@@ -482,7 +492,7 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border)/0.5)" />
-                  <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(value, index) => index % 3 === 0 ? value : ''} />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(value, index) => index % Math.ceil(dashboardMetrics.salesData.length / 10) === 0 ? value : ''} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(value) => `₹${value/1000}k`} />
                   <ChartTooltip cursor={{fill: 'hsl(var(--accent)/0.1)'}} content={<ChartTooltipContent indicator="dot" formatter={(value, name, props) => (<div className="flex flex-col"><span>{props.payload.date}</span><span className="font-bold">₹{Number(value).toLocaleString('en-IN')}</span></div>)} />} />
                   <Area type="monotone" dataKey="amount" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" strokeWidth={2} />

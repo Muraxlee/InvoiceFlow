@@ -10,7 +10,9 @@ import { AreaChart, Area, CartesianGrid, ResponsiveContainer, XAxis, YAxis, PieC
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, subDays, parseISO, isValid, isPast, startOfDay, isAfter, isToday, startOfMonth } from 'date-fns';
 import Link from 'next/link';
 import PageHeader from '@/components/page-header';
 import {
@@ -18,10 +20,11 @@ import {
   Clock, LineChart as LineChartIcon, RefreshCw, AlertCircle,
   ArrowRight, ArrowUp, ArrowDown, PieChart as PieChartIcon, 
   CircleDollarSign, Receipt, Package, ChevronRight, BarChart3,
-  Boxes, DraftingCompass, ShoppingCart
+  Boxes, DraftingCompass, ShoppingCart, CalendarIcon
 } from "lucide-react";
 import type { StoredInvoice, Customer, Product, Employee, InventoryItem, Measurement, PurchaseInvoice } from '@/types/database';
 import { getInvoices, getCustomers, getProducts, getEmployees, getInventoryItems, getMeasurements, getPurchaseInvoices } from '@/lib/firestore-actions';
+import { cn } from '@/lib/utils';
 
 const chartConfigSales = {
   revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
@@ -50,6 +53,8 @@ type DashboardMetrics = {
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null);
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
 
   const { data: invoices, isLoading: isLoadingInvoices, error: invoicesError } = useQuery<StoredInvoice[]>({
     queryKey: ['invoices'],
@@ -91,6 +96,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (invoices && customers && products && employees && inventoryItems && measurements && purchaseInvoices) {
+
+        const filteredInvoices = invoices.filter(inv => {
+            const invoiceDate = new Date(inv.invoiceDate);
+            if(startDate && invoiceDate < startOfDay(startDate)) return false;
+            if(endDate && invoiceDate > startOfDay(endDate)) return false;
+            return true;
+        });
+        
+        const filteredPurchases = purchaseInvoices.filter(p => {
+            const purchaseDate = new Date(p.date);
+            if(startDate && purchaseDate < startOfDay(startDate)) return false;
+            if(endDate && purchaseDate > startOfDay(endDate)) return false;
+            return true;
+        });
+
         let revenue = 0;
         let outstanding = 0;
         let pendingCount = 0;
@@ -106,7 +126,7 @@ export default function DashboardPage() {
         const dailySales: Record<string, number> = {};
         last30DaysDates.forEach(date => { dailySales[date] = 0; });
         
-        invoices.forEach(invoice => {
+        filteredInvoices.forEach(invoice => {
           const invDate = new Date(invoice.invoiceDate);
           if (!isValid(invDate)) return;
 
@@ -134,7 +154,7 @@ export default function DashboardPage() {
           }
         });
 
-        const totalPurchases = purchaseInvoices
+        const totalPurchases = filteredPurchases
           .filter(p => p.status === 'Paid')
           .reduce((sum, p) => sum + p.amount, 0);
 
@@ -186,7 +206,7 @@ export default function DashboardPage() {
             revenueGrowth: growthRate,
         });
     }
-  }, [invoices, customers, products, employees, inventoryItems, measurements, purchaseInvoices]);
+  }, [invoices, customers, products, employees, inventoryItems, measurements, purchaseInvoices, startDate, endDate]);
 
 
   const refetch = () => {
@@ -285,6 +305,39 @@ export default function DashboardPage() {
         actions={ <Button onClick={() => refetch()} variant="outline" size="sm" className="flex items-center gap-2"> <RefreshCw className="h-4 w-4" /> Refresh Data </Button> }
       />
       
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap gap-4 items-center">
+            <div className="flex gap-2 items-center">
+                <Label>From:</Label>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} />
+                    </PopoverContent>
+                </Popover>
+            </div>
+             <div className="flex gap-2 items-center">
+                <Label>To:</Label>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={endDate} onSelect={setEndDate} />
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-card to-background border border-border/40 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -298,7 +351,7 @@ export default function DashboardPage() {
                 {dashboardMetrics.revenueGrowth >= 0 ? <ArrowUp className="h-3 w-3 mr-1" /> : <ArrowDown className="h-3 w-3 mr-1" />}
                 {Math.abs(dashboardMetrics.revenueGrowth).toFixed(1)}%
               </Badge>
-              <span className="text-xs text-muted-foreground ml-2">vs. prior 15 days</span>
+              <span className="text-xs text-muted-foreground ml-2">vs. prior 15 days (30-day trend)</span>
             </div>
           </CardContent>
         </Card>

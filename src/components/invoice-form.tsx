@@ -426,7 +426,13 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command>
+                        <Command filter={(value, search) => {
+                          const customer = customers?.find(c => c.id === value);
+                          if (customer) {
+                            return customer.name.toLowerCase().includes(search.toLowerCase()) || customer.email.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+                          }
+                          return 0;
+                        }}>
                           <CommandInput placeholder="Search customers..." />
                           <CommandList>
                             <CommandEmpty>

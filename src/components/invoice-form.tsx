@@ -219,8 +219,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     name: "additionalCharges",
   });
 
-  const watchItems = watch("items");
-  const watchAdditionalCharges = watch("additionalCharges");
+  const watchAllFields = watch();
   const watchInvoiceDate = watch("invoiceDate");
   const customerId = watch("customerId");
 
@@ -306,7 +305,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [sameAsBilling, customerId, customers, setValue]);
 
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
-    const currentItems = watchItems || [];
+    const currentItems = watchAllFields.items || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
     let cgst = 0; let sgst = 0; let igst = 0;
     currentItems.forEach(item => {
@@ -316,7 +315,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       if (item.applySgst) sgst += itemAmount * ((Number(item.sgstRate) || 0) / 100);
     });
 
-    const chargesTotal = (watchAdditionalCharges || []).reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
+    const chargesTotal = (watchAllFields.additionalCharges || []).reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
     
     const grandTotal = sub + cgst + sgst + igst + chargesTotal;
     let calculatedFinalTotal = grandTotal;
@@ -329,7 +328,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchItems, watchAdditionalCharges, applyRoundOff]);
+  }, [watchAllFields, applyRoundOff]);
 
   useEffect(() => {
     setValue('amount', finalTotal);

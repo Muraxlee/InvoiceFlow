@@ -2,7 +2,7 @@
 "use client";
 
 import PageHeader from "@/components/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -246,19 +246,18 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Document Numbering</CardTitle>
-              <CardDescription>Configure prefixes and numbering format for all document types.</CardDescription>
+              <CardDescription>Configure prefixes and numbering format for all document types. Settings are now stored in the cloud.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-2">
                 <Switch id="include-date-toggle" checked={includeDate} onCheckedChange={setIncludeDate} />
                 <Label htmlFor="include-date-toggle" className="flex items-center gap-2">
-                  Include Date in Document Number
+                  Display Date in Document Number
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild><HelpCircle className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
                       <TooltipContent>
-                        <p>ON: INV{exampleInvoiceDateString}0001 (daily reset)</p>
-                        <p>OFF: INV-0001 (sequential)</p>
+                        <p>This only changes how numbers are displayed. The full unique ID is always stored.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

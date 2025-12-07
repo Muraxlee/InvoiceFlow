@@ -55,7 +55,6 @@ export default function SettingsPage() {
   const { data: companyInfo, isLoading: isLoadingCompanyInfo, refetch: refetchCompanyInfo } = useQuery<CompanyData | null>({
       queryKey: ['companyInfo'],
       queryFn: getDbCompanyInfo,
-      initialData: initialCompanyInfo
   });
 
   const saveCompanyMutation = useMutation({
@@ -246,7 +245,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Document Numbering</CardTitle>
-              <CardDescription>Configure prefixes and numbering format for all document types. Settings are now stored in the cloud.</CardDescription>
+              <CardDescription>Configure prefixes and numbering display format (stored in the cloud).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-2">

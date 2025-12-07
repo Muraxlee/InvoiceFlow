@@ -221,7 +221,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     name: "additionalCharges",
   });
 
-  const watchItems = watch("items");
+  const watchedItems = watch("items");
   const watchAdditionalCharges = watch("additionalCharges");
   const watchInvoiceDate = watch("invoiceDate");
   const watchDocType = watch("type");
@@ -297,7 +297,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [sameAsBilling, customerId, customers, setValue]);
 
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
-    const currentItems = watchItems || [];
+    const currentItems = getValues("items") || [];
+    const currentCharges = getValues("additionalCharges") || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
     let cgst = 0; let sgst = 0; let igst = 0;
     currentItems.forEach(item => {
@@ -307,7 +308,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       if (item.applySgst) sgst += itemAmount * ((Number(item.sgstRate) || 0) / 100);
     });
 
-    const chargesTotal = (watchAdditionalCharges || []).reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
+    const chargesTotal = currentCharges.reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
     
     const grandTotal = sub + cgst + sgst + igst + chargesTotal;
     let calculatedFinalTotal = grandTotal;
@@ -320,7 +321,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchItems, watchAdditionalCharges, applyRoundOff]);
+  }, [watchedItems, watchAdditionalCharges, applyRoundOff, getValues]);
 
   useEffect(() => {
     setValue('amount', finalTotal);
@@ -425,21 +426,23 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             <CommandGroup>
                               {customers?.map((customer) => (
                                 <CommandItem value={customer.id} key={customer.id} onSelect={() => {
-                                    field.onChange(customer.id);
-                                    setValue("customerName", customer.name);
-                                    setValue("customerEmail", customer.email || "");
-                                    setValue("customerAddress", customer.address || "");
-                                    setValue("customerPhone", customer.phone || "");
-                                    setValue("customerGstin", customer.gstin || "");
-                                    setValue("customerState", customer.state || "");
-                                    setValue("customerStateCode", customer.stateCode || "");
-                                    if (sameAsBilling) {
-                                      setValue("shipmentDetails.consigneeName", customer.name);
-                                      setValue("shipmentDetails.consigneeAddress", customer.address || "");
-                                      setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
-                                      setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
-                                    }
-                                    setIsCustomerPopoverOpen(false);
+                                    setTimeout(() => {
+                                      field.onChange(customer.id);
+                                      setValue("customerName", customer.name);
+                                      setValue("customerEmail", customer.email || "");
+                                      setValue("customerAddress", customer.address || "");
+                                      setValue("customerPhone", customer.phone || "");
+                                      setValue("customerGstin", customer.gstin || "");
+                                      setValue("customerState", customer.state || "");
+                                      setValue("customerStateCode", customer.stateCode || "");
+                                      if (sameAsBilling) {
+                                        setValue("shipmentDetails.consigneeName", customer.name);
+                                        setValue("shipmentDetails.consigneeAddress", customer.address || "");
+                                        setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
+                                        setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
+                                      }
+                                      setIsCustomerPopoverOpen(false);
+                                    }, 0);
                                 }}>
                                   <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
                                   {customer.name}
@@ -582,18 +585,20 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                   products={products || []}
                                   selectedProductId={productField.value}
                                   onSelectProduct={(product) => {
-                                    productField.onChange(product.id);
-                                    setValue(`items.${index}.description`, product.description || product.name);
-                                    setValue(`items.${index}.price`, product.price);
-                                    setValue(`items.${index}.productName`, product.name);
-                                    setValue(`items.${index}.gstCategory`, product.hsn || "");
-                                    setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
-                                    setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
-                                    setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
-                                    setValue(`items.${index}.applyIgst`, true);
-                                    setValue(`items.${index}.applyCgst`, false);
-                                    setValue(`items.${index}.applySgst`, false);
-                                    setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
+                                    setTimeout(() => {
+                                      productField.onChange(product.id);
+                                      setValue(`items.${index}.description`, product.description || product.name);
+                                      setValue(`items.${index}.price`, product.price);
+                                      setValue(`items.${index}.productName`, product.name);
+                                      setValue(`items.${index}.gstCategory`, product.hsn || "");
+                                      setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+                                      setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+                                      setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+                                      setValue(`items.${index}.applyIgst`, true);
+                                      setValue(`items.${index}.applyCgst`, false);
+                                      setValue(`items.${index}.applySgst`, false);
+                                      setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
+                                    }, 0);
                                   }}
                                 />
                             </PopoverContent>
@@ -670,7 +675,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                   </div>
                 </div>
               );
-            })}
+              })}
             </div>
           </CardContent>
           <CardFooter>
@@ -791,4 +796,5 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     
 
     
+
 

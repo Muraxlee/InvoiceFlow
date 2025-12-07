@@ -2,6 +2,9 @@
 'use client';
 
 import { format as formatDateFns } from 'date-fns';
+import { getDocs, collection, query, where, Timestamp } from 'firebase/firestore';
+import { db } from './firebase';
+import type { CompanyData } from '@/types/database';
 
 // Helper function to safely get data from localStorage
 export function loadFromLocalStorage<T>(key: string, defaultValue: T): T {
@@ -55,67 +58,37 @@ export interface InvoiceConfig {
   };
 }
 
-export function generateInvoiceNumber(invoiceDate: Date, type: 'Tax Invoice' | 'Proforma Invoice' | 'Quotation', increment: boolean = false): string {
-  if (typeof window === 'undefined') {
-    const prefix = type === 'Proforma Invoice' ? DEFAULT_PROFORMA_PREFIX : type === 'Quotation' ? DEFAULT_QUOTATION_PREFIX : DEFAULT_INVOICE_PREFIX;
-    const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
-    const sequentialNumber = "0001"; 
-    return `${prefix}${dateKey}${sequentialNumber}`;
-  }
-
-  const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
-    prefix: DEFAULT_INVOICE_PREFIX,
-    proformaPrefix: DEFAULT_PROFORMA_PREFIX,
-    quotationPrefix: DEFAULT_QUOTATION_PREFIX,
-    includeDateInNumber: true,
-    dailyCounters: {},
-    globalCounters: {},
-  });
-  
-  // Ensure globalCounters exists to prevent runtime errors
-  if (!config.globalCounters) {
-    config.globalCounters = {};
-  }
-
-  let prefix;
-  switch (type) {
-    case 'Proforma Invoice':
-      prefix = (config.proformaPrefix || DEFAULT_PROFORMA_PREFIX).substring(0,3).toUpperCase();
-      break;
-    case 'Quotation':
-      prefix = (config.quotationPrefix || DEFAULT_QUOTATION_PREFIX).substring(0,3).toUpperCase();
-      break;
-    case 'Tax Invoice':
-    default:
-      prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
-      break;
-  }
-  
-  if (config.includeDateInNumber) {
-    const dateStr = formatDateFns(invoiceDate, "ddMMyyyy");
-    const dateKey = `${prefix}-${dateStr}`;
-    const currentCounter = config.dailyCounters[dateKey] || 0;
-    const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
-    
-    if (increment) {
-        config.dailyCounters[dateKey] = useCounter;
-        saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+export async function generateInvoiceNumber(companyConfig: CompanyData): Promise<string> {
+    if (!db) {
+        throw new Error("Firestore is not available for generating invoice number.");
     }
-    
-    const sequentialNumber = String(useCounter).padStart(4, '0');
-    return `${prefix}${dateStr}${sequentialNumber}`;
-  } else {
-    const currentCounter = config.globalCounters[prefix] || 0;
-    const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
+    const { includeDateInNumber, invoicePrefix } = companyConfig;
 
-    if (increment) {
-        config.globalCounters[prefix] = useCounter;
-        saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+    const date = new Date();
+    const prefix = invoicePrefix || DEFAULT_INVOICE_PREFIX;
+
+    if (includeDateInNumber) {
+        const dateStr = formatDateFns(date, "ddMMyyyy");
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const q = query(collection(db, "invoices"),
+            where("createdAt", ">=", Timestamp.fromDate(startOfDay)),
+            where("createdAt", "<=", Timestamp.fromDate(endOfDay)),
+            where("invoiceNumber", ">=", `${prefix}${dateStr}`),
+            where("invoiceNumber", "<", `${prefix}${dateStr}9999`)
+        );
+        const querySnapshot = await getDocs(q);
+        const nextNumber = querySnapshot.size + 1;
+        return `${prefix}${dateStr}${String(nextNumber).padStart(4, '0')}`;
+    } else {
+        const q = query(collection(db, "invoices"), where("invoiceNumber", ">=", `${prefix}-`), where("invoiceNumber", "<", `${prefix}-~`));
+        const querySnapshot = await getDocs(q);
+        const nextNumber = querySnapshot.size + 1;
+        return `${prefix}-${String(nextNumber).padStart(4, '0')}`;
     }
-    
-    const sequentialNumber = String(useCounter).padStart(4, '0');
-    return `${prefix}-${sequentialNumber}`;
-  }
 }
 
 

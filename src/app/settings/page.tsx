@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Trash2, Settings2 as SettingsIcon, Save, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2, HelpCircle } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, DEFAULT_PROFORMA_PREFIX, DEFAULT_QUOTATION_PREFIX } from "@/lib/localStorage";
 
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/components/providers"; 
@@ -21,8 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import FontSettings from "@/components/font-settings";
 import { CompanySettingsForm } from "@/components/company-settings-form";
-import type { CompanyInfo } from "@/types/database";
-import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements, clearAllPurchases } from "@/lib/firestore-actions"; 
+import type { CompanyData } from "@/types/database";
+import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements, clearAllPurchases, saveCompanyInfo } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 import MeasurementSettings from "@/components/measurement-settings";
 import { Switch } from "@/components/ui/switch";
@@ -34,109 +34,79 @@ import {
 } from "@/components/ui/tooltip";
 
 
-const initialCompanyInfo: CompanyInfo = {
+const initialCompanyInfo: CompanyData = {
+  id: 'main',
   name: '', address: '', phone: '', phone2: '', email: '', gstin: '',
-  bank_account_name: '', bank_name: '', bank_account: '', bank_ifsc: ''
+  bank_account_name: '', bank_name: '', bank_account: '', bank_ifsc: '',
+  invoicePrefix: DEFAULT_INVOICE_PREFIX,
+  proformaPrefix: DEFAULT_PROFORMA_PREFIX,
+  quotationPrefix: DEFAULT_QUOTATION_PREFIX,
+  includeDateInNumber: true,
 };
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
+  const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
+  const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
+  const [lastSettingsBackupTimestamp, setLastSettingsBackupTimestamp] = useState<number | null>(null);
+
+  const { data: companyInfo, isLoading: isLoadingCompanyInfo, refetch: refetchCompanyInfo } = useQuery<CompanyData | null>({
+      queryKey: ['companyInfo'],
+      queryFn: getDbCompanyInfo,
+      initialData: initialCompanyInfo
+  });
+
+  const saveCompanyMutation = useMutation({
+    mutationFn: saveCompanyInfo,
+    onSuccess: () => {
+      toast({ title: 'Settings Saved', description: 'Your changes have been saved to the cloud.' });
+      queryClient.invalidateQueries({ queryKey: ['companyInfo'] });
+    },
+    onError: (error) => {
+      toast({ title: 'Error', description: 'Failed to save settings.', variant: 'destructive' });
+    }
+  });
+
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [proformaPrefix, setProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
   const [quotationPrefix, setQuotationPrefix] = useState(DEFAULT_QUOTATION_PREFIX);
   const [includeDate, setIncludeDate] = useState(true);
-  
-  const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
-  const [originalProformaPrefix, setOriginalProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
-  const [originalQuotationPrefix, setOriginalQuotationPrefix] = useState(DEFAULT_QUOTATION_PREFIX);
-
-  const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
-  const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); 
-  const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); 
   const [exampleInvoiceDateString, setExampleInvoiceDateString] = useState(""); 
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-
-
-  const [customThemeValues, setCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
-  const [originalCustomThemeValues, setOriginalCustomThemeValues] = useState<CustomThemeValues>(DEFAULT_CUSTOM_THEME_VALUES);
   
-  const [lastSettingsBackupTimestamp, setLastSettingsBackupTimestamp] = useState<number | null>(null);
+  useEffect(() => {
+    if (companyInfo) {
+      setInvoicePrefix(companyInfo.invoicePrefix || DEFAULT_INVOICE_PREFIX);
+      setProformaPrefix(companyInfo.proformaPrefix || DEFAULT_PROFORMA_PREFIX);
+      setQuotationPrefix(companyInfo.quotationPrefix || DEFAULT_QUOTATION_PREFIX);
+      setIncludeDate(companyInfo.includeDateInNumber === false ? false : true);
+    }
+  }, [companyInfo]);
 
   useEffect(() => {
-    const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
-      prefix: DEFAULT_INVOICE_PREFIX,
-      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
-      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
-      includeDateInNumber: true,
-      dailyCounters: {},
-      globalCounters: {},
-    });
-    setInvoicePrefix(config.prefix);
-    setOriginalInvoicePrefix(config.prefix);
-    setProformaPrefix(config.proformaPrefix);
-    setOriginalProformaPrefix(config.proformaPrefix);
-    setQuotationPrefix(config.quotationPrefix);
-    setOriginalQuotationPrefix(config.quotationPrefix);
-    setIncludeDate(config.includeDateInNumber);
-
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY;
     setSelectedThemeKey(storedTheme);
-
-    const storedAppTitleCompanyName = loadFromLocalStorage<string>(COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME);
-    setCompanyNameInput(storedAppTitleCompanyName);
-    setCurrentCompanyName(storedAppTitleCompanyName);
-    
     const storedCustomTheme = loadFromLocalStorage<CustomThemeValues>(CUSTOM_THEME_STORAGE_KEY, DEFAULT_CUSTOM_THEME_VALUES);
     setCustomThemeValues(storedCustomTheme);
     setOriginalCustomThemeValues(storedCustomTheme);
-
     const storedBackupTimestamp = loadFromLocalStorage<number | null>(LAST_BACKUP_TIMESTAMP_KEY, null);
     setLastSettingsBackupTimestamp(storedBackupTimestamp);
     
     if (typeof window !== 'undefined') { 
         setExampleInvoiceDateString(format(new Date(), 'ddMMyyyy'));
     }
-
-    const loadCompanyInfoFromDb = async () => {
-      try {
-        const info = await getDbCompanyInfo();
-        setCompanyInfo(info || initialCompanyInfo);
-      } catch (error) {
-        console.error('Failed to load company info from DB:', error);
-        setCompanyInfo(initialCompanyInfo);
-      }
-    };
-    loadCompanyInfoFromDb();
-
   }, []);
 
   const { mutate: seedMutation, isPending: isSeeding } = useMutation({
     mutationFn: seedSampleData,
     onSuccess: () => {
-        toast({
-            title: "Sample Data Seeded",
-            description: "Sample customers, products, and an invoice have been added."
-        });
-        queryClient.invalidateQueries({ queryKey: ['customers'] });
-        queryClient.invalidateQueries({ queryKey: ['products'] });
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
-        queryClient.invalidateQueries({ queryKey: ['reportData'] });
+        toast({ title: "Sample Data Seeded", description: "Sample customers, products, and an invoice have been added." });
+        queryClient.invalidateQueries();
     },
-    onError: (error: any) => {
-        toast({
-            title: "Error Seeding Data",
-            description: error.message || "An unknown error occurred.",
-            variant: "destructive"
-        });
-    }
+    onError: (error: any) => { toast({ title: "Error Seeding Data", description: error.message || "An unknown error occurred.", variant: "destructive" }); }
   });
 
-  const handleSeedData = () => {
-      seedMutation();
-  };
-  
   const { mutate: dataClearMutation, isPending: isDataClearing } = useMutation({
     mutationFn: async (dataType: 'customers' | 'products' | 'invoices' | 'measurements' | 'allData' | 'settings' | 'purchases') => {
       switch (dataType) {
@@ -147,137 +117,40 @@ export default function SettingsPage() {
         case 'purchases': return clearAllPurchases();
         case 'allData': return clearAllData();
         case 'settings':
-            const keysToClear = [
-                COMPANY_NAME_STORAGE_KEY, INVOICE_CONFIG_KEY, 
-                THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY, LAST_BACKUP_TIMESTAMP_KEY,
-            ];
-            keysToClear.forEach(key => localStorage.removeItem(key));
-            return Promise.resolve();
+            localStorage.clear();
+            return await saveCompanyInfo(initialCompanyInfo);
         default: throw new Error("Invalid data type for clearing.");
       }
     },
     onSuccess: (_, dataType) => {
-      let requiresReload = false;
       const actionName = {
-        customers: "Clear Customer Data",
-        products: "Clear Product Data",
-        invoices: "Clear Invoice Data",
-        measurements: "Clear Measurement Data",
-        purchases: "Clear Purchase Data",
-        allData: "Factory Reset",
-        settings: "Settings Reset",
+        customers: "Clear Customer Data", products: "Clear Product Data", invoices: "Clear Invoice Data",
+        measurements: "Clear Measurement Data", purchases: "Clear Purchase Data",
+        allData: "Factory Reset", settings: "Settings Reset",
       }[dataType];
-
-      toast({
-        title: `${actionName} Successful`,
-        description: `The operation has been completed.`,
-      });
-
-      // Invalidate relevant queries
-      if (dataType === 'customers' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['customers'] });
-      if (dataType === 'products' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['products'] });
-      if (dataType === 'invoices' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      if (dataType === 'measurements' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['measurements'] });
-      if (dataType === 'purchases' || dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['purchaseInvoices'] });
-      if (dataType === 'allData') queryClient.invalidateQueries({ queryKey: ['companyInfo'] });
-
-      // If settings are reset, or all data is cleared, reload the page
+      toast({ title: `${actionName} Successful`, description: `The operation has been completed.` });
+      
       if (dataType === 'settings' || dataType === 'allData') {
         setTimeout(() => window.location.reload(), 1500);
+      } else {
+        queryClient.invalidateQueries();
       }
     },
-    onError: (error: any, dataType) => {
-      toast({
-        title: "Error",
-        description: `Failed to clear ${dataType} data: ${error.message}`,
-        variant: "destructive"
-      });
-    },
+    onError: (error: any, dataType) => { toast({ title: "Error", description: `Failed to clear ${dataType} data: ${error.message}`, variant: "destructive" }); },
   });
 
-  const handleSavePrefix = (prefixType: 'invoice' | 'proforma' | 'quotation') => {
-    const currentConfig = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
-      prefix: DEFAULT_INVOICE_PREFIX,
-      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
-      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
-      includeDateInNumber: true,
-      dailyCounters: {},
-      globalCounters: {},
-    });
-
-    let valueToSave: string;
-    let originalValue: string;
-    let fieldName: keyof InvoiceConfig;
-    let displayName: string;
-
-    switch (prefixType) {
-        case 'proforma':
-            valueToSave = proformaPrefix;
-            originalValue = originalProformaPrefix;
-            fieldName = 'proformaPrefix';
-            displayName = 'Proforma Prefix';
-            break;
-        case 'quotation':
-            valueToSave = quotationPrefix;
-            originalValue = originalQuotationPrefix;
-            fieldName = 'quotationPrefix';
-            displayName = 'Quotation Prefix';
-            break;
-        case 'invoice':
-        default:
-            valueToSave = invoicePrefix;
-            originalValue = originalInvoicePrefix;
-            fieldName = 'prefix';
-            displayName = 'Invoice Prefix';
-            break;
-    }
-
-    let newPrefix = valueToSave.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
-
-    if (newPrefix.length !== 3) {
-        toast({ title: "Invalid Prefix", description: `${displayName} must be 3 letters.`, variant: "destructive" });
-        if (prefixType === 'proforma') setProformaPrefix(originalValue);
-        else if (prefixType === 'quotation') setQuotationPrefix(originalValue);
-        else setInvoicePrefix(originalValue);
-        return;
-    }
-    
-    (currentConfig as any)[fieldName] = newPrefix;
-    saveToLocalStorage(INVOICE_CONFIG_KEY, currentConfig);
-
-    if (prefixType === 'proforma') setOriginalProformaPrefix(newPrefix);
-    else if (prefixType === 'quotation') setOriginalQuotationPrefix(newPrefix);
-    else setOriginalInvoicePrefix(newPrefix);
-
-    toast({ title: `${displayName} Saved`, description: `${displayName} updated to ${newPrefix}.`});
-  };
-
-  const handleDateInNumberToggle = (checked: boolean) => {
-    setIncludeDate(checked);
-    const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
-      prefix: DEFAULT_INVOICE_PREFIX,
-      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
-      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
-      includeDateInNumber: true,
-      dailyCounters: {},
-      globalCounters: {},
-    });
-    config.includeDateInNumber = checked;
-    saveToLocalStorage(INVOICE_CONFIG_KEY, config);
-    toast({ title: 'Number Format Updated', description: `Document numbers will now ${checked ? 'include' : 'exclude'} the date.` });
+  const handleSaveNumberingSettings = () => {
+    if (!companyInfo) return;
+    const newSettings = {
+        ...companyInfo,
+        invoicePrefix,
+        proformaPrefix,
+        quotationPrefix,
+        includeDateInNumber: includeDate,
+    };
+    saveCompanyMutation.mutate(newSettings);
   };
   
-  const handleSaveAppTitle = () => {
-    if (!companyNameInput.trim()) {
-      toast({ title: "Application Title Empty", description: "Please enter an application title.", variant: "destructive"}); return;
-    }
-    saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, companyNameInput);
-    setCurrentCompanyName(companyNameInput);
-    if (document) document.title = companyNameInput;
-    window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(companyNameInput) }));
-    toast({ title: "Application Title Saved", description: `Application title updated to ${companyNameInput}.`});
-  };
-
   const handleThemeChange = useCallback((themeKey: string) => {
     if (AVAILABLE_THEMES[themeKey as keyof typeof AVAILABLE_THEMES]) {
       const htmlElement = document.documentElement;
@@ -307,7 +180,7 @@ export default function SettingsPage() {
     { id: "clearCustomers", label: "Clear Customer Data", description: "Permanently delete all customer information from the database.", dataType: 'customers' as const },
     { id: "clearProducts", label: "Clear Product Data", description: "Permanently delete all product information from the database.", dataType: 'products' as const },
     { id: "clearPurchases", label: "Clear Purchase Data", description: "Permanently delete all purchase invoices from the database.", dataType: 'purchases' as const },
-    { id: "factoryReset", label: "Factory Reset Application", description: "Reset all database data and clear local storage settings. Requires app restart.", dataType: 'allData' as const },
+    { id: "factoryReset", label: "Factory Reset Application", description: "Reset all database data and cloud settings. Requires app restart.", dataType: 'allData' as const },
   ];
 
   return (
@@ -326,36 +199,14 @@ export default function SettingsPage() {
         </TabsList>
         
         <TabsContent value="company" className="space-y-6">
-         {companyInfo ? (
+         {companyInfo && !isLoadingCompanyInfo ? (
             <CompanySettingsForm 
               defaultValues={companyInfo} 
-              onSuccess={async () => {
-                const info = await getDbCompanyInfo();
-                setCompanyInfo(info || initialCompanyInfo); 
-                if (info?.name) {
-                    saveToLocalStorage(COMPANY_NAME_STORAGE_KEY, info.name);
-                    setCurrentCompanyName(info.name); setCompanyNameInput(info.name);
-                    if (document) document.title = info.name;
-                    window.dispatchEvent(new StorageEvent('storage', { key: COMPANY_NAME_STORAGE_KEY, newValue: JSON.stringify(info.name) }));
-                }
-              }} 
+              onSuccess={() => refetchCompanyInfo()} 
             />
          ) : (
             <Card><CardContent className="pt-6"><div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin"/></div></CardContent></Card>
          )}
-          <Card>
-            <CardHeader><CardTitle>Application Title</CardTitle><CardDescription>Set the title displayed in the browser tab/application window (stored locally).</CardDescription></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="appTitle">Application Title</Label>
-                <div className="flex w-full max-w-md items-center gap-2">
-                  <Input id="appTitle" placeholder="Enter application title" value={companyNameInput} onChange={(e) => setCompanyNameInput(e.target.value)} className="flex-1"/>
-                  <Button onClick={handleSaveAppTitle} size="sm" disabled={companyNameInput === currentCompanyName || !companyNameInput.trim()}><Save className="mr-2 h-4 w-4" /> Save</Button>
-                </div>
-                <p className="text-sm text-muted-foreground">Current: <span className="font-medium">{currentCompanyName}</span></p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="appearance" className="space-y-6">
@@ -367,13 +218,7 @@ export default function SettingsPage() {
                   {Object.entries(AVAILABLE_THEMES).map(([key, name]) => (
                     <div key={key}>
                       <RadioGroupItem value={key} id={`theme-${key}`} className="peer sr-only"/>
-                      <Label 
-                        htmlFor={`theme-${key}`} 
-                        className={cn(
-                          "flex flex-col items-center justify-center rounded-md border-2 bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer h-28 text-center", 
-                          selectedThemeKey === key ? "border-primary ring-2 ring-primary" : "border-muted"
-                        )}
-                      >
+                      <Label htmlFor={`theme-${key}`} className={cn("flex flex-col items-center justify-center rounded-md border-2 bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer h-28 text-center", selectedThemeKey === key ? "border-primary ring-2 ring-primary" : "border-muted")}>
                         <div className="mb-2 h-5 w-5 rounded-full border" style={{background: key === 'custom' ? (customThemeValues.primary ? `hsl(${customThemeValues.primary})` : 'var(--sidebar-primary, var(--primary))') : `var(--sidebar-primary, var(--primary))`}} data-theme-preview={key} />
                         <div className="font-medium text-xs leading-tight">{name}</div>
                       </Label>
@@ -401,11 +246,11 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Document Numbering</CardTitle>
-              <CardDescription>Configure prefixes and numbering format for different document types (stored locally).</CardDescription>
+              <CardDescription>Configure prefixes and numbering format for all document types.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-2">
-                <Switch id="include-date-toggle" checked={includeDate} onCheckedChange={handleDateInNumberToggle} />
+                <Switch id="include-date-toggle" checked={includeDate} onCheckedChange={setIncludeDate} />
                 <Label htmlFor="include-date-toggle" className="flex items-center gap-2">
                   Include Date in Document Number
                   <TooltipProvider>
@@ -420,36 +265,27 @@ export default function SettingsPage() {
                 </Label>
               </div>
 
-              {/* Invoice Prefix */}
               <div className="space-y-2">
                 <Label htmlFor="invoicePrefix">Tax Invoice Prefix (3 uppercase letters)</Label>
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Input id="invoicePrefix" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. INV"/>
-                    <Button onClick={() => handleSavePrefix('invoice')} disabled={invoicePrefix === originalInvoicePrefix || invoicePrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
-                </div>
-                 <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(invoicePrefix || 'INV').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(invoicePrefix || 'INV').padEnd(3,'X')}-0001`}</p>
+                <Input id="invoicePrefix" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[150px]" placeholder="e.g. INV"/>
+                <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(invoicePrefix || 'INV').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(invoicePrefix || 'INV').padEnd(3,'X')}-0001`}</p>
               </div>
 
-              {/* Proforma Prefix */}
               <div className="space-y-2">
                 <Label htmlFor="proformaPrefix">Proforma Prefix (3 uppercase letters)</Label>
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Input id="proformaPrefix" value={proformaPrefix} onChange={(e) => setProformaPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. PRF"/>
-                    <Button onClick={() => handleSavePrefix('proforma')} disabled={proformaPrefix === originalProformaPrefix || proformaPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
-                </div>
+                <Input id="proformaPrefix" value={proformaPrefix} onChange={(e) => setProformaPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[150px]" placeholder="e.g. PRF"/>
                 <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(proformaPrefix || 'PRF').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(proformaPrefix || 'PRF').padEnd(3,'X')}-0001`}</p>
               </div>
 
-              {/* Quotation Prefix */}
               <div className="space-y-2">
                 <Label htmlFor="quotationPrefix">Quotation Prefix (3 uppercase letters)</Label>
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Input id="quotationPrefix" value={quotationPrefix} onChange={(e) => setQuotationPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. QTN"/>
-                    <Button onClick={() => handleSavePrefix('quotation')} disabled={quotationPrefix === originalQuotationPrefix || quotationPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
-                </div>
+                <Input id="quotationPrefix" value={quotationPrefix} onChange={(e) => setQuotationPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[150px]" placeholder="e.g. QTN"/>
                 <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(quotationPrefix || 'QTN').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(quotationPrefix || 'QTN').padEnd(3,'X')}-0001`}</p>
               </div>
             </CardContent>
+            <CardFooter>
+              <Button onClick={handleSaveNumberingSettings} disabled={saveCompanyMutation.isPending}><Save className="mr-2 h-4 w-4" /> Save Numbering Settings</Button>
+            </CardFooter>
           </Card>
            <MeasurementSettings />
         </TabsContent>
@@ -458,12 +294,10 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Seed Sample Data</CardTitle>
-              <CardDescription>
-                Populate your database with a sample customer, product, and invoice to explore the app's features. This is safe to run multiple times.
-              </CardDescription>
+              <CardDescription>Populate your database with samples to explore features. This is safe to run multiple times.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={handleSeedData} disabled={isSeeding || isDataClearing}>
+              <Button onClick={() => seedMutation()} disabled={isSeeding || isDataClearing}>
                 {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                 Load Sample Data
               </Button>
@@ -492,5 +326,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

@@ -126,4 +126,9 @@ export interface CompanyData {
   bank_name?: string;
   bank_account?: string;
   bank_ifsc?: string;
+  // Numbering settings
+  invoicePrefix?: string;
+  proformaPrefix?: string;
+  quotationPrefix?: string;
+  includeDateInNumber?: boolean;
 }

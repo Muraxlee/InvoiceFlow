@@ -27,7 +27,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { generateInvoiceNumber } from "@/lib/localStorage";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import type { Product, Customer } from "@/types/database";
+import type { Product, Customer, CompanyData } from "@/types/database";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -41,7 +41,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useQuery } from '@tanstack/react-query';
-import { getCustomers, getProducts } from '@/lib/firestore-actions';
+import { getCustomers, getProducts, getCompanyInfo } from '@/lib/firestore-actions';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const invoiceItemSchema = z.object({
@@ -187,7 +187,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   
   const { data: customers, isLoading: isLoadingCustomers, error: customersError, refetch: refetchCustomers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: getCustomers });
   const { data: products, isLoading: isLoadingProducts, error: productsError, refetch: refetchProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: getProducts });
-  
+  const { data: companyInfo, isLoading: isLoadingCompanyInfo } = useQuery<CompanyData | null>({ queryKey: ['companyInfo'], queryFn: getCompanyInfo });
+
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
@@ -256,35 +257,25 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [fields.length]);
 
   useEffect(() => {
-    let initialInvoiceDate: Date | null = null;
-    let initialDueDate: Date | null = null;
-    let isCreatingNew = true;
-
-    if (typeof window !== 'undefined') {
-      isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
-      initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : (isCreatingNew ? new Date() : new Date());
-      if (defaultValuesProp?.dueDate) {
-        initialDueDate = new Date(defaultValuesProp.dueDate);
-        setShowDueDate(true);
-      } else {
-        setShowDueDate(isCreatingNew ? false : !!defaultValuesProp?.dueDate);
-        initialDueDate = null;
-      }
+    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
+    const initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : new Date();
+    
+    if (isCreatingNew && typeof window !== 'undefined' && companyInfo) {
+      generateInvoiceNumber(companyInfo).then(num => setValue('invoiceNumber', num));
+    } else if (defaultValuesProp?.invoiceNumber) {
+      setValue('invoiceNumber', defaultValuesProp.invoiceNumber);
     }
     
-    const initialInvoiceNumber = isCreatingNew && initialInvoiceDate && typeof window !== 'undefined'
-        ? generateInvoiceNumber(initialInvoiceDate, watchDocType || 'Tax Invoice', false) 
-        : defaultValuesProp?.invoiceNumber || '';
-
     reset({
       ...defaultValuesProp,
-      invoiceNumber: initialInvoiceNumber,
-      invoiceDate: initialInvoiceDate || new Date(),
-      dueDate: initialDueDate,
+      invoiceDate: initialInvoiceDate,
+      dueDate: defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : null,
       additionalCharges: defaultValuesProp?.additionalCharges || [],
     });
 
-  }, [defaultValuesProp, reset, watchDocType]);
+    if(defaultValuesProp?.dueDate) setShowDueDate(true);
+
+  }, [defaultValuesProp, companyInfo, setValue, reset, watchDocType]);
 
   useEffect(() => {
     if (showDueDate && !getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
@@ -346,16 +337,6 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     if (!showDueDate) {
       submissionData.dueDate = null;
     }
-    if (typeof window !== 'undefined' && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "")) {
-        const invoiceDateForNumber = data.invoiceDate instanceof Date ? data.invoiceDate : new Date(data.invoiceDate);
-        if (isValid(invoiceDateForNumber)) {
-            const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, data.type, true);
-            submissionData.invoiceNumber = confirmedInvoiceNumber;
-        } else {
-            toast({ title: "Error", description: "Invalid invoice date provided.", variant: "destructive" });
-            return; 
-        }
-    }
     onSubmit(submissionData);
   };
   
@@ -393,7 +374,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     );
   }
 
-  if (isLoadingCustomers || isLoadingProducts) { 
+  if (isLoadingCustomers || isLoadingProducts || isLoadingCompanyInfo) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -649,7 +630,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                       {watch(`items.${index}.applyCgst`) && (
                         <FormField control={form.control} name={`items.${index}.cgstRate`} render={({ field }) => (
                           <FormItem><FormLabel>CGST Rate</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value.toString()}>
+                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} value={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
                               <FormControl><SelectTrigger><SelectValue placeholder="%" /></SelectTrigger></FormControl>
                               <SelectContent><SelectItem value="0">0%</SelectItem><SelectItem value="2.5">2.5%</SelectItem><SelectItem value="6">6%</SelectItem><SelectItem value="9">9%</SelectItem><SelectItem value="14">14%</SelectItem></SelectContent>
                             </Select><FormMessage />
@@ -659,7 +640,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                       {watch(`items.${index}.applySgst`) && (
                          <FormField control={form.control} name={`items.${index}.sgstRate`} render={({ field }) => (
                           <FormItem><FormLabel>SGST Rate</FormLabel>
-                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} defaultValue={field.value.toString()}>
+                            <Select onValueChange={(value) => field.onChange(parseFloat(value))} value={field.value !== undefined && field.value !== null ? field.value.toString() : "9"}>
                                <FormControl><SelectTrigger><SelectValue placeholder="%" /></SelectTrigger></FormControl>
                               <SelectContent><SelectItem value="0">0%</SelectItem><SelectItem value="2.5">2.5%</SelectItem><SelectItem value="6">6%</SelectItem><SelectItem value="9">9%</SelectItem><SelectItem value="14">14%</SelectItem></SelectContent>
                             </Select><FormMessage />

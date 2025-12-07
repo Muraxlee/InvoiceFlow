@@ -7,9 +7,9 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { saveCompanyInfo } from '@/lib/firestore-actions';
-import { COMPANY_NAME_STORAGE_KEY, saveToLocalStorage } from '@/lib/localStorage';
-import { type CompanyInfo } from '@/types/database';
-import { useState, useRef } from 'react';
+import { COMPANY_NAME_STORAGE_KEY, saveToLocalStorage, DEFAULT_INVOICE_PREFIX, DEFAULT_PROFORMA_PREFIX, DEFAULT_QUOTATION_PREFIX } from '@/lib/localStorage';
+import { type CompanyData } from '@/types/database';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ const companySchema = z.object({
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 interface CompanySettingsFormProps {
-  defaultValues: Partial<CompanyInfo>;
+  defaultValues: Partial<CompanyData>;
   onSuccess?: () => void;
 }
 
@@ -55,8 +55,17 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
     defaultValues: { ...defaultValues, logo: defaultValues?.logo || '' } || {},
   });
 
+  useEffect(() => {
+    form.reset({
+      ...defaultValues,
+      logo: defaultValues?.logo || '',
+    });
+    setLogoPreview(defaultValues?.logo);
+  }, [defaultValues, form]);
+
+
   const mutation = useMutation({
-    mutationFn: saveCompanyInfo,
+    mutationFn: (data: CompanyData) => saveCompanyInfo(data),
     onSuccess: (_, variables) => {
       toast({
         title: 'Settings Saved',
@@ -117,7 +126,16 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
   };
 
   async function onSubmit(data: CompanyFormValues) {
-    mutation.mutate(data);
+    const updatedCompanyData: CompanyData = {
+        ...defaultValues,
+        ...data,
+        id: 'main',
+        invoicePrefix: defaultValues.invoicePrefix || DEFAULT_INVOICE_PREFIX,
+        proformaPrefix: defaultValues.proformaPrefix || DEFAULT_PROFORMA_PREFIX,
+        quotationPrefix: defaultValues.quotationPrefix || DEFAULT_QUOTATION_PREFIX,
+        includeDateInNumber: defaultValues.includeDateInNumber === false ? false : true,
+    };
+    mutation.mutate(updatedCompanyData);
   }
 
   return (

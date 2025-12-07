@@ -360,7 +360,7 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
           
           .header-container-flex { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 3mm; }
-          .logo { max-width: 150px; max-height: 60px; object-fit: contain; margin-right: 15px; }
+          .logo { max-width: 150px; max-height: 70px; object-fit: contain; margin-right: 15px; }
           .company-details-right { text-align: left; flex-grow: 1; }
           .company-details-center { text-align: center; margin-bottom: 3mm; }
 
@@ -661,3 +661,5 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     </div>
   );
 }
+
+    

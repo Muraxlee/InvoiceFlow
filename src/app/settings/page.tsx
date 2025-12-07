@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, DatabaseZap, UsersRound, Trash2, Settings2 as SettingsIcon, Save, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY } from "@/lib/localStorage";
+import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, DEFAULT_PROFORMA_PREFIX, DEFAULT_QUOTATION_PREFIX } from "@/lib/localStorage";
 
 import { THEME_STORAGE_KEY, AVAILABLE_THEMES, DEFAULT_THEME_KEY } from "@/components/providers"; 
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -35,7 +35,13 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
+  const [proformaPrefix, setProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
+  const [quotationPrefix, setQuotationPrefix] = useState(DEFAULT_QUOTATION_PREFIX);
+  
   const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
+  const [originalProformaPrefix, setOriginalProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
+  const [originalQuotationPrefix, setOriginalQuotationPrefix] = useState(DEFAULT_QUOTATION_PREFIX);
+
   const [selectedThemeKey, setSelectedThemeKey] = useState<string>(DEFAULT_THEME_KEY);
   const [companyNameInput, setCompanyNameInput] = useState(DEFAULT_COMPANY_NAME); 
   const [currentCompanyName, setCurrentCompanyName] = useState(DEFAULT_COMPANY_NAME); 
@@ -50,11 +56,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { 
-      prefix: DEFAULT_INVOICE_PREFIX, 
+      prefix: DEFAULT_INVOICE_PREFIX,
+      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
+      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
       dailyCounters: {} 
     });
     setInvoicePrefix(config.prefix);
     setOriginalInvoicePrefix(config.prefix);
+    setProformaPrefix(config.proformaPrefix);
+    setOriginalProformaPrefix(config.proformaPrefix);
+    setQuotationPrefix(config.quotationPrefix);
+    setOriginalQuotationPrefix(config.quotationPrefix);
 
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY;
     setSelectedThemeKey(storedTheme);
@@ -171,22 +183,59 @@ export default function SettingsPage() {
     },
   });
 
-  const handleSaveInvoiceSettings = () => {
-    const currentConfig = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, { prefix: DEFAULT_INVOICE_PREFIX, dailyCounters: {} });
-    let newPrefix = invoicePrefix.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
-    if (newPrefix.length === 0 && invoicePrefix.length > 0) {
-        toast({title: "Invalid Prefix", description: "Invoice prefix must contain letters and be 3 characters long.", variant: "destructive"});
-        setInvoicePrefix(originalInvoicePrefix); return;
+  const handleSavePrefix = (prefixType: 'invoice' | 'proforma' | 'quotation') => {
+    const currentConfig = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
+      prefix: DEFAULT_INVOICE_PREFIX,
+      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
+      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
+      dailyCounters: {},
+    });
+
+    let valueToSave: string;
+    let originalValue: string;
+    let fieldName: keyof InvoiceConfig;
+    let displayName: string;
+
+    switch (prefixType) {
+        case 'proforma':
+            valueToSave = proformaPrefix;
+            originalValue = originalProformaPrefix;
+            fieldName = 'proformaPrefix';
+            displayName = 'Proforma Prefix';
+            break;
+        case 'quotation':
+            valueToSave = quotationPrefix;
+            originalValue = originalQuotationPrefix;
+            fieldName = 'quotationPrefix';
+            displayName = 'Quotation Prefix';
+            break;
+        case 'invoice':
+        default:
+            valueToSave = invoicePrefix;
+            originalValue = originalInvoicePrefix;
+            fieldName = 'prefix';
+            displayName = 'Invoice Prefix';
+            break;
     }
-    if (newPrefix.length === 0 && invoicePrefix.length === 0) newPrefix = DEFAULT_INVOICE_PREFIX;
-    else if (newPrefix.length < 3) {
-       toast({title: "Prefix Too Short", description: "Invoice prefix must be 3 letters.", variant: "destructive"});
-       setInvoicePrefix(originalInvoicePrefix); return;
+
+    let newPrefix = valueToSave.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
+
+    if (newPrefix.length !== 3) {
+        toast({ title: "Invalid Prefix", description: `${displayName} must be 3 letters.`, variant: "destructive" });
+        if (prefixType === 'proforma') setProformaPrefix(originalValue);
+        else if (prefixType === 'quotation') setQuotationPrefix(originalValue);
+        else setInvoicePrefix(originalValue);
+        return;
     }
-    currentConfig.prefix = newPrefix; 
+    
+    (currentConfig as any)[fieldName] = newPrefix;
     saveToLocalStorage(INVOICE_CONFIG_KEY, currentConfig);
-    setInvoicePrefix(currentConfig.prefix); setOriginalInvoicePrefix(currentConfig.prefix);
-    toast({ title: "Invoice Settings Saved", description: `Invoice prefix updated to ${currentConfig.prefix}.`});
+
+    if (prefixType === 'proforma') setOriginalProformaPrefix(newPrefix);
+    else if (prefixType === 'quotation') setOriginalQuotationPrefix(newPrefix);
+    else setOriginalInvoicePrefix(newPrefix);
+
+    toast({ title: `${displayName} Saved`, description: `${displayName} updated to ${newPrefix}.`});
   };
   
   const handleSaveAppTitle = () => {
@@ -321,15 +370,39 @@ export default function SettingsPage() {
 
         <TabsContent value="modules" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Invoice Settings</CardTitle><CardDescription>Configure invoice numbering (stored locally).</CardDescription></CardHeader>
-            <CardContent className="space-y-4">
+            <CardHeader>
+              <CardTitle>Document Numbering</CardTitle>
+              <CardDescription>Configure prefixes for different document types (stored locally).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Invoice Prefix */}
               <div className="space-y-2">
-                <Label htmlFor="invoicePrefix">Invoice Prefix (3 uppercase letters)</Label>
+                <Label htmlFor="invoicePrefix">Tax Invoice Prefix (3 uppercase letters)</Label>
                 <div className="flex gap-2 items-center flex-wrap">
                     <Input id="invoicePrefix" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. INV"/>
-                    <Button onClick={handleSaveInvoiceSettings} disabled={invoicePrefix === originalInvoicePrefix && invoicePrefix.length === 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
+                    <Button onClick={() => handleSavePrefix('invoice')} disabled={invoicePrefix === originalInvoicePrefix || invoicePrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
                 </div>
                 {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(invoicePrefix || 'INV').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
+              </div>
+
+              {/* Proforma Prefix */}
+              <div className="space-y-2">
+                <Label htmlFor="proformaPrefix">Proforma Prefix (3 uppercase letters)</Label>
+                <div className="flex gap-2 items-center flex-wrap">
+                    <Input id="proformaPrefix" value={proformaPrefix} onChange={(e) => setProformaPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. PRF"/>
+                    <Button onClick={() => handleSavePrefix('proforma')} disabled={proformaPrefix === originalProformaPrefix || proformaPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
+                </div>
+                {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(proformaPrefix || 'PRF').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
+              </div>
+
+              {/* Quotation Prefix */}
+              <div className="space-y-2">
+                <Label htmlFor="quotationPrefix">Quotation Prefix (3 uppercase letters)</Label>
+                <div className="flex gap-2 items-center flex-wrap">
+                    <Input id="quotationPrefix" value={quotationPrefix} onChange={(e) => setQuotationPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. QTN"/>
+                    <Button onClick={() => handleSavePrefix('quotation')} disabled={quotationPrefix === originalQuotationPrefix || quotationPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
+                </div>
+                {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(quotationPrefix || 'QTN').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
               </div>
             </CardContent>
           </Card>

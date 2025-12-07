@@ -3,7 +3,7 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Printer, FileText, Eye, Anchor } from 'lucide-react';
+import { Printer, Eye } from 'lucide-react';
 import { StoredInvoice, CompanyData } from '@/types/database'; 
 import { format } from 'date-fns';
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,23 +12,23 @@ import { Label } from "@/components/ui/label";
 interface InvoicePrintProps {
   invoice: StoredInvoice;
   company: CompanyData | null;
-  printType?: 'Original' | 'Duplicate' | 'Triplicate';
 }
 
-export function InvoicePrint({ invoice, company, printType: initialPrintType = 'Original' }: InvoicePrintProps) {
+export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   
-  const [isOriginal, setIsOriginal] = useState(initialPrintType === 'Original');
-  const [isDuplicate, setIsDuplicate] = useState(initialPrintType === 'Duplicate');
-  const [isTransportBill, setIsTransportBill] = useState(initialPrintType === 'Triplicate'); 
+  const [isOriginal, setIsOriginal] = useState(true);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isTransportBill, setIsTransportBill] = useState(false); 
   
-  const [invoiceType, setInvoiceType] = useState<'tax' | 'proforma' | 'quotation'>('tax');
+  const invoiceType = invoice.type || 'Tax Invoice';
 
   const getCurrentDocumentType = () => {
+    if (invoiceType !== 'Tax Invoice') return '';
     if (isTransportBill) return "Triplicate for Supplier";
     if (isOriginal) return "Original for Recipient";
     if (isDuplicate) return "Duplicate for Transporter";
@@ -37,9 +37,9 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
 
   const getCurrentInvoiceTypeTitle = () => {
     switch (invoiceType) {
-      case 'proforma': return "PROFORMA INVOICE";
-      case 'quotation': return "Quotation";
-      case 'tax':
+      case 'Proforma Invoice': return "PROFORMA INVOICE";
+      case 'Quotation': return "Quotation";
+      case 'Tax Invoice':
       default: return "TAX INVOICE";
     }
   };
@@ -564,65 +564,37 @@ export function InvoicePrint({ invoice, company, printType: initialPrintType = '
           </Button>
         </div>
         
-        <div className="flex flex-col space-y-3 p-3 border rounded-md no-print">
-          <div className="text-sm font-medium mb-1">Copy Type:</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="original" 
-                checked={isOriginal} 
-                onCheckedChange={() => handleDocumentTypeChange('original')}
-              />
-              <Label htmlFor="original">Original for Recipient</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="duplicate" 
-                checked={isDuplicate} 
-                onCheckedChange={() => handleDocumentTypeChange('duplicate')}
-              />
-              <Label htmlFor="duplicate">Duplicate for Transporter</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="transport" 
-                checked={isTransportBill} 
-                onCheckedChange={() => handleDocumentTypeChange('transport')}
-              />
-              <Label htmlFor="transport">Triplicate for Supplier</Label>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex flex-col space-y-3 p-3 border rounded-md no-print">
-          <div className="text-sm font-medium mb-1">Document Title:</div>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="tax" 
-                checked={invoiceType === 'tax'} 
-                onCheckedChange={() => setInvoiceType('tax')}
-              />
-              <Label htmlFor="tax">Tax Invoice</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="proforma" 
-                checked={invoiceType === 'proforma'} 
-                onCheckedChange={() => setInvoiceType('proforma')}
-              />
-              <Label htmlFor="proforma">Proforma Invoice</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="quotation" 
-                checked={invoiceType === 'quotation'} 
-                onCheckedChange={() => setInvoiceType('quotation')}
-              />
-              <Label htmlFor="quotation">Quotation</Label>
+        {invoiceType === 'Tax Invoice' && (
+          <div className="flex flex-col space-y-3 p-3 border rounded-md no-print">
+            <div className="text-sm font-medium mb-1">Copy Type:</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="original" 
+                  checked={isOriginal} 
+                  onCheckedChange={() => handleDocumentTypeChange('original')}
+                />
+                <Label htmlFor="original">Original for Recipient</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="duplicate" 
+                  checked={isDuplicate} 
+                  onCheckedChange={() => handleDocumentTypeChange('duplicate')}
+                />
+                <Label htmlFor="duplicate">Duplicate for Transporter</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="transport" 
+                  checked={isTransportBill} 
+                  onCheckedChange={() => handleDocumentTypeChange('transport')}
+                />
+                <Label htmlFor="transport">Triplicate for Supplier</Label>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
       
       {showPreview && pdfUrl && (

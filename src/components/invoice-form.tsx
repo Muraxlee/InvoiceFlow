@@ -222,6 +222,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
   const watchAllFields = watch();
   const watchInvoiceDate = watch("invoiceDate");
+  const watchDocType = watch("type");
   const customerId = watch("customerId");
 
   const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
@@ -272,7 +273,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
     
     const initialInvoiceNumber = isCreatingNew && initialInvoiceDate && typeof window !== 'undefined'
-        ? generateInvoiceNumber(initialInvoiceDate, false) 
+        ? generateInvoiceNumber(initialInvoiceDate, watchDocType || 'Tax Invoice', false) 
         : defaultValuesProp?.invoiceNumber || '';
 
     reset({
@@ -283,7 +284,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       additionalCharges: defaultValuesProp?.additionalCharges || [],
     });
 
-  }, [defaultValuesProp, reset]);
+  }, [defaultValuesProp, reset, watchDocType]);
 
   useEffect(() => {
     if (showDueDate && !getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
@@ -348,7 +349,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     if (typeof window !== 'undefined' && (!defaultValuesProp?.invoiceNumber || defaultValuesProp.invoiceNumber === "")) {
         const invoiceDateForNumber = data.invoiceDate instanceof Date ? data.invoiceDate : new Date(data.invoiceDate);
         if (isValid(invoiceDateForNumber)) {
-            const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, true);
+            const confirmedInvoiceNumber = generateInvoiceNumber(invoiceDateForNumber, data.type, true);
             submissionData.invoiceNumber = confirmedInvoiceNumber;
         } else {
             toast({ title: "Error", description: "Invalid invoice date provided.", variant: "destructive" });

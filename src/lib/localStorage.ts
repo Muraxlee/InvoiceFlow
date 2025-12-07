@@ -39,17 +39,21 @@ export function saveToLocalStorage<T>(key: string, value: T): void {
 // Configuration for invoice numbering
 export const INVOICE_CONFIG_KEY = "app_invoice_config";
 export const DEFAULT_INVOICE_PREFIX = "INV";
+export const DEFAULT_PROFORMA_PREFIX = "PRF";
+export const DEFAULT_QUOTATION_PREFIX = "QTN";
 
 export interface InvoiceConfig {
   prefix: string;
+  proformaPrefix: string;
+  quotationPrefix: string;
   dailyCounters: {
-    [dateKey: string]: number; // dateKey will be "DDMMYYYY"
+    [dateKey: string]: number; // dateKey will be "PREFIX-DDMMYYYY"
   };
 }
 
-export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = false): string {
+export function generateInvoiceNumber(invoiceDate: Date, type: 'Tax Invoice' | 'Proforma Invoice' | 'Quotation', increment: boolean = false): string {
   if (typeof window === 'undefined') {
-    const prefix = DEFAULT_INVOICE_PREFIX.substring(0,3).toUpperCase();
+    const prefix = type === 'Proforma Invoice' ? DEFAULT_PROFORMA_PREFIX : type === 'Quotation' ? DEFAULT_QUOTATION_PREFIX : DEFAULT_INVOICE_PREFIX;
     const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
     const sequentialNumber = "0001"; 
     return `${prefix}${dateKey}${sequentialNumber}`;
@@ -57,11 +61,27 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
 
   const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
     prefix: DEFAULT_INVOICE_PREFIX,
+    proformaPrefix: DEFAULT_PROFORMA_PREFIX,
+    quotationPrefix: DEFAULT_QUOTATION_PREFIX,
     dailyCounters: {},
   });
 
-  const prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
-  const dateKey = formatDateFns(invoiceDate, "ddMMyyyy");
+  let prefix;
+  switch (type) {
+    case 'Proforma Invoice':
+      prefix = (config.proformaPrefix || DEFAULT_PROFORMA_PREFIX).substring(0,3).toUpperCase();
+      break;
+    case 'Quotation':
+      prefix = (config.quotationPrefix || DEFAULT_QUOTATION_PREFIX).substring(0,3).toUpperCase();
+      break;
+    case 'Tax Invoice':
+    default:
+      prefix = (config.prefix || DEFAULT_INVOICE_PREFIX).substring(0,3).toUpperCase();
+      break;
+  }
+  
+  const dateStr = formatDateFns(invoiceDate, "ddMMyyyy");
+  const dateKey = `${prefix}-${dateStr}`;
 
   const currentCounter = config.dailyCounters[dateKey] || 0;
   const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
@@ -73,7 +93,7 @@ export function generateInvoiceNumber(invoiceDate: Date, increment: boolean = fa
   
   const sequentialNumber = String(useCounter).padStart(4, '0');
 
-  return `${prefix}${dateKey}${sequentialNumber}`;
+  return `${prefix}${dateStr}${sequentialNumber}`;
 }
 
 

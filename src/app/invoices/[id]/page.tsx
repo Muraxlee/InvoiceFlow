@@ -201,19 +201,22 @@ export default function InvoiceDetailPage() {
   if (!invoice) {
     return null; // Should be handled by useEffect redirect
   }
+  
+  const docTypeLabel = invoice.type || 'Invoice';
+  const backLink = invoice.type === 'Proforma Invoice' ? '/proformas' : invoice.type === 'Quotation' ? '/quotations' : '/invoices';
 
   return (
     <div className="space-y-6">
       <PageHeader 
-        title={isEditing ? `Edit Invoice ${invoice.invoiceNumber}` : `Invoice ${invoice.invoiceNumber}`}
-        description={isEditing ? "Make changes to this invoice" : `View and manage invoice details for ${invoice.customerName}`}
+        title={isEditing ? `Edit ${docTypeLabel} ${invoice.invoiceNumber}` : `${docTypeLabel} ${invoice.invoiceNumber}`}
+        description={isEditing ? `Make changes to this ${docTypeLabel.toLowerCase()}` : `View and manage details for ${invoice.customerName}`}
         actions={
           <div className="flex gap-2">
-            <Link href="/invoices">
+            <Link href={backLink}>
               <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
             </Link>
             {!isEditing && (
-              <Button onClick={() => setIsEditing(true)}><Pencil className="mr-2 h-4 w-4" /> Edit Invoice</Button>
+              <Button onClick={() => setIsEditing(true)}><Pencil className="mr-2 h-4 w-4" /> Edit {docTypeLabel}</Button>
             )}
             {isEditing && (
               <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saveMutation.isPending}>
@@ -242,14 +245,14 @@ export default function InvoiceDetailPage() {
           
           <TabsContent value="view" className="space-y-6">
             <Card>
-              <CardHeader><CardTitle className="text-lg">Invoice Summary</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">Summary</CardTitle></CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-6">
-                  <DetailItem label="Invoice #" value={invoice.invoiceNumber} icon={FileText} />
-                  <DetailItem label="Invoice Date" value={isValid(new Date(invoice.invoiceDate)) ? formatDateFns(new Date(invoice.invoiceDate), 'PP') : 'N/A'} icon={CalendarDays} />
+                  <DetailItem label={`${docTypeLabel} #`} value={invoice.invoiceNumber} icon={FileText} />
+                  <DetailItem label={`${docTypeLabel} Date`} value={isValid(new Date(invoice.invoiceDate)) ? formatDateFns(new Date(invoice.invoiceDate), 'PP') : 'N/A'} icon={CalendarDays} />
                   <DetailItem label="Due Date" value={invoice.dueDate && isValid(new Date(invoice.dueDate)) ? formatDateFns(new Date(invoice.dueDate), 'PP') : 'N/A'} icon={CalendarDays} />
-                  <DetailItem label="Status" value={<Badge variant={statusVariant}>{displayedStatus}</Badge>} icon={Info}/>
-                  <DetailItem label="Payment Method" value={invoice.paymentMethod || 'N/A'} icon={Banknote} />
+                  {invoice.type === 'Tax Invoice' && <DetailItem label="Status" value={<Badge variant={statusVariant}>{displayedStatus}</Badge>} icon={Info}/>}
+                  {invoice.type === 'Tax Invoice' && <DetailItem label="Payment Method" value={invoice.paymentMethod || 'N/A'} icon={Banknote} />}
                 </dl>
               </CardContent>
             </Card>
@@ -299,7 +302,7 @@ export default function InvoiceDetailPage() {
             )}
 
             <Card>
-              <CardHeader><CardTitle className="text-lg flex items-center gap-1"><PackageSearch className="h-5 w-5" />Invoice Items</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-1"><PackageSearch className="h-5 w-5" />Items</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -343,7 +346,7 @@ export default function InvoiceDetailPage() {
                         {invoice.roundOffApplied && roundOffDifference !== 0 && (
                           <div className="flex justify-between"><span className="text-muted-foreground">Round Off:</span> <span>{roundOffDifference >= 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>
                         )}
-                        <div className="flex justify-between text-md font-bold border-t pt-1 mt-1"><span>Grand Total:</span> <span>₹{finalTotal.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-xl font-bold border-t pt-2 mt-2"><span>Grand Total:</span> <span>₹{finalTotal.toFixed(2)}</span></div>
                     </div>
                 </div>
               </CardContent>

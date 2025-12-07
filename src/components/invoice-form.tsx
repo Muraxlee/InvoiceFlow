@@ -257,13 +257,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [fields.length]);
 
   useEffect(() => {
-    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.invoiceNumber;
+    const isCreatingNew = !defaultValuesProp || !defaultValuesProp.id;
     const initialInvoiceDate = defaultValuesProp?.invoiceDate ? new Date(defaultValuesProp.invoiceDate) : new Date();
     
-    if (isCreatingNew && typeof window !== 'undefined' && companyInfo) {
-      generateInvoiceNumber(companyInfo).then(num => setValue('invoiceNumber', num));
-    } else if (defaultValuesProp?.invoiceNumber) {
-      setValue('invoiceNumber', defaultValuesProp.invoiceNumber);
+    if (isCreatingNew && companyInfo) {
+      generateInvoiceNumber(companyInfo, watchDocType).then(num => setValue('invoiceNumber', num));
     }
     
     reset({
@@ -557,10 +555,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
           <CardHeader><CardTitle>Items</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {fields.map((field, index) => (
+              {fields.map((field, index) => {
+                 const item = watch(`items.${index}`);
+                 const itemSubtotal = (item.quantity || 0) * (item.price || 0);
+                 let itemGst = 0;
+                 if (item.applyIgst) {
+                   itemGst = itemSubtotal * (item.igstRate / 100);
+                 } else if (item.applyCgst) {
+                   itemGst = itemSubtotal * ((item.cgstRate + item.sgstRate) / 100);
+                 }
+                 const itemTotal = itemSubtotal + itemGst;
+
+                return (
                 <div key={field.id} className="flex flex-col gap-4 p-4 border rounded-lg relative hover:bg-muted/30">
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    <div className="md:col-span-4">
+                    <div className="md:col-span-4 lg:col-span-3">
                       <FormField control={form.control} name={`items.${index}.productId`} render={({ field: productField }) => (
                         <FormItem><FormLabel>Product/Service</FormLabel>
                           <Popover open={productPopoversOpen[index]} onOpenChange={(isOpen) => setProductPopoversOpen(p => { const n = [...p]; n[index] = isOpen; return n; })}>
@@ -594,13 +603,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                         </FormItem>
                       )}/>
                     </div>
-                    <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field: qtyField }) => (
+                    <div className="md:col-span-2 lg:col-span-1"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field: qtyField }) => (
                       <FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" {...qtyField} /></FormControl><FormMessage /></FormItem>
                     )}/></div>
                     <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.price`} render={({ field: priceField }) => (
                       <FormItem><FormLabel>Price (₹)</FormLabel><FormControl><Input type="number" {...priceField} /></FormControl><FormMessage /></FormItem>
                     )}/></div>
-                    <div className="md:col-span-4"><FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: gstField }) => (
+                     <div className="md:col-span-2">
+                        <FormItem>
+                            <FormLabel>Total (₹)</FormLabel>
+                            <FormControl>
+                                <Input type="text" value={itemTotal.toFixed(2)} readOnly className="bg-muted cursor-not-allowed" />
+                            </FormControl>
+                        </FormItem>
+                    </div>
+                    <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.gstCategory`} render={({ field: gstField }) => (
                       <FormItem><FormLabel>HSN/SAC</FormLabel><FormControl><Input {...gstField} /></FormControl><FormMessage /></FormItem>
                     )}/></div>
                   </div>
@@ -654,7 +671,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 h-8 w-8" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </CardContent>
           <CardFooter>
@@ -742,7 +759,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     {applyRoundOff && roundOffDifference !== 0 && (
                         <div className="flex justify-between text-sm text-muted-foreground"><span >Round Off Adjustment</span><span>{roundOffDifference > 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>
                     )}
-                    <div className="flex justify-between text-xl font-bold border-t pt-2"><span>Grand Total</span><span>₹{finalTotal.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xl font-bold border-t pt-2 mt-2"><span>Grand Total</span><span>₹{finalTotal.toFixed(2)}</span></div>
                 </div>
             </CardContent>
         </Card>
@@ -771,3 +788,5 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
+
+    

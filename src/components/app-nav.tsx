@@ -19,6 +19,8 @@ import {
   Boxes,
   Users,
   ShoppingCart,
+  ClipboardList,
+  FileQuestion,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,7 +38,9 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'Business Overview' },
-  { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Invoices' },
+  { href: '/invoices', label: 'Invoices', icon: FileText, tooltip: 'Manage Tax Invoices' },
+  { href: '/proformas', label: 'Proforma', icon: ClipboardList, tooltip: 'Manage Proforma Invoices' },
+  { href: '/quotations', label: 'Quotations', icon: FileQuestion, tooltip: 'Manage Quotations' },
   { href: '/purchases', label: 'Purchases', icon: ShoppingCart, tooltip: 'Manage Purchases' },
   { href: '/customers', label: 'Customers', icon: UsersRound, tooltip: 'Manage Customers' },
   { href: '/products', label: 'Products', icon: Package, tooltip: 'Manage Products' },
@@ -55,6 +59,8 @@ export function AppNav() {
   const prefetchData = (href: string) => {
     switch (href) {
       case '/invoices':
+      case '/proformas':
+      case '/quotations':
         queryClient.prefetchQuery({ queryKey: ['invoices'], queryFn: getInvoices });
         break;
       case '/customers':
@@ -77,8 +83,7 @@ export function AppNav() {
       return null;
     }
     
-    const isActive = pathname.startsWith(item.href) && (item.href !== '/' || pathname === '/');
-
+    const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
 
     const buttonClass = cn(
       "justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2.5 pl-3 pr-2 group-[[data-state=collapsed]]:pl-0 group-[[data-state=collapsed]]:justify-center",

@@ -15,6 +15,7 @@ export interface User {
 export interface StoredInvoice extends InvoiceFormValues {
   id: string;
   status: "Paid" | "Pending" | "Overdue" | "Draft" | "Unpaid" | "Partially Paid";
+  type: 'Tax Invoice' | 'Proforma Invoice' | 'Quotation';
   amount: number;
   dueDate: Date | null;
   roundOffApplied?: boolean;

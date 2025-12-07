@@ -66,6 +66,7 @@ const additionalChargeSchema = z.object({
 
 const invoiceSchema = z.object({
   id: z.string().optional(),
+  type: z.enum(['Tax Invoice', 'Proforma Invoice', 'Quotation']),
   roundOffApplied: z.boolean().default(false),
   customerId: z.string().min(1, "Customer selection is required."),
   customerName: z.string().min(1, "Customer name is required (auto-filled on selection)."),
@@ -328,7 +329,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchAllFields, applyRoundOff]);
+  }, [watchAllFields.items, watchAllFields.additionalCharges, applyRoundOff]);
 
   useEffect(() => {
     setValue('amount', finalTotal);
@@ -406,7 +407,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
         {/* Main Details Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Invoice Details</CardTitle>
+            <CardTitle>Document Details</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
              <FormField
@@ -478,7 +479,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
               <FormField control={form.control} name="invoiceDate" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Invoice Date</FormLabel>
+                  <FormLabel>Document Date</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
@@ -491,7 +492,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                 </FormItem>
               )}/>
                <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Invoice Number</FormLabel><FormControl><Input {...field} readOnly className="bg-muted cursor-not-allowed"/></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Document Number</FormLabel><FormControl><Input {...field} readOnly className="bg-muted cursor-not-allowed"/></FormControl><FormMessage /></FormItem>
               )}/>
 
               <div className="flex items-center space-x-2 pt-4">
@@ -571,7 +572,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 
         {/* Items Card */}
         <Card>
-          <CardHeader><CardTitle>Invoice Items</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Items</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
               {fields.map((field, index) => (
@@ -781,7 +782,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
             <Button type="button" variant="outline" onClick={handleCancel} disabled={formSubmitLoading}>Cancel</Button>
             <Button type="submit" disabled={formSubmitLoading}>
                 {formSubmitLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {defaultValuesProp?.id ? "Save Changes" : "Create Invoice"}
+                {defaultValuesProp?.id ? "Save Changes" : "Create Document"}
             </Button>
         </div>
       </form>

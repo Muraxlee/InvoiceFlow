@@ -151,22 +151,22 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Company Name</FormLabel> <FormControl> <Input placeholder="Your Company Name" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address</FormLabel> <FormControl> <Input placeholder="contact@company.com" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel>Primary Phone</FormLabel> <FormControl> <Input placeholder="+91 1234567890" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="phone2" render={({ field }) => ( <FormItem> <FormLabel>Secondary Phone (Optional)</FormLabel> <FormControl> <Input placeholder="+91 0987654321" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="gstin" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>GST Number (GSTIN)</FormLabel> <FormControl> <Input placeholder="22AAAAA0000A1Z5" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Company Name</FormLabel> <FormControl><Input placeholder="Your Company Name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address</FormLabel> <FormControl><Input placeholder="contact@company.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel>Primary Phone</FormLabel> <FormControl><Input placeholder="+91 1234567890" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="phone2" render={({ field }) => ( <FormItem> <FormLabel>Secondary Phone (Optional)</FormLabel> <FormControl><Input placeholder="+91 0987654321" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="gstin" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>GST Number (GSTIN)</FormLabel> <FormControl><Input placeholder="22AAAAA0000A1Z5" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
 
-            <FormField control={form.control} name="address" render={({ field }) => ( <FormItem> <FormLabel>Company Address</FormLabel> <FormControl> <Textarea placeholder="Full address with city, state and pincode" className="min-h-[100px]" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="address" render={({ field }) => ( <FormItem> <FormLabel>Company Address</FormLabel> <FormControl><Textarea placeholder="Full address with city, state and pincode" className="min-h-[100px]" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
 
             <div className="border-t pt-6">
               <h3 className="text-lg font-medium mb-4">Banking Details</h3>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                 <FormField control={form.control} name="bank_account_name" render={({ field }) => ( <FormItem> <FormLabel>Account Holder Name</FormLabel> <FormControl> <Input placeholder="e.g., Your Company Name" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                 <FormField control={form.control} name="bank_account" render={({ field }) => ( <FormItem> <FormLabel>Bank A/C No</FormLabel> <FormControl> <Input placeholder="1234567890" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                 <FormField control={form.control} name="bank_name" render={({ field }) => ( <FormItem> <FormLabel>Bank Name</FormLabel> <FormControl> <Input placeholder="e.g., HDFC Bank" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                 <FormField control={form.control} name="bank_ifsc" render={({ field }) => ( <FormItem> <FormLabel>Bank IFSC</FormLabel> <FormControl> <Input placeholder="e.g., HDFC0001234" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                 <FormField control={form.control} name="bank_account_name" render={({ field }) => (<FormItem><FormLabel>Account Holder Name</FormLabel><FormControl><Input placeholder="e.g., Your Company Name" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                 <FormField control={form.control} name="bank_account" render={({ field }) => (<FormItem><FormLabel>Bank A/C No</FormLabel><FormControl><Input placeholder="1234567890" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                 <FormField control={form.control} name="bank_name" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input placeholder="e.g., HDFC Bank" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                 <FormField control={form.control} name="bank_ifsc" render={({ field }) => (<FormItem><FormLabel>Bank IFSC</FormLabel><FormControl><Input placeholder="e.g., HDFC0001234" {...field} /></FormControl><FormMessage /></FormItem>)}/>
               </div>
             </div>
 

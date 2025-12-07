@@ -152,7 +152,9 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     const headerHtml = company?.logo 
       ? `
         <div class="header-container">
-          <img src="${company.logo}" alt="Logo" class="logo" />
+          <div class="logo-container">
+            <img src="${company.logo}" alt="Logo" class="logo" />
+          </div>
           <div class="company-details-right">
             <div class="title">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
             <div class="company-address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
@@ -185,8 +187,9 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
             @page { size: A4; margin: 20mm; } 
             body { font-family: 'Arial', sans-serif; color: #000; font-size: 12pt; line-height: 1.5; }
             .quotation-container { width: 100%; margin: 0 auto; }
-            .header-container { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
-            .logo { max-width: 150px; max-height: 70px; object-fit: contain; margin-right: 20px; }
+            .header-container { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 20px; gap: 20px; }
+            .logo-container { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; }
+            .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
             .company-details-right { text-align: left; flex-grow: 1; }
             .header { text-align: center; margin-bottom: 20px; }
             .title { font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
@@ -324,7 +327,9 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     const headerHtml = company?.logo 
       ? `
         <div class="header-container-flex">
-          <img src="${company.logo}" alt="Logo" class="logo" />
+          <div class="logo-container">
+            <img src="${company.logo}" alt="Logo" class="logo" />
+          </div>
           <div class="company-details-right">
             <div class="title">${company?.name || 'Your Company Name'}</div>
             <div class="company-address">${company?.address || 'Your Company Address'}</div>
@@ -359,8 +364,9 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
           
-          .header-container-flex { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 3mm; }
-          .logo { max-width: 150px; max-height: 70px; object-fit: contain; margin-right: 15px; }
+          .header-container-flex { display: flex; align-items: center; justify-content: flex-start; margin-bottom: 3mm; gap: 15px; }
+          .logo-container { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; }
+          .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
           .company-details-right { text-align: left; flex-grow: 1; }
           .company-details-center { text-align: center; margin-bottom: 3mm; }
 
@@ -661,5 +667,3 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     </div>
   );
 }
-
-    

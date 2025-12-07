@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Upload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 const companySchema = z.object({
   logo: z.string().optional(),
@@ -146,7 +147,7 @@ export function CompanySettingsForm({ defaultValues, onSuccess }: CompanySetting
                   <Button type="button" variant="ghost" size="sm" onClick={() => { setLogoPreview(undefined); form.setValue('logo', '', { shouldDirty: true }); }}>Remove Logo</Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Recommended: Square logo. Max {MAX_FILE_SIZE_MB}MB. Will be resized to 400px width.</p>
+              <p className="text-xs text-muted-foreground">Recommended: Square logo. Max ${MAX_FILE_SIZE_MB}MB. Will be resized to 400px width.</p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

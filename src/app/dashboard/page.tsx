@@ -185,6 +185,7 @@ export default function DashboardPage() {
         const trendData = dateStringsInRange.map(date => ({ date: format(parseISO(date), 'MMM dd'), amount: dailySales[date] || 0 }));
         
         const recentInvoices = [...invoices]
+          .filter(invoice => invoice.type === 'Tax Invoice')
           .sort((a, b) => new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()).slice(0, 5);
 
         const measurementsDueCount = measurements.filter(m => {
@@ -532,10 +533,18 @@ export default function DashboardPage() {
           <CardContent className="px-0">
             {dashboardMetrics.recentInvoices.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {dashboardMetrics.recentInvoices.map((invoice) => {
-                    const status = invoice.dueDate && isPast(new Date(invoice.dueDate)) && invoice.status !== 'Paid' ? 'Overdue' : invoice.status;
+                    const status = invoice.dueDate && isPast(new Date(invoice.dueDate || '')) && invoice.status !== 'Paid' ? 'Overdue' : invoice.status;
                     return (
                       <TableRow key={invoice.id} className="cursor-pointer hover:bg-muted/50">
                         <TableCell className="font-medium"> <Link href={`/invoices/${invoice.id}`} className="hover:underline text-primary"> {invoice.invoiceNumber} </Link> </TableCell>

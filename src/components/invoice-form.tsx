@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { CalendarIcon, PlusCircle, Trash2, Loader2, X, Check, ArrowLeft, HelpCircle, UserPlus, ChevronDown, AlertCircle, RefreshCw, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format as formatDateFns, isValid, addDays } from "date-fns";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { generateInvoiceNumber } from "@/lib/localStorage";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -169,7 +169,9 @@ function ProductSelector({ products, onSelectProduct, selectedProductId }: { pro
                 <CommandEmpty>No products found.</CommandEmpty>
                 <CommandGroup>
                     {filteredProducts.map(product => (
-                        <CommandItem value={product.id} key={product.id} onSelect={() => onSelectProduct(product)}>
+                        <CommandItem value={product.id} key={product.id} onSelect={() => {
+                            setTimeout(() => onSelectProduct(product), 0);
+                        }}>
                             <Check className={cn("mr-2 h-4 w-4", product.id === selectedProductId ? "opacity-100" : "opacity-0")} />
                             {product.name}
                         </CommandItem>
@@ -193,6 +195,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
   const [showDueDate, setShowDueDate] = useState(false);
+
+  const [totals, setTotals] = useState({
+      subtotal: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, total: 0,
+      additionalChargesTotal: 0, roundOffDifference: 0, finalTotal: 0
+  });
   
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -228,6 +235,45 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const applyRoundOff = watch('roundOffApplied');
   const [sameAsBilling, setSameAsBilling] = useState(true);
 
+  const calculateTotals = useCallback(() => {
+    const currentItems = getValues("items") || [];
+    const currentCharges = getValues("additionalCharges") || [];
+    const roundOffApplied = getValues('roundOffApplied');
+
+    const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
+    let cgst = 0; let sgst = 0; let igst = 0;
+    
+    currentItems.forEach(item => {
+      const itemAmount = (Number(item.quantity) || 0) * (Number(item.price) || 0);
+      if (item.applyIgst) igst += itemAmount * ((Number(item.igstRate) || 0) / 100);
+      if (item.applyCgst) cgst += itemAmount * ((Number(item.cgstRate) || 0) / 100);
+      if (item.applySgst) sgst += itemAmount * ((Number(item.sgstRate) || 0) / 100);
+    });
+
+    const chargesTotal = currentCharges.reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
+    const grandTotal = sub + cgst + sgst + igst + chargesTotal;
+    
+    let calculatedFinalTotal = grandTotal;
+    let diff = 0;
+    if (roundOffApplied) {
+      calculatedFinalTotal = Math.round(grandTotal);
+      diff = calculatedFinalTotal - grandTotal;
+    }
+    
+    setTotals({
+      subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
+      total: grandTotal, additionalChargesTotal: chargesTotal,
+      roundOffDifference: diff, finalTotal: calculatedFinalTotal
+    });
+  }, [getValues, setTotals]);
+
+  useEffect(() => {
+    const subscription = watch((value) => {
+      calculateTotals();
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, calculateTotals]);
+
   const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
     if (type === 'igst') {
       form.setValue(`items.${index}.applyIgst`, value);
@@ -252,6 +298,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     if (!applyIgst && !applyCgst && !applySgst) {
       form.setValue(`items.${index}.applyIgst`, true);
     }
+    calculateTotals();
   };
 
   useEffect(() => {
@@ -275,9 +322,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     });
 
     if(defaultValuesProp?.dueDate) setShowDueDate(true);
-    if(defaultValuesProp?.roundOffApplied) setApplyRoundOff(true);
+    if(defaultValuesProp?.roundOffApplied) setValue('roundOffApplied', true);
+    
+    calculateTotals();
 
-  }, [defaultValuesProp, companyInfo, setValue, reset, watchDocType]);
+  }, [defaultValuesProp, companyInfo, setValue, reset, watchDocType, calculateTotals]);
 
   useEffect(() => {
     if (showDueDate && !getValues("dueDate") && watchInvoiceDate && typeof window !== 'undefined') {
@@ -299,32 +348,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     }
   }, [sameAsBilling, customerId, customers, setValue]);
 
-  const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
-    const currentItems = watchedItems || [];
-    const currentCharges = watchAdditionalCharges || [];
-    const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
-    let cgst = 0; let sgst = 0; let igst = 0;
-    currentItems.forEach(item => {
-      const itemAmount = (Number(item.quantity) || 0) * (Number(item.price) || 0);
-      if (item.applyIgst) igst += itemAmount * ((Number(item.igstRate) || 0) / 100);
-      if (item.applyCgst) cgst += itemAmount * ((Number(item.cgstRate) || 0) / 100);
-      if (item.applySgst) sgst += itemAmount * ((Number(item.sgstRate) || 0) / 100);
-    });
-
-    const chargesTotal = currentCharges.reduce((acc, charge) => acc + (Number(charge.amount) || 0), 0);
-    
-    const grandTotal = sub + cgst + sgst + igst + chargesTotal;
-    let calculatedFinalTotal = grandTotal;
-    let diff = 0;
-    if (applyRoundOff) {
-      calculatedFinalTotal = Math.round(grandTotal);
-      diff = calculatedFinalTotal - grandTotal;
-    }
-    return {
-      subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
-      total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
-    };
-  }, [watchedItems, watchAdditionalCharges, applyRoundOff]);
+  const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = totals;
 
   useEffect(() => {
     setValue('amount', finalTotal);
@@ -429,21 +453,23 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             <CommandGroup>
                               {customers?.map((customer) => (
                                 <CommandItem value={customer.id} key={customer.id} onSelect={() => {
-                                  form.setValue("customerId", customer.id);
-                                  form.setValue("customerName", customer.name);
-                                  form.setValue("customerEmail", customer.email || "");
-                                  form.setValue("customerAddress", customer.address || "");
-                                  form.setValue("customerPhone", customer.phone || "");
-                                  form.setValue("customerGstin", customer.gstin || "");
-                                  form.setValue("customerState", customer.state || "");
-                                  form.setValue("customerStateCode", customer.stateCode || "");
-                                  if (sameAsBilling) {
-                                    form.setValue("shipmentDetails.consigneeName", customer.name);
-                                    form.setValue("shipmentDetails.consigneeAddress", customer.address || "");
-                                    form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
-                                    form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
-                                  }
-                                  setIsCustomerPopoverOpen(false);
+                                  setTimeout(() => {
+                                    form.setValue("customerId", customer.id);
+                                    form.setValue("customerName", customer.name);
+                                    form.setValue("customerEmail", customer.email || "");
+                                    form.setValue("customerAddress", customer.address || "");
+                                    form.setValue("customerPhone", customer.phone || "");
+                                    form.setValue("customerGstin", customer.gstin || "");
+                                    form.setValue("customerState", customer.state || "");
+                                    form.setValue("customerStateCode", customer.stateCode || "");
+                                    if (sameAsBilling) {
+                                      form.setValue("shipmentDetails.consigneeName", customer.name);
+                                      form.setValue("shipmentDetails.consigneeAddress", customer.address || "");
+                                      form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
+                                      form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
+                                    }
+                                    setIsCustomerPopoverOpen(false);
+                                  }, 0);
                                 }}>
                                   <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
                                   {customer.name}

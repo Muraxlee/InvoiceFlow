@@ -3,15 +3,27 @@
 
 import PageHeader from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, BarChart3, FileText, Users, Package, Boxes, DraftingCompass, UsersRound } from "lucide-react";
+import { ArrowRight, BarChart3, FileText, Users, Package, Boxes, DraftingCompass, UsersRound, ClipboardList, FileQuestion } from "lucide-react";
 import Link from "next/link";
 
 const reportsList = [
   {
     title: "Invoice Report",
-    description: "Analyze and filter all invoices by status, amount, and customer.",
+    description: "Analyze and filter all tax invoices by status, amount, and customer.",
     href: "/reports/invoices",
     icon: FileText,
+  },
+  {
+    title: "Quotation Report",
+    description: "View and filter all your created quotations.",
+    href: "/reports/quotations",
+    icon: FileQuestion,
+  },
+  {
+    title: "Proforma Invoice Report",
+    description: "Track and review all your proforma invoices.",
+    href: "/reports/proformas",
+    icon: ClipboardList,
   },
   {
     title: "Customer Report",
@@ -21,7 +33,7 @@ const reportsList = [
   },
   {
     title: "Product Sales Report",
-    description: "Analyze product performance based on units sold and total revenue.",
+    description: "Analyze product performance based on units sold and total revenue from tax invoices.",
     href: "/reports/products",
     icon: Package,
   },

@@ -43,7 +43,8 @@ export default function ProductReportPage() {
         });
 
         invoices.forEach(invoice => {
-            if (invoice.status === 'Paid' && invoice.items) {
+            // Only count sales from paid Tax Invoices
+            if (invoice.type === 'Tax Invoice' && invoice.status === 'Paid' && invoice.items) {
                 invoice.items.forEach(item => {
                     if (productMap.has(item.productId)) {
                         const product = productMap.get(item.productId)!;
@@ -108,7 +109,7 @@ export default function ProductReportPage() {
         <div className="space-y-6">
             <PageHeader 
                 title="Product Sales Report" 
-                description="Analyze the performance of your products and services."
+                description="Analyze the performance of your products and services from paid tax invoices."
                 actions={
                   <div className="flex items-center gap-2">
                     <Link href="/reports">
@@ -166,7 +167,7 @@ export default function ProductReportPage() {
                                         <TableCell className="text-right">₹{product.totalRevenue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No products found.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No products found or no sales recorded for the filtered period.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

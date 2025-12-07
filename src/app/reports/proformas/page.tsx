@@ -5,13 +5,11 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getInvoices } from '@/lib/firestore-actions';
 import type { StoredInvoice } from '@/types/database';
-import { format, isPast, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import PageHeader from '@/components/page-header';
 import { Loader2, Search, X, RefreshCw, ArrowLeft, FileDown, CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -22,13 +20,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
-type StatusFilter = "all" | "paid" | "unpaid" | "pending" | "overdue";
-
-export default function InvoiceReportPage() {
+export default function ProformaReportPage() {
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-    const [minAmount, setMinAmount] = useState('');
-    const [maxAmount, setMaxAmount] = useState('');
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
 
@@ -37,28 +30,10 @@ export default function InvoiceReportPage() {
         queryFn: getInvoices,
     });
 
-    const getInvoiceStatus = (invoice: StoredInvoice) => {
-        let status = invoice.status || 'Unpaid';
-        if (invoice.dueDate && isPast(new Date(invoice.dueDate)) && (status === 'Unpaid' || status === 'Pending' || status === 'Partially Paid')) {
-            return 'Overdue';
-        }
-        if(status === 'Unpaid' || status === 'Partially Paid') {
-            return 'Pending';
-        }
-        return status;
-    }
-
-    const filteredInvoices = useMemo(() => {
+    const filteredProformas = useMemo(() => {
         if (!invoices) return [];
         return invoices.filter(invoice => {
-            // Only include Tax Invoices in this report
-            if (invoice.type !== 'Tax Invoice') {
-                return false;
-            }
-
-            const currentStatus = getInvoiceStatus(invoice).toLowerCase();
-            
-            if (statusFilter !== 'all' && currentStatus !== statusFilter) {
+            if (invoice.type !== 'Proforma Invoice') {
                 return false;
             }
 
@@ -67,63 +42,44 @@ export default function InvoiceReportPage() {
                 return false;
             }
 
-            const min = parseFloat(minAmount);
-            const max = parseFloat(maxAmount);
-            if (!isNaN(min) && invoice.amount < min) return false;
-            if (!isNaN(max) && invoice.amount > max) return false;
-
             const invoiceDate = new Date(invoice.invoiceDate);
             if (startDate && invoiceDate < startOfDay(startDate)) return false;
             if (endDate && invoiceDate > endOfDay(endDate)) return false;
 
             return true;
         });
-    }, [invoices, searchTerm, statusFilter, minAmount, maxAmount, startDate, endDate]);
-
-    const getStatusBadge = (invoice: StoredInvoice) => {
-        const status = getInvoiceStatus(invoice);
-        const variant = status.toLowerCase() === 'paid' ? 'success' :
-                        status.toLowerCase() === 'overdue' ? 'destructive' :
-                        status.toLowerCase() === 'pending' ? 'warning' :
-                        'outline';
-        return <Badge variant={variant as any}>{status}</Badge>;
-    };
+    }, [invoices, searchTerm, startDate, endDate]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF();
-        doc.text("Invoice Report", 14, 16);
+        doc.text("Proforma Invoice Report", 14, 16);
         autoTable(doc, {
-            head: [['Invoice #', 'Customer', 'Date', 'Status', 'Amount (₹)']],
-            body: filteredInvoices.map(inv => [
+            head: [['Proforma #', 'Customer', 'Date', 'Amount (₹)']],
+            body: filteredProformas.map(inv => [
                 inv.invoiceNumber,
                 inv.customerName,
                 format(new Date(inv.invoiceDate), 'dd MMM yyyy'),
-                getInvoiceStatus(inv),
                 inv.amount.toLocaleString('en-IN')
             ]),
             startY: 20
         });
-        doc.save('invoice_report.pdf');
+        doc.save('proforma_report.pdf');
     };
 
     const handleExportExcel = () => {
-        const worksheet = XLSX.utils.json_to_sheet(filteredInvoices.map(inv => ({
-            'Invoice #': inv.invoiceNumber,
+        const worksheet = XLSX.utils.json_to_sheet(filteredProformas.map(inv => ({
+            'Proforma #': inv.invoiceNumber,
             'Customer': inv.customerName,
             'Date': format(new Date(inv.invoiceDate), 'dd MMM yyyy'),
-            'Status': getInvoiceStatus(inv),
             'Amount (INR)': inv.amount
         })));
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Invoices");
-        XLSX.writeFile(workbook, "invoice_report.xlsx");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Proforma Invoices");
+        XLSX.writeFile(workbook, "proforma_report.xlsx");
     };
-    
+
     const clearFilters = () => {
         setSearchTerm('');
-        setStatusFilter('all');
-        setMinAmount('');
-        setMaxAmount('');
         setStartDate(undefined);
         setEndDate(undefined);
     };
@@ -131,8 +87,8 @@ export default function InvoiceReportPage() {
     return (
         <div className="space-y-6">
             <PageHeader 
-                title="Tax Invoice Report" 
-                description="Filter and analyze your tax invoices."
+                title="Proforma Invoice Report" 
+                description="Filter and view all your proforma invoices."
                 actions={
                   <div className="flex items-center gap-2">
                     <Link href="/reports">
@@ -145,28 +101,15 @@ export default function InvoiceReportPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Filters & Search</CardTitle>
-                    <CardDescription>Use the controls below to refine the invoice list.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
                            <label className="text-sm font-medium">Search</label>
                            <div className="relative">
                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                               <Input placeholder="Customer or Invoice #" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                               <Input placeholder="Customer or Proforma #" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
                            </div>
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-sm font-medium">Status</label>
-                           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-                               <SelectTrigger><SelectValue /></SelectTrigger>
-                               <SelectContent>
-                                   <SelectItem value="all">All</SelectItem>
-                                   <SelectItem value="paid">Paid</SelectItem>
-                                   <SelectItem value="pending">Pending</SelectItem>
-                                   <SelectItem value="overdue">Overdue</SelectItem>
-                               </SelectContent>
-                           </Select>
                         </div>
                          <div className="space-y-2">
                            <label className="text-sm font-medium">Start Date</label>
@@ -196,14 +139,6 @@ export default function InvoiceReportPage() {
                             </PopoverContent>
                            </Popover>
                         </div>
-                        <div className="space-y-2">
-                           <label className="text-sm font-medium">Min Amount (₹)</label>
-                           <Input type="number" placeholder="e.g., 1000" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                           <label className="text-sm font-medium">Max Amount (₹)</label>
-                           <Input type="number" placeholder="e.g., 5000" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} />
-                        </div>
                     </div>
                     <Button onClick={clearFilters} variant="ghost" size="sm"><X className="mr-2 h-4 w-4" />Clear Filters</Button>
                 </CardContent>
@@ -211,9 +146,7 @@ export default function InvoiceReportPage() {
 
             <Card>
                 <CardHeader className="flex flex-row justify-between items-center">
-                    <div>
-                        <CardTitle>Filtered Invoices ({filteredInvoices.length})</CardTitle>
-                    </div>
+                    <CardTitle>Proforma Invoices ({filteredProformas.length})</CardTitle>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />PDF</Button>
                         <Button variant="outline" size="sm" onClick={handleExportExcel}><FileDown className="mr-2 h-4 w-4" />Excel</Button>
@@ -226,24 +159,22 @@ export default function InvoiceReportPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Invoice #</TableHead>
+                                    <TableHead>Proforma #</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Date</TableHead>
-                                    <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredInvoices.length > 0 ? filteredInvoices.map(invoice => (
+                                {filteredProformas.length > 0 ? filteredProformas.map(invoice => (
                                     <TableRow key={invoice.id}>
                                         <TableCell><Link href={`/invoices/${invoice.id}`} className="font-medium text-primary hover:underline">{invoice.invoiceNumber}</Link></TableCell>
                                         <TableCell>{invoice.customerName}</TableCell>
                                         <TableCell>{format(new Date(invoice.invoiceDate), 'dd MMM yyyy')}</TableCell>
-                                        <TableCell>{getStatusBadge(invoice)}</TableCell>
                                         <TableCell className="text-right">₹{invoice.amount.toLocaleString('en-IN')}</TableCell>
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No invoices match your criteria.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="text-center h-24">No proforma invoices match your criteria.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

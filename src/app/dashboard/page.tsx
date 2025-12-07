@@ -532,7 +532,7 @@ export default function DashboardPage() {
           <CardContent className="px-0">
             {dashboardMetrics.recentInvoices.length > 0 ? (
               <Table>
-                <TableHeader> <TableRow> <TableHead>Invoice</TableHead> <TableHead>Customer</TableHead> <TableHead>Date</TableHead> <TableHead>Amount</TableHead> <TableHead>Status</TableHead> </TableRow> </TableHeader>
+                <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {dashboardMetrics.recentInvoices.map((invoice) => {
                     const status = invoice.dueDate && isPast(new Date(invoice.dueDate)) && invoice.status !== 'Paid' ? 'Overdue' : invoice.status;

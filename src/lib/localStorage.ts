@@ -71,6 +71,11 @@ export function generateInvoiceNumber(invoiceDate: Date, type: 'Tax Invoice' | '
     dailyCounters: {},
     globalCounters: {},
   });
+  
+  // Ensure globalCounters exists to prevent runtime errors
+  if (!config.globalCounters) {
+    config.globalCounters = {};
+  }
 
   let prefix;
   switch (type) {

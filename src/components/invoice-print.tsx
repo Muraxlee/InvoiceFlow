@@ -149,6 +149,33 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
       `).join('')
     ) : `<tr><td colspan="3" class="text-center" style="height: 100px; vertical-align: middle;">No items quoted</td></tr>`;
 
+    const headerHtml = company?.logo 
+      ? `
+        <div class="header-container">
+          <img src="${company.logo}" alt="Logo" class="logo" />
+          <div class="company-details-right">
+            <div class="title">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
+            <div class="company-address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
+            <div class="company-contact">
+              Phone: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''} | 
+              Email: ${company?.email || ''} | 
+              GSTIN: ${company?.gstin || ''}
+            </div>
+          </div>
+        </div>
+        `
+      : `
+        <div class="header">
+          <div class="title">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
+          <div class="company-address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
+          <div class="company-contact">
+            Phone: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''} | 
+            Email: ${company?.email || ''} | 
+            GSTIN: ${company?.gstin || ''}
+          </div>
+        </div>`;
+
+
     return `
       <html>
         <head>
@@ -158,9 +185,12 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
             @page { size: A4; margin: 20mm; } 
             body { font-family: 'Arial', sans-serif; color: #000; font-size: 12pt; line-height: 1.5; }
             .quotation-container { width: 100%; margin: 0 auto; }
+            .header-container { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+            .logo { max-width: 150px; max-height: 70px; object-fit: contain; margin-right: 20px; }
+            .company-details-right { text-align: left; flex-grow: 1; }
             .header { text-align: center; margin-bottom: 20px; }
-            .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
-            .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
+            .title { font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
+            .company-address, .company-contact { font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
             .company-contact { margin-bottom: 3mm; }
             .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
             hr { border: 0; border-top: 1px solid #000; margin: 15px 0; }
@@ -184,16 +214,8 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
         </head>
         <body>
           <div class="quotation-container">
-            <div class="header">
-              <div class="title">${company?.name || 'SEAFARER’S NAVAL TAILORS'}</div>
-              <div class="company-address">${company?.address || 'New no 19, old no 9, Linghi chetty st, Mannady, Chennai- 600001.'}</div>
-              <div class="company-contact">
-                Phone: ${company?.phone || ''}${company?.phone2 ? `, ${company.phone2}` : ''} | 
-                Email: ${company?.email || ''} | 
-                GSTIN: ${company?.gstin || ''}
-              </div>
-              <div class="subtitle">Quotation</div>
-            </div>
+            ${headerHtml}
+            <div class="subtitle">Quotation</div>
             <hr/>
             <div class="meta-info">
               <div class="to-address">
@@ -298,6 +320,33 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           <span class="summary-value">₹${(charge.amount || 0).toFixed(2)}</span>
         </div>
       `).join('');
+      
+    const headerHtml = company?.logo 
+      ? `
+        <div class="header-container-flex">
+          <img src="${company.logo}" alt="Logo" class="logo" />
+          <div class="company-details-right">
+            <div class="title">${company?.name || 'Your Company Name'}</div>
+            <div class="company-address">${company?.address || 'Your Company Address'}</div>
+            <div class="company-contact">
+              Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 
+              Email: ${company?.email || 'N/A'} | 
+              GSTIN: ${company?.gstin || 'N/A'}
+            </div>
+          </div>
+        </div>
+        `
+      : `
+        <div class="company-details-center">
+          <div class="title">${company?.name || 'Your Company Name'}</div>
+          <div class="company-address">${company?.address || 'Your Company Address'}</div>
+          <div class="company-contact">
+            Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 
+            Email: ${company?.email || 'N/A'} | 
+            GSTIN: ${company?.gstin || 'N/A'}
+          </div>
+        </div>`;
+
 
     return `
     <html>
@@ -309,11 +358,14 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           * { box-sizing: border-box; }
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
-          .header-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3mm; }
-          .logo { max-width: 150px; max-height: 60px; object-fit: contain; }
-          .company-details { text-align: center; flex-grow: 1; }
-          .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
-          .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
+          
+          .header-container-flex { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 3mm; }
+          .logo { max-width: 150px; max-height: 60px; object-fit: contain; margin-right: 15px; }
+          .company-details-right { text-align: left; flex-grow: 1; }
+          .company-details-center { text-align: center; margin-bottom: 3mm; }
+
+          .title { font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
+          .company-address, .company-contact { font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
           .company-contact { margin-bottom: 3mm; }
           .subtitle { text-align: center; font-size: 14pt; margin-bottom: 1.5mm; font-weight: bold; text-transform: uppercase; color: #000;}
           .info-container { display: flex; width: 100%; margin-bottom: 2.5mm; }
@@ -366,19 +418,7 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
       <body>
         <div class="invoice-box">
           <div class="original-mark">${getCurrentDocumentType()}</div>
-          <div class="header-container">
-            ${company?.logo ? `<img src="${company.logo}" alt="Logo" class="logo" />` : '<div></div>'}
-            <div class="company-details">
-              <div class="title">${company?.name || 'Your Company Name'}</div>
-              <div class="company-address">${company?.address || 'Your Company Address'}</div>
-              <div class="company-contact">
-                Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 
-                Email: ${company?.email || 'N/A'} | 
-                GSTIN: ${company?.gstin || 'N/A'}
-              </div>
-            </div>
-            ${company?.logo ? '<div></div>' : ''}
-          </div>
+          ${headerHtml}
           <div class="subtitle">${getCurrentInvoiceTypeTitle()}</div>
 
           <div class="info-container">

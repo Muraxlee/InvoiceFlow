@@ -193,9 +193,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const [productPopoversOpen, setProductPopoversOpen] = useState<boolean[]>([]);
   
   const [showDueDate, setShowDueDate] = useState(false);
-  const [applyRoundOff, setApplyRoundOff] = useState(defaultValuesProp?.roundOffApplied || false);
-  const [sameAsBilling, setSameAsBilling] = useState(true);
-
+  
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -206,6 +204,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       additionalCharges: [],
       ...defaultValuesProp,
       customerPhone: defaultValuesProp?.customerPhone || '',
+      roundOffApplied: defaultValuesProp?.roundOffApplied || false,
     }, 
   });
   
@@ -226,6 +225,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   const watchInvoiceDate = watch("invoiceDate");
   const watchDocType = watch("type");
   const customerId = watch("customerId");
+  const applyRoundOff = watch('roundOffApplied');
+  const [sameAsBilling, setSameAsBilling] = useState(true);
 
   const handleToggleGstType = (index: number, type: 'igst' | 'cgstSgst', value: boolean) => {
     if (type === 'igst') {
@@ -270,9 +271,11 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       invoiceDate: initialInvoiceDate,
       dueDate: defaultValuesProp?.dueDate ? new Date(defaultValuesProp.dueDate) : null,
       additionalCharges: defaultValuesProp?.additionalCharges || [],
+      roundOffApplied: defaultValuesProp?.roundOffApplied || false,
     });
 
     if(defaultValuesProp?.dueDate) setShowDueDate(true);
+    if(defaultValuesProp?.roundOffApplied) setApplyRoundOff(true);
 
   }, [defaultValuesProp, companyInfo, setValue, reset, watchDocType]);
 
@@ -297,8 +300,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   }, [sameAsBilling, customerId, customers, setValue]);
 
   const { subtotal, cgstAmount, sgstAmount, igstAmount, total, additionalChargesTotal, roundOffDifference, finalTotal } = useMemo(() => {
-    const currentItems = getValues("items") || [];
-    const currentCharges = getValues("additionalCharges") || [];
+    const currentItems = watchedItems || [];
+    const currentCharges = watchAdditionalCharges || [];
     const sub = currentItems.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0), 0);
     let cgst = 0; let sgst = 0; let igst = 0;
     currentItems.forEach(item => {
@@ -321,7 +324,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
       subtotal: sub, cgstAmount: cgst, sgstAmount: sgst, igstAmount: igst,
       total: grandTotal, additionalChargesTotal: chargesTotal, roundOffDifference: diff, finalTotal: calculatedFinalTotal
     };
-  }, [watchedItems, watchAdditionalCharges, applyRoundOff, getValues]);
+  }, [watchedItems, watchAdditionalCharges, applyRoundOff]);
 
   useEffect(() => {
     setValue('amount', finalTotal);
@@ -333,7 +336,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
   };
 
   const handleFormSubmit = (data: InvoiceFormValues) => {
-    const submissionData = { ...data, amount: finalTotal, roundOffApplied: applyRoundOff };
+    const submissionData = { ...data, amount: finalTotal };
     if (!showDueDate) {
       submissionData.dueDate = null;
     }
@@ -426,23 +429,21 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             <CommandGroup>
                               {customers?.map((customer) => (
                                 <CommandItem value={customer.id} key={customer.id} onSelect={() => {
-                                    setTimeout(() => {
-                                      field.onChange(customer.id);
-                                      setValue("customerName", customer.name);
-                                      setValue("customerEmail", customer.email || "");
-                                      setValue("customerAddress", customer.address || "");
-                                      setValue("customerPhone", customer.phone || "");
-                                      setValue("customerGstin", customer.gstin || "");
-                                      setValue("customerState", customer.state || "");
-                                      setValue("customerStateCode", customer.stateCode || "");
-                                      if (sameAsBilling) {
-                                        setValue("shipmentDetails.consigneeName", customer.name);
-                                        setValue("shipmentDetails.consigneeAddress", customer.address || "");
-                                        setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
-                                        setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
-                                      }
-                                      setIsCustomerPopoverOpen(false);
-                                    }, 0);
+                                  form.setValue("customerId", customer.id);
+                                  form.setValue("customerName", customer.name);
+                                  form.setValue("customerEmail", customer.email || "");
+                                  form.setValue("customerAddress", customer.address || "");
+                                  form.setValue("customerPhone", customer.phone || "");
+                                  form.setValue("customerGstin", customer.gstin || "");
+                                  form.setValue("customerState", customer.state || "");
+                                  form.setValue("customerStateCode", customer.stateCode || "");
+                                  if (sameAsBilling) {
+                                    form.setValue("shipmentDetails.consigneeName", customer.name);
+                                    form.setValue("shipmentDetails.consigneeAddress", customer.address || "");
+                                    form.setValue("shipmentDetails.consigneeGstin", customer.gstin || "");
+                                    form.setValue("shipmentDetails.consigneeStateCode", customer.state ? `${customer.state} / ${customer.stateCode || ''}` : "");
+                                  }
+                                  setIsCustomerPopoverOpen(false);
                                 }}>
                                   <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
                                   {customer.name}
@@ -585,20 +586,18 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                                   products={products || []}
                                   selectedProductId={productField.value}
                                   onSelectProduct={(product) => {
-                                    setTimeout(() => {
-                                      productField.onChange(product.id);
-                                      setValue(`items.${index}.description`, product.description || product.name);
-                                      setValue(`items.${index}.price`, product.price);
-                                      setValue(`items.${index}.productName`, product.name);
-                                      setValue(`items.${index}.gstCategory`, product.hsn || "");
-                                      setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
-                                      setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
-                                      setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
-                                      setValue(`items.${index}.applyIgst`, true);
-                                      setValue(`items.${index}.applyCgst`, false);
-                                      setValue(`items.${index}.applySgst`, false);
+                                      form.setValue(`items.${index}.productId`, product.id);
+                                      form.setValue(`items.${index}.description`, product.description || product.name);
+                                      form.setValue(`items.${index}.price`, product.price);
+                                      form.setValue(`items.${index}.productName`, product.name);
+                                      form.setValue(`items.${index}.gstCategory`, product.hsn || "");
+                                      form.setValue(`items.${index}.igstRate`, Number(product.igstRate || 18));
+                                      form.setValue(`items.${index}.cgstRate`, Number(product.cgstRate || 9));
+                                      form.setValue(`items.${index}.sgstRate`, Number(product.sgstRate || 9));
+                                      form.setValue(`items.${index}.applyIgst`, true);
+                                      form.setValue(`items.${index}.applyCgst`, false);
+                                      form.setValue(`items.${index}.applySgst`, false);
                                       setProductPopoversOpen(prev => { const newState = [...prev]; newState[index] = false; return newState; });
-                                    }, 0);
                                   }}
                                 />
                             </PopoverContent>
@@ -751,15 +750,23 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     {sgstAmount > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">SGST</span><span>₹{sgstAmount.toFixed(2)}</span></div>}
                     {additionalChargesTotal > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Additional Charges</span><span>₹{additionalChargesTotal.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-sm font-medium border-t pt-2 mt-1"><span className="text-muted-foreground">Total Before Round Off</span><span>₹{total.toFixed(2)}</span></div>
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="round-off" className="flex items-center gap-2">Round Off Total
-                            <TooltipProvider><Tooltip>
-                                <TooltipTrigger asChild><HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
-                                <TooltipContent><p>Rounds the final invoice amount to the nearest rupee.</p></TooltipContent>
-                            </Tooltip></TooltipProvider>
-                        </Label>
-                        <Switch id="round-off" checked={applyRoundOff} onCheckedChange={setApplyRoundOff} />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="roundOffApplied"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                            <Label htmlFor="round-off" className="flex items-center gap-2">Round Off Total
+                                <TooltipProvider><Tooltip>
+                                    <TooltipTrigger asChild><HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                                    <TooltipContent><p>Rounds the final invoice amount to the nearest rupee.</p></TooltipContent>
+                                </Tooltip></TooltipProvider>
+                            </Label>
+                            <FormControl>
+                              <Switch id="round-off" checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     {applyRoundOff && roundOffDifference !== 0 && (
                         <div className="flex justify-between text-sm text-muted-foreground"><span >Round Off Adjustment</span><span>{roundOffDifference > 0 ? '+' : ''}₹{roundOffDifference.toFixed(2)}</span></div>
                     )}
@@ -794,7 +801,3 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
 }
 
     
-
-    
-
-

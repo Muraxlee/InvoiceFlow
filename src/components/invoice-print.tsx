@@ -145,7 +145,7 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
         <tr>
           <td class="text-center">${index + 1}</td>
           <td>${item.productName || item.description || ''}</td>
-          <td class="text-right">₹${(item.price || 0).toFixed(2)}</td>
+          <td class="text-right">₹${((item.price || 0) * (item.quantity || 0)).toFixed(2)}</td>
         </tr>
       `).join('')
     ) : `<tr><td colspan="3" class="text-center" style="height: 100px; vertical-align: middle;">No items quoted</td></tr>`;
@@ -241,7 +241,7 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
   };
 
   const generateInvoiceHTML = () => {
-    if (invoiceType === 'quotation') {
+    if (invoiceType.toLowerCase() === 'quotation') {
       return generateQuotationHTML();
     }
     
@@ -619,3 +619,5 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     </div>
   );
 }
+
+    

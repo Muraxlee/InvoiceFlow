@@ -424,24 +424,26 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                             <CommandGroup>
                               {customers?.map((customer) => (
                                 <CommandItem value={customer.id} key={customer.id} onSelect={(currentValue) => {
-                                  field.onChange(currentValue);
-                                  const selectedCustomer = customers?.find(c => c.id === currentValue);
-                                  if (selectedCustomer) {
-                                      setValue("customerName", selectedCustomer.name);
-                                      setValue("customerEmail", selectedCustomer.email || "");
-                                      setValue("customerAddress", selectedCustomer.address || "");
-                                      setValue("customerPhone", selectedCustomer.phone || "");
-                                      setValue("customerGstin", selectedCustomer.gstin || "");
-                                      setValue("customerState", selectedCustomer.state || "");
-                                      setValue("customerStateCode", selectedCustomer.stateCode || "");
-                                      if (sameAsBilling) {
-                                        setValue("shipmentDetails.consigneeName", selectedCustomer.name);
-                                        setValue("shipmentDetails.consigneeAddress", selectedCustomer.address || "");
-                                        setValue("shipmentDetails.consigneeGstin", selectedCustomer.gstin || "");
-                                        setValue("shipmentDetails.consigneeStateCode", selectedCustomer.state ? `${selectedCustomer.state} / ${selectedCustomer.stateCode || ''}` : "");
-                                      }
-                                  }
-                                  setIsCustomerPopoverOpen(false);
+                                  setTimeout(() => {
+                                    field.onChange(currentValue);
+                                    const selectedCustomer = customers?.find(c => c.id === currentValue);
+                                    if (selectedCustomer) {
+                                        setValue("customerName", selectedCustomer.name);
+                                        setValue("customerEmail", selectedCustomer.email || "");
+                                        setValue("customerAddress", selectedCustomer.address || "");
+                                        setValue("customerPhone", selectedCustomer.phone || "");
+                                        setValue("customerGstin", selectedCustomer.gstin || "");
+                                        setValue("customerState", selectedCustomer.state || "");
+                                        setValue("customerStateCode", selectedCustomer.stateCode || "");
+                                        if (sameAsBilling) {
+                                          setValue("shipmentDetails.consigneeName", selectedCustomer.name);
+                                          setValue("shipmentDetails.consigneeAddress", selectedCustomer.address || "");
+                                          setValue("shipmentDetails.consigneeGstin", selectedCustomer.gstin || "");
+                                          setValue("shipmentDetails.consigneeStateCode", selectedCustomer.state ? `${selectedCustomer.state} / ${selectedCustomer.stateCode || ''}` : "");
+                                        }
+                                    }
+                                    setIsCustomerPopoverOpen(false);
+                                  }, 0);
                                 }}>
                                   <Check className={cn("mr-2 h-4 w-4", customer.id === field.value ? "opacity-100" : "opacity-0")} />
                                   {customer.name}
@@ -671,7 +673,8 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
                     <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 h-8 w-8" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
-              )})}
+              );
+            })}
             </div>
           </CardContent>
           <CardFooter>
@@ -788,5 +791,7 @@ export function InvoiceForm({ onSubmit, defaultValues: defaultValuesProp, isLoad
     </Form>
   );
 }
+
+    
 
     

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, DatabaseZap, UsersRound, Trash2, Settings2 as SettingsIcon, Save, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2 } from "lucide-react";
+import { AlertTriangle, DatabaseZap, UsersRound, Trash2, Settings2 as SettingsIcon, Save, Palette, Building, FileCog, ShieldCheck, Edit3, Download, Upload, Archive, Type, FileJson, Info, Database, FolderInput, Loader2, HelpCircle } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { loadFromLocalStorage, saveToLocalStorage, INVOICE_CONFIG_KEY, DEFAULT_INVOICE_PREFIX, type InvoiceConfig, COMPANY_NAME_STORAGE_KEY, DEFAULT_COMPANY_NAME, CUSTOM_THEME_STORAGE_KEY, type CustomThemeValues, DEFAULT_CUSTOM_THEME_VALUES, LAST_BACKUP_TIMESTAMP_KEY, DEFAULT_PROFORMA_PREFIX, DEFAULT_QUOTATION_PREFIX } from "@/lib/localStorage";
@@ -25,6 +25,14 @@ import type { CompanyInfo } from "@/types/database";
 import { getCompanyInfo as getDbCompanyInfo, clearAllCustomers, clearAllProducts, clearAllData, seedSampleData, clearAllInvoices, clearAllMeasurements, clearAllPurchases } from "@/lib/firestore-actions"; 
 import UserManagementSettings from "./user-management-settings";
 import MeasurementSettings from "@/components/measurement-settings";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 const initialCompanyInfo: CompanyInfo = {
   name: '', address: '', phone: '', phone2: '', email: '', gstin: '',
@@ -37,6 +45,7 @@ export default function SettingsPage() {
   const [invoicePrefix, setInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [proformaPrefix, setProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
   const [quotationPrefix, setQuotationPrefix] = useState(DEFAULT_QUOTATION_PREFIX);
+  const [includeDate, setIncludeDate] = useState(true);
   
   const [originalInvoicePrefix, setOriginalInvoicePrefix] = useState(DEFAULT_INVOICE_PREFIX);
   const [originalProformaPrefix, setOriginalProformaPrefix] = useState(DEFAULT_PROFORMA_PREFIX);
@@ -59,7 +68,9 @@ export default function SettingsPage() {
       prefix: DEFAULT_INVOICE_PREFIX,
       proformaPrefix: DEFAULT_PROFORMA_PREFIX,
       quotationPrefix: DEFAULT_QUOTATION_PREFIX,
-      dailyCounters: {} 
+      includeDateInNumber: true,
+      dailyCounters: {},
+      globalCounters: {},
     });
     setInvoicePrefix(config.prefix);
     setOriginalInvoicePrefix(config.prefix);
@@ -67,6 +78,7 @@ export default function SettingsPage() {
     setOriginalProformaPrefix(config.proformaPrefix);
     setQuotationPrefix(config.quotationPrefix);
     setOriginalQuotationPrefix(config.quotationPrefix);
+    setIncludeDate(config.includeDateInNumber);
 
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) || DEFAULT_THEME_KEY;
     setSelectedThemeKey(storedTheme);
@@ -188,7 +200,9 @@ export default function SettingsPage() {
       prefix: DEFAULT_INVOICE_PREFIX,
       proformaPrefix: DEFAULT_PROFORMA_PREFIX,
       quotationPrefix: DEFAULT_QUOTATION_PREFIX,
+      includeDateInNumber: true,
       dailyCounters: {},
+      globalCounters: {},
     });
 
     let valueToSave: string;
@@ -236,6 +250,21 @@ export default function SettingsPage() {
     else setOriginalInvoicePrefix(newPrefix);
 
     toast({ title: `${displayName} Saved`, description: `${displayName} updated to ${newPrefix}.`});
+  };
+
+  const handleDateInNumberToggle = (checked: boolean) => {
+    setIncludeDate(checked);
+    const config = loadFromLocalStorage<InvoiceConfig>(INVOICE_CONFIG_KEY, {
+      prefix: DEFAULT_INVOICE_PREFIX,
+      proformaPrefix: DEFAULT_PROFORMA_PREFIX,
+      quotationPrefix: DEFAULT_QUOTATION_PREFIX,
+      includeDateInNumber: true,
+      dailyCounters: {},
+      globalCounters: {},
+    });
+    config.includeDateInNumber = checked;
+    saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+    toast({ title: 'Number Format Updated', description: `Document numbers will now ${checked ? 'include' : 'exclude'} the date.` });
   };
   
   const handleSaveAppTitle = () => {
@@ -372,9 +401,25 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Document Numbering</CardTitle>
-              <CardDescription>Configure prefixes for different document types (stored locally).</CardDescription>
+              <CardDescription>Configure prefixes and numbering format for different document types (stored locally).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="flex items-center space-x-2">
+                <Switch id="include-date-toggle" checked={includeDate} onCheckedChange={handleDateInNumberToggle} />
+                <Label htmlFor="include-date-toggle" className="flex items-center gap-2">
+                  Include Date in Document Number
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild><HelpCircle className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+                      <TooltipContent>
+                        <p>ON: INV{exampleInvoiceDateString}0001 (daily reset)</p>
+                        <p>OFF: INV-0001 (sequential)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+              </div>
+
               {/* Invoice Prefix */}
               <div className="space-y-2">
                 <Label htmlFor="invoicePrefix">Tax Invoice Prefix (3 uppercase letters)</Label>
@@ -382,7 +427,7 @@ export default function SettingsPage() {
                     <Input id="invoicePrefix" value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. INV"/>
                     <Button onClick={() => handleSavePrefix('invoice')} disabled={invoicePrefix === originalInvoicePrefix || invoicePrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
                 </div>
-                {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(invoicePrefix || 'INV').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
+                 <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(invoicePrefix || 'INV').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(invoicePrefix || 'INV').padEnd(3,'X')}-0001`}</p>
               </div>
 
               {/* Proforma Prefix */}
@@ -392,7 +437,7 @@ export default function SettingsPage() {
                     <Input id="proformaPrefix" value={proformaPrefix} onChange={(e) => setProformaPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. PRF"/>
                     <Button onClick={() => handleSavePrefix('proforma')} disabled={proformaPrefix === originalProformaPrefix || proformaPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
                 </div>
-                {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(proformaPrefix || 'PRF').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
+                <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(proformaPrefix || 'PRF').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(proformaPrefix || 'PRF').padEnd(3,'X')}-0001`}</p>
               </div>
 
               {/* Quotation Prefix */}
@@ -402,7 +447,7 @@ export default function SettingsPage() {
                     <Input id="quotationPrefix" value={quotationPrefix} onChange={(e) => setQuotationPrefix(e.target.value.toUpperCase().substring(0,3))} maxLength={3} className="max-w-[100px] flex-grow sm:flex-grow-0" placeholder="e.g. QTN"/>
                     <Button onClick={() => handleSavePrefix('quotation')} disabled={quotationPrefix === originalQuotationPrefix || quotationPrefix.length !== 3}><Save className="mr-2 h-4 w-4" /> Save Prefix</Button>
                 </div>
-                {exampleInvoiceDateString && <p className="text-xs text-muted-foreground">Example: {(quotationPrefix || 'QTN').padEnd(3,'X')}{exampleInvoiceDateString}0001</p>}
+                <p className="text-xs text-muted-foreground">Example: {includeDate ? `${(quotationPrefix || 'QTN').padEnd(3,'X')}${exampleInvoiceDateString}0001` : `${(quotationPrefix || 'QTN').padEnd(3,'X')}-0001`}</p>
               </div>
             </CardContent>
           </Card>

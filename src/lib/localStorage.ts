@@ -46,8 +46,12 @@ export interface InvoiceConfig {
   prefix: string;
   proformaPrefix: string;
   quotationPrefix: string;
+  includeDateInNumber: boolean;
   dailyCounters: {
     [dateKey: string]: number; // dateKey will be "PREFIX-DDMMYYYY"
+  };
+  globalCounters: {
+    [prefix: string]: number;
   };
 }
 
@@ -63,7 +67,9 @@ export function generateInvoiceNumber(invoiceDate: Date, type: 'Tax Invoice' | '
     prefix: DEFAULT_INVOICE_PREFIX,
     proformaPrefix: DEFAULT_PROFORMA_PREFIX,
     quotationPrefix: DEFAULT_QUOTATION_PREFIX,
+    includeDateInNumber: true,
     dailyCounters: {},
+    globalCounters: {},
   });
 
   let prefix;
@@ -80,20 +86,31 @@ export function generateInvoiceNumber(invoiceDate: Date, type: 'Tax Invoice' | '
       break;
   }
   
-  const dateStr = formatDateFns(invoiceDate, "ddMMyyyy");
-  const dateKey = `${prefix}-${dateStr}`;
+  if (config.includeDateInNumber) {
+    const dateStr = formatDateFns(invoiceDate, "ddMMyyyy");
+    const dateKey = `${prefix}-${dateStr}`;
+    const currentCounter = config.dailyCounters[dateKey] || 0;
+    const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
+    
+    if (increment) {
+        config.dailyCounters[dateKey] = useCounter;
+        saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+    }
+    
+    const sequentialNumber = String(useCounter).padStart(4, '0');
+    return `${prefix}${dateStr}${sequentialNumber}`;
+  } else {
+    const currentCounter = config.globalCounters[prefix] || 0;
+    const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
 
-  const currentCounter = config.dailyCounters[dateKey] || 0;
-  const useCounter = increment ? currentCounter + 1 : (currentCounter > 0 ? currentCounter + 1 : 1);
-
-  if (increment) {
-    config.dailyCounters[dateKey] = useCounter;
-    saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+    if (increment) {
+        config.globalCounters[prefix] = useCounter;
+        saveToLocalStorage(INVOICE_CONFIG_KEY, config);
+    }
+    
+    const sequentialNumber = String(useCounter).padStart(4, '0');
+    return `${prefix}-${sequentialNumber}`;
   }
-  
-  const sequentialNumber = String(useCounter).padStart(4, '0');
-
-  return `${prefix}${dateStr}${sequentialNumber}`;
 }
 
 

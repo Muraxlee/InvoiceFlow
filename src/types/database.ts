@@ -115,6 +115,7 @@ export interface Task {
 
 export interface CompanyData {
   id: string; // Document ID is 'main'
+  logo?: string; // Logo as a base64 data URL
   name: string;
   address: string;
   phone: string;

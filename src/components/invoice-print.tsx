@@ -18,7 +18,6 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   
   const [isOriginal, setIsOriginal] = useState(true);
@@ -310,6 +309,9 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           * { box-sizing: border-box; }
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; font-size: 8.5pt; line-height: 1.3; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;}
           .invoice-box { width: 100%; margin: 0 auto; padding: 0; } 
+          .header-container { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3mm; }
+          .logo { max-width: 150px; max-height: 60px; object-fit: contain; }
+          .company-details { text-align: center; flex-grow: 1; }
           .title { text-align: center; font-weight: bold; font-size: 22pt; margin-bottom: 1mm; color: #000; }
           .company-address, .company-contact { text-align: center; font-size: 9pt; margin-bottom: 0.8mm; color: #000; }
           .company-contact { margin-bottom: 3mm; }
@@ -364,12 +366,18 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
       <body>
         <div class="invoice-box">
           <div class="original-mark">${getCurrentDocumentType()}</div>
-          <div class="title">${company?.name || 'Your Company Name'}</div>
-          <div class="company-address">${company?.address || 'Your Company Address'}</div>
-          <div class="company-contact">
-            Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 
-            Email: ${company?.email || 'N/A'} | 
-            GSTIN: ${company?.gstin || 'N/A'}
+          <div class="header-container">
+            ${company?.logo ? `<img src="${company.logo}" alt="Logo" class="logo" />` : '<div></div>'}
+            <div class="company-details">
+              <div class="title">${company?.name || 'Your Company Name'}</div>
+              <div class="company-address">${company?.address || 'Your Company Address'}</div>
+              <div class="company-contact">
+                Phone: ${company?.phone || 'N/A'} ${company?.phone2 ? ` / ${company.phone2}` : ''} | 
+                Email: ${company?.email || 'N/A'} | 
+                GSTIN: ${company?.gstin || 'N/A'}
+              </div>
+            </div>
+            ${company?.logo ? '<div></div>' : ''}
           </div>
           <div class="subtitle">${getCurrentInvoiceTypeTitle()}</div>
 
@@ -602,14 +610,8 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
           <iframe 
             src={pdfUrl} 
             className="w-full h-full" 
-            title="Invoice Preview" 
-            style={{
-              border: 'none',
-              transform: `scale(${zoomLevel})`,
-              transformOrigin: 'top center',
-              height: `calc(100% / ${zoomLevel})`, 
-              width: `calc(100% / ${zoomLevel})`  
-            }}
+            title="Invoice Preview"
+            style={{ border: 'none' }}
           ></iframe>
         </div>
       )}
@@ -619,5 +621,3 @@ export function InvoicePrint({ invoice, company }: InvoicePrintProps) {
     </div>
   );
 }
-
-    
